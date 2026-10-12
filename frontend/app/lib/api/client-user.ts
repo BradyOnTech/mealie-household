@@ -1,4 +1,5 @@
 import { RecipeAPI } from "./user/recipes";
+import { GroceriesAPI } from "./user/groceries";
 import { UserApi } from "./user/users";
 import { HouseholdAPI } from "./user/households";
 import { GroupAPI } from "./user/groups";
@@ -28,6 +29,7 @@ import { AIProvidersAPI } from "./user/group-ai-providers";
 import type { ApiRequestInstance } from "~/lib/api/types/non-generated";
 
 export class UserApiClient {
+  public groceries: GroceriesAPI;
   public recipes: RecipeAPI;
   public users: UserApi;
   public households: HouseholdAPI;
@@ -57,6 +59,7 @@ export class UserApiClient {
   public aiProviders: AIProvidersAPI;
 
   constructor(requests: ApiRequestInstance) {
+    this.groceries = new GroceriesAPI(requests);
     // Recipes
     this.recipes = new RecipeAPI(requests);
     this.categories = new CategoriesAPI(requests);

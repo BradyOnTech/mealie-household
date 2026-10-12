@@ -1,3 +1,8 @@
+# Household Groceries fork
+
+This checkout adds preferred grocery products, multi-store weekly lists, pantry/staple rules, and dinner suggestions.
+See [HOUSEHOLD_GROCERIES.md](HOUSEHOLD_GROCERIES.md) for setup and usage.
+
 [![Latest Release][latest-release-shield]][latest-release-url]
 [![Contributors][contributors-shield]][contributors-url]
 [![Stargazers][stars-shield]][stars-url]

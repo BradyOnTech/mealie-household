@@ -176,3 +176,5 @@ dev/code-generation/openapi.json
 .task/*
 .dev.env
 frontend/eslint.config.deprecated.js
+# Generated corresponding-source archive; rebuilt into the Docker image.
+mealie/household-source.zip

@@ -1,0 +1,20 @@
+services:
+  mealie:
+    image: mealie-household:local
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "9925:9000"
+    volumes:
+      - mealie-household-data:/app/data
+    environment:
+      TZ: America/Chicago
+      BASE_URL: http://localhost:9925
+      ALLOW_SIGNUP: "false"
+      DEFAULT_GROUP: Home
+      DEFAULT_HOUSEHOLD: Family
+
+volumes:
+  mealie-household-data:

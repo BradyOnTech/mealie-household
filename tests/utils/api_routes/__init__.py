@@ -89,6 +89,14 @@ households_cookbooks = "/api/households/cookbooks"
 """`/api/households/cookbooks`"""
 households_events_notifications = "/api/households/events/notifications"
 """`/api/households/events/notifications`"""
+households_groceries_products = "/api/households/groceries/products"
+"""`/api/households/groceries/products`"""
+households_groceries_rules = "/api/households/groceries/rules"
+"""`/api/households/groceries/rules`"""
+households_groceries_source = "/api/households/groceries/source"
+"""`/api/households/groceries/source`"""
+households_groceries_suggestions = "/api/households/groceries/suggestions"
+"""`/api/households/groceries/suggestions`"""
 households_invitations = "/api/households/invitations"
 """`/api/households/invitations`"""
 households_invitations_email = "/api/households/invitations/email"
@@ -375,6 +383,41 @@ def households_events_notifications_item_id(item_id):
 def households_events_notifications_item_id_test(item_id):
     """`/api/households/events/notifications/{item_id}/test`"""
     return f"{prefix}/households/events/notifications/{item_id}/test"
+
+
+def households_groceries_products_product_id(product_id):
+    """`/api/households/groceries/products/{product_id}`"""
+    return f"{prefix}/households/groceries/products/{product_id}"
+
+
+def households_groceries_rules_rule_id(rule_id):
+    """`/api/households/groceries/rules/{rule_id}`"""
+    return f"{prefix}/households/groceries/rules/{rule_id}"
+
+
+def households_groceries_weeks_week_start(week_start):
+    """`/api/households/groceries/weeks/{week_start}`"""
+    return f"{prefix}/households/groceries/weeks/{week_start}"
+
+
+def households_groceries_weeks_week_start_assignment(week_start):
+    """`/api/households/groceries/weeks/{week_start}/assignment`"""
+    return f"{prefix}/households/groceries/weeks/{week_start}/assignment"
+
+
+def households_groceries_weeks_week_start_checked(week_start):
+    """`/api/households/groceries/weeks/{week_start}/checked`"""
+    return f"{prefix}/households/groceries/weeks/{week_start}/checked"
+
+
+def households_groceries_weeks_week_start_items(week_start):
+    """`/api/households/groceries/weeks/{week_start}/items`"""
+    return f"{prefix}/households/groceries/weeks/{week_start}/items"
+
+
+def households_groceries_weeks_week_start_items_delete(week_start):
+    """`/api/households/groceries/weeks/{week_start}/items/delete`"""
+    return f"{prefix}/households/groceries/weeks/{week_start}/items/delete"
 
 
 def households_mealplans_item_id(item_id):

@@ -1,0 +1,156 @@
+# Household Groceries for Mealie
+
+A personal Mealie v3.28.0 fork for a household that shops at Walmart, Cub Foods, Aldi, and Whole Foods.
+Upstream base: `0552eaa4a80031b8572849cca0ed95d07f1be001`.
+
+## Run with Docker
+
+Install Docker with Compose, extract this source package, and run from its root:
+
+```bash
+docker compose -f compose.household.yml up -d --build
+```
+
+Open `http://localhost:9925`. On a new installation, Mealie's initial account is
+`changeme@example.com` / `MyPassword`. Change its password on first login.
+Set `BASE_URL` in `compose.household.yml` to the address your household will actually use,
+such as your server's local hostname. The time zone defaults to America/Chicago.
+
+Use Mealie's admin interface or household invitation flow to put family members in the same
+**group and household**. Public registration is disabled in the supplied Compose configuration.
+Grant Mealie's **Organize** permission to members who will create new ingredient Foods.
+Members without that permission can select existing ingredients and save their product preferences.
+Recipes, imports, authentication, backups, planner rules, and the standard shopping list interface remain available.
+
+The named Docker volume stores all recipes, preferences, users, and grocery lists.
+The supplied configuration uses Mealie's SQLite database; no separate database server is needed.
+Use Mealie's existing backup feature before moving an established installation onto this fork.
+
+## First use
+
+1. Import or enter recipes in Mealie. Parse/link recipe ingredients to Foods in the recipe editor;
+   preferred products are matched by Food ID, rather than by an approximate ingredient name.
+2. Open **Groceries → Preferred products**. Start with your most common products.
+3. Choose an ingredient, paste the product URL, enter its name, and choose its store.
+   The form suggests a store from a recognized retailer domain. You can override it.
+4. Add alternatives for the same ingredient and mark them as backup choices.
+5. Optionally enter the amount in one package and its unit. A 1 lb pack uses quantity `1`, unit `lb`.
+6. Plan dinners and sides in Mealie's calendar. Open Groceries and choose the week and stores you will visit.
+7. Generate the list. Use store filters, open product links, and check off purchases.
+
+Products with no saved URL work for in-store shopping. Ingredients without a matching product stay visible
+under Unassigned. Saved preferences do not automatically add every catalog product to your shopping list.
+
+## Behavior
+
+### Store and product choices
+
+An explicit product override wins, followed by an explicit store override, followed by the best enabled
+product at an active store. Lower preference numbers win; equal priorities use the order of the selected stores.
+Changing a card's assignment applies only to that week's items. Edit the catalog to change future defaults.
+
+Links are saved bookmarks. This version does not fetch retailer prices, check stock, or fill carts.
+
+### Quantities and repeat updates
+
+Ingredient aggregation and recipe references use Mealie's existing shopping-list service.
+Package quantities are rounded up **after** combining the week's matching requirements, including manual additions.
+Package and pantry conversions require compatible standardized units. There are no guessed mass-to-volume conversions.
+Count-based products require recipes to count the same item. Unspecified or incompatible quantities are flagged for review.
+
+Each household has one managed shopping list per Monday-based week. Generation reconciles derived demand
+instead of adding the same recipes again. Manual additions and trip overrides are preserved. Checked rows
+remain purchased; a larger plan creates only the additional demand. Checking a card with a calculated package
+count means you bought that suggested package count, so package overage is available to later updates in the same week.
+Uncheck the card if the purchase was not completed.
+
+Recipe multipliers apply to the recipe as written. Use `0` to omit purchasing for an entry, such as a leftover meal.
+Only dinners and sides are included automatically. Other household needs can be manual items or weekly staples.
+
+### Pantry and weekly staples
+
+An exact pantry amount overrides Mealie's all-or-nothing on-hand flag for that food.
+Pantry amounts are starting-inventory snapshots, not a continuously consumed inventory ledger.
+They refresh when generating a week before shopping starts. Once items have been purchased, that week retains
+its original pantry baseline, preventing updated pantry quantities from counting those same purchases twice.
+Later pantry edits apply to future weeks. Update pantry quantities yourself after shopping or cooking.
+
+A minimum weekly staple brings recipe requirements up to the saved weekly total. An extra weekly staple
+adds that amount to recipe requirements. Pantry is deducted once after combining these requirements.
+
+### Household collaboration
+
+Product preferences, pantry/staple rules, and weeks are scoped to the authenticated household.
+Food records remain group-scoped, as in stock Mealie. The grocery page refreshes every 12 seconds when no
+form edits are pending. An optimistic revision check prevents one grocery-page session from silently replacing
+another session's changes. The standard shopping list uses the same underlying items; checked items appear in both views.
+
+### Recommendations
+
+Dinner suggestions use existing planner rules for the requested date, recipe ratings, household on-hand ingredients,
+and past planned dinners. Recipes already in the chosen week are omitted. The UI requests suggestions for the
+week's Monday. History is described as planning history; it is not proof that a meal was cooked.
+AI recipe imports remain Mealie's standard optional feature, configured in group settings.
+
+## Development
+
+Use Python 3.14, Node 24, pnpm 11, uv, Go Task, and the `json2ts` CLI from json-schema-to-typescript.
+On Linux, building python-ldap also needs LDAP and SASL development headers.
+
+```bash
+uv sync --frozen --all-extras
+cd frontend
+pnpm install --frozen-lockfile
+pnpm exec nuxt prepare
+cd ..
+task dev:generate
+task py:lint
+task py:mypy
+uv run --frozen pytest tests/integration_tests/user_household_tests/test_groceries.py
+```
+
+The generated TypeScript API models are in `frontend/app/lib/api/types/grocery.ts`.
+Do not edit generated files by hand. The repository's AGENTS.md describes the normal development workflow.
+
+Production frontend output is `frontend/.output/public`. The Dockerfile builds it and packages it into Mealie.
+For local production-style testing, set `STATIC_FILES` to that directory when starting the backend.
+The source download is generated with:
+
+```bash
+uv run --no-project python dev/household/build_source_archive.py . mealie/household-source.zip
+```
+
+The Docker build runs this automatically. The Groceries page links to the corresponding-source download;
+it requires a signed-in household user and contains source/build instructions without databases or credentials.
+
+## Main extension points
+
+- `mealie/db/models/household/grocery.py`: household products, pantry/staple rules, and managed weeks.
+- `mealie/services/household_services/groceries.py`: routing, purchase quantities, pantry, reconciliation, suggestions.
+- `mealie/repos/repository_grocery.py`: scoped data access, revision checks, and atomic list/week writes.
+- `mealie/routes/households/controller_groceries.py`: authenticated `/api/households/groceries` endpoints.
+- `frontend/app/pages/household/groceries/`: shopping and catalog pages.
+- `frontend/app/components/Domain/Grocery/`: product and pantry/staple editors.
+
+One Alembic migration adds the three grocery tables. When merging a later upstream release with new migrations,
+check for multiple Alembic heads and create/test an Alembic merge revision when required.
+Preferences live in household tables so a shared Food does not impose one household's preferred products on another.
+
+## Validation
+
+Focused tests cover aggregation, repeated generation, store fallbacks, overrides, purchased package overage,
+pantry snapshots, recurring rules, manual additions, validation, authentication, and tenant isolation.
+The existing shopping-list regression tests are included in verification.
+Verification passed 76 backend tests, 125 focused frontend tests, backend lint/type checks, and SQLite migration
+upgrade, rollback, and re-upgrade. The new migration also renders successfully for PostgreSQL; a live PostgreSQL
+server was not used in these checks. Desktop and mobile browser checks cover login, list generation and repeat
+updates, dinner suggestions, product overrides, manual items, new-product entry, ingredient permissions, and
+the signed-in source download.
+
+The frontend production build succeeds. Full frontend type checking reports the same existing errors on the
+unmodified v3.28.0 checkout and this fork; no additional errors are reported in the grocery feature files.
+Docker image execution itself requires a Docker host and is not validated by the browser/runtime checks.
+
+## License
+
+Mealie and this fork use AGPL-3.0-only. LICENSE and the corresponding source are included.

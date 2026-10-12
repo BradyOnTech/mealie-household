@@ -17,6 +17,7 @@ from .._model_utils.guid import GUID
 if TYPE_CHECKING:
     from ..group import Group
     from ..household import Household
+    from ..household.grocery import GroceryFoodRule, GroceryProduct
     from .recipe import RecipeModel
 
 households_to_ingredient_foods = sa.Table(
@@ -212,6 +213,12 @@ class IngredientUnitModel(SqlAlchemyBase, BaseMixins):
 class IngredientFoodModel(SqlAlchemyBase, BaseMixins):
     __tablename__ = "ingredient_foods"
     id: FilterableColumn[GUID] = mapped_column(GUID, primary_key=True, default=GUID.generate)
+    grocery_products: Mapped[list[GroceryProduct]] = orm.relationship(
+        "GroceryProduct", back_populates="food", cascade="all, delete-orphan"
+    )
+    grocery_food_rules: Mapped[list[GroceryFoodRule]] = orm.relationship(
+        "GroceryFoodRule", back_populates="food", cascade="all, delete-orphan"
+    )
 
     # ID Relationships
     group_id: FilterableColumn[GUID] = mapped_column(GUID, ForeignKey("groups.id"), nullable=False, index=True)

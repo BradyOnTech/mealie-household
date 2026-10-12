@@ -45,6 +45,16 @@ class ShoppingListService:
     def can_merge(self, item1: ShoppingListItemBase, item2: ShoppingListItemBase) -> bool:
         """Check to see if this item can be merged with another item"""
 
+        # Weekly generated demand must stay separate from manual additions and purchased rows.
+        source1 = (item1.extras or {}).get("shop.source", "manual")
+        source2 = (item2.extras or {}).get("shop.source", "manual")
+        if source1 != source2:
+            return False
+        if source1 == "week":
+            for key in ("shop.store_override", "shop.product_override"):
+                if (item1.extras or {}).get(key) != (item2.extras or {}).get(key):
+                    return False
+
         if any(
             [
                 item1.checked,
@@ -400,8 +410,18 @@ class ShoppingListService:
                 # since this is the same recipe, we combine the quanities, rather than the scales
                 # all items will have exactly one recipe reference
                 if ingredient.quantity:
-                    existing_item.quantity += ingredient.quantity
-                    existing_item.recipe_references[0].recipe_quantity += ingredient.quantity  # type: ignore
+                    existing_unit = self.data_matcher.units_by_id.get(existing_item.unit_id)
+                    incoming_unit = self.data_matcher.units_by_id.get(new_item.unit_id)
+                    if existing_unit and incoming_unit and existing_unit.standard_unit and incoming_unit.standard_unit:
+                        quantity, unit = merge_quantity_and_unit(
+                            existing_item.quantity, existing_unit, new_item.quantity, incoming_unit
+                        )
+                        existing_item.quantity = quantity
+                        existing_item.unit_id = unit.id
+                        existing_item.unit = unit
+                    else:
+                        existing_item.quantity += new_item.quantity
+                    existing_item.recipe_references[0].recipe_quantity = existing_item.quantity / scale if scale else 0
 
                 # merge notes
                 if new_item.note and existing_item.note != new_item.note:

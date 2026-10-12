@@ -99,6 +99,14 @@ class RepositoryFood(GroupRepositoryGeneric[IngredientFood, IngredientFoodModel]
         to_model = self._get_food(to_food)
 
         to_model.ingredients += from_model.ingredients
+        # Product links follow the normalized ingredient when duplicate foods are merged.
+        to_model.grocery_products += from_model.grocery_products
+        existing_rules = {(rule.household_id, rule.kind) for rule in to_model.grocery_food_rules}
+        for rule in list(from_model.grocery_food_rules):
+            key = (rule.household_id, rule.kind)
+            if key not in existing_rules:
+                to_model.grocery_food_rules.append(rule)
+                existing_rules.add(key)
         self._merge_substitutions(from_model, to_model)
         self._merge_recipe_substitutions(from_food, to_food)
 

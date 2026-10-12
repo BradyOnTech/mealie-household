@@ -20,6 +20,7 @@ if TYPE_CHECKING:
     from ..group import Group
     from ..recipe import RecipeModel
     from ..users import User
+    from .grocery import GroceryWeek
     from .household import Household
 
 
@@ -147,6 +148,9 @@ class ShoppingListMultiPurposeLabel(SqlAlchemyBase, BaseMixins):
 class ShoppingList(SqlAlchemyBase, BaseMixins):
     __tablename__ = "shopping_lists"
     id: FilterableColumn[GUID] = mapped_column(GUID, primary_key=True, default=GUID.generate)
+    grocery_week: Mapped[GroceryWeek | None] = orm.relationship(
+        "GroceryWeek", back_populates="shopping_list", cascade="all, delete-orphan", uselist=False
+    )
 
     group_id: FilterableColumn[GUID] = mapped_column(GUID, ForeignKey("groups.id"), nullable=False, index=True)
     group: Mapped[Group] = orm.relationship("Group", back_populates="shopping_lists")

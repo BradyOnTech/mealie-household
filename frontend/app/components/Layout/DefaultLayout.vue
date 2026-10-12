@@ -225,6 +225,12 @@ const createLinks = computed(() => [
 
 const topLinks = computed<SideBarLink[]>(() => [
   {
+    icon: $globals.icons.formatListCheck,
+    title: i18n.t("groceries.title"),
+    to: "/household/groceries",
+    restricted: true,
+  },
+  {
     icon: $globals.icons.silverwareForkKnife,
     to: `/g/${groupSlug.value}`,
     title: i18n.t("general.recipes"),

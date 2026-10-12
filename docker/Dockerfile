@@ -10,7 +10,7 @@ WORKDIR /frontend
 
 COPY frontend .
 
-RUN pnpm clean-install
+RUN pnpm install --frozen-lockfile
 
 RUN pnpm generate
 
@@ -58,9 +58,11 @@ WORKDIR /mealie
 # copy project files here to ensure they will be cached.
 COPY uv.lock pyproject.toml ./
 COPY mealie ./mealie
+COPY . /source
+RUN uv run --no-project python /source/dev/household/build_source_archive.py /source /mealie/mealie/household-source.zip
 
 # Copy frontend to package it into the wheel
-COPY --from=frontend-builder /frontend/dist ./mealie/frontend
+COPY --from=frontend-builder /frontend/.output/public ./mealie/frontend
 
 # Build the source and binary package
 RUN uv build --out-dir dist

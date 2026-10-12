@@ -32,3 +32,11 @@ venv
 /mealie/frontend/
 
 crowdin.yml
+.env
+.env.*
+.dev.env
+dev/data
+tests/.temp
+frontend/.nuxt
+frontend/.output
+mealie/household-source.zip
