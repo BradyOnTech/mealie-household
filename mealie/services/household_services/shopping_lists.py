@@ -34,8 +34,9 @@ from mealie.services.parser_services.parser_utils import UnitConverter, merge_qu
 class ShoppingListService:
     DEFAULT_FOOD_FUZZY_MATCH_THRESHOLD = 80
 
-    def __init__(self, repos: AllRepositories):
+    def __init__(self, repos: AllRepositories, *, strict_units: bool = False) -> None:
         self.repos = repos
+        self.strict_units = strict_units
         self.shopping_lists = repos.group_shopping_lists
         self.list_items = repos.group_shopping_list_item
         self.list_item_refs = repos.group_shopping_list_item_references
@@ -74,7 +75,11 @@ class ShoppingListService:
                 return False
 
             uc = UnitConverter()
-            if not uc.can_convert(item1_unit.standard_unit, item2_unit.standard_unit):
+            if not uc.can_convert(
+                item1_unit.standard_unit,
+                item2_unit.standard_unit,
+                strict=self.strict_units or source1 == "week",
+            ):
                 return False
 
         # if foods match, we can merge, otherwise compare the notes

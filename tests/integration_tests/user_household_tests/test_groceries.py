@@ -7,6 +7,8 @@ from fastapi.testclient import TestClient
 
 from mealie.schema.recipe.recipe import Recipe
 from mealie.schema.recipe.recipe_ingredient import IngredientFood, IngredientUnit, RecipeIngredient
+from mealie.services.backups_v2.alchemy_exporter import AlchemyExporter
+from mealie.services.backups_v2.backup_v2 import BackupV2
 from tests import utils
 from tests.utils.fixture_schemas import TestUser
 
@@ -279,6 +281,103 @@ def test_unknown_units_do_not_become_package_counts(grocery_case: GroceryCase) -
     purchase = grocery_case.generate()["purchases"][0]
     assert purchase["packageCount"] is None
     assert "incompatible" in purchase["quantityNote"]
+
+
+@pytest.mark.parametrize("same_recipe", [True, False])
+@pytest.mark.parametrize("second_unit", ["cup", "pound"])
+def test_grocery_aggregation_preserves_unit_dimensions(
+    grocery_case: GroceryCase, same_recipe: bool, second_unit: str
+) -> None:
+    case = grocery_case
+    for meal in case.meals:
+        response = case.client.delete(f"/api/households/mealplans/{meal['id']}", headers=case.user.token)
+        assert response.status_code == 200
+    ingredients = []
+    for name, quantity in [("ounce", 8), (second_unit, 1)]:
+        response = case.client.post(
+            "/api/units",
+            headers=case.user.token,
+            json={"name": name, "standardUnit": name, "standardQuantity": 1},
+        )
+        assert response.status_code == 201, response.text
+        ingredients.append(
+            RecipeIngredient(
+                quantity=quantity,
+                food=IngredientFood.model_validate(case.food),
+                unit=IngredientUnit.model_validate(response.json()),
+            )
+        )
+    recipes = [ingredients] if same_recipe else [[ingredient] for ingredient in ingredients]
+    for recipe_ingredients in recipes:
+        recipe = case.user.repos.recipes.create(
+            Recipe(
+                user_id=case.user.user_id,
+                group_id=case.user.group_id,
+                name=f"Unit regression {uuid4().hex[:8]}",
+                recipe_ingredient=recipe_ingredients,
+            )
+        )
+        response = case.client.post(
+            "/api/households/mealplans",
+            headers=case.user.token,
+            json={"date": WEEK, "entryType": "dinner", "recipeId": str(recipe.id)},
+        )
+        assert response.status_code == 201, response.text
+    response = case.client.put(
+        f"{BASE}/products/{case.product['id']}",
+        headers=case.user.token,
+        json={
+            "foodId": case.food["id"],
+            "name": "Unit regression product",
+            "store": "walmart",
+            "packageQuantity": 1,
+            "packageUnit": second_unit,
+        },
+    )
+    assert response.status_code == 200, response.text
+    first = case.generate()
+    updated = case.generate()
+    assert {item["id"] for item in pending(first)} == {item["id"] for item in pending(updated)}
+    purchase = updated["purchases"][0]
+    if second_unit == "cup":
+        assert len(pending(updated)) == 2
+        assert purchase["packageCount"] is None
+        assert "incompatible" in purchase["quantityNote"]
+        assert {item["unit"]["standardUnit"]: item["quantity"] for item in pending(updated)} == {
+            "ounce": 8,
+            "cup": 1,
+        }
+    else:
+        assert len(pending(updated)) == 1
+        assert purchase["packageQuantityNeeded"] == pytest.approx(1.5)
+        assert purchase["packageCount"] == 2
+
+
+def test_backup_restores_grocery_week(grocery_case: GroceryCase) -> None:
+    case = grocery_case
+    response = case.client.post(
+        f"{BASE}/rules",
+        headers=case.user.token,
+        json={"foodId": case.food["id"], "kind": "pantry", "quantity": 0.4, "unit": "pound"},
+    )
+    assert response.status_code == 201, response.text
+    view = case.generate(mealScales={str(case.meals[0]["id"]): 2})
+    case.user.repos.session.close()
+    backup = BackupV2()
+    exporter = AlchemyExporter(backup.db_url)
+    try:
+        before = exporter.dump()
+        path = backup.backup()
+        backup.restore(path)
+        after = exporter.dump()
+        for table in ("grocery_products", "grocery_food_rules", "grocery_weeks"):
+            assert after[table] == before[table]
+        restored = case.client.get(f"{BASE}/weeks/{WEEK}", headers=case.user.token)
+        assert restored.status_code == 200, restored.text
+        assert restored.json() == view
+    finally:
+        exporter.engine.dispose()
+        backup.db_exporter.engine.dispose()
 
 
 def test_changed_plan_removes_only_generated_items(grocery_case: GroceryCase) -> None:

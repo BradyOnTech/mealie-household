@@ -124,7 +124,8 @@ class GroceryService(BaseService):
         self.repos = repos
         self.user_id = user_id
         self.weeks = repos.grocery_weeks
-        self.shopping = ShoppingListService(repos)
+        # Apply strict compatibility even while building a single recipe, before week metadata is attached.
+        self.shopping = ShoppingListService(repos, strict_units=True)
 
     def validate_food(self, food_id: UUID) -> IngredientFood:
         food = self.repos.ingredient_foods.get_one(food_id)

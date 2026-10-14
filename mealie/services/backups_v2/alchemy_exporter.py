@@ -70,7 +70,7 @@ class AlchemyExporter(BaseService):
     """Column names restored back into datetimes. Anything stored as a `NaiveDateTime` and missing
     here comes back from a backup as a string; `test_every_datetime_column_survives_a_backup` guards
     against forgetting to add one."""
-    look_for_date = {"date_added", "date"}
+    look_for_date = {"date_added", "date", "week_start"}
     look_for_time = {"scheduled_time"}
 
     class DateTimeParser(BaseModel):
@@ -108,26 +108,22 @@ class AlchemyExporter(BaseService):
 
         return False
 
-    def convert_types(self, data: dict) -> dict:
-        """
-        walks the dictionary to restore all things that look like string representations of their complex types
-        used in the context of reading a json file into a database via SQLAlchemy.
-        """
-        for key, value in data.items():
-            if isinstance(value, dict):
-                data = self.convert_types(value)
-            elif isinstance(value, list):  # assume that this is a list of dictionaries
-                data[key] = [self.convert_types(item) for item in value]
-            elif isinstance(value, str):
-                if self.is_uuid(value):
-                    # convert the data to the current database's native GUID type
-                    data[key] = GUID.convert_value_to_guid(value, self.engine.dialect)
-                if key in self.look_for_datetime:
-                    data[key] = self.DateTimeParser(dt=value).dt
-                if key in self.look_for_date:
-                    data[key] = self.DateTimeParser(date=value).date
-                if key in self.look_for_time:
-                    data[key] = self.DateTimeParser(time=value).time
+    def convert_types(self, data: dict[str, list[dict]]) -> dict[str, list[dict]]:
+        """Restore scalar database column types while leaving JSON column contents unchanged."""
+        for rows in data.values():
+            for row in rows:
+                for key, value in row.items():
+                    if not isinstance(value, str):
+                        continue
+                    if self.is_uuid(value):
+                        # convert the data to the current database's native GUID type
+                        row[key] = GUID.convert_value_to_guid(value, self.engine.dialect)
+                    if key in self.look_for_datetime:
+                        row[key] = self.DateTimeParser(dt=value).dt
+                    if key in self.look_for_date:
+                        row[key] = self.DateTimeParser(date=value).date
+                    if key in self.look_for_time:
+                        row[key] = self.DateTimeParser(time=value).time
         return data
 
     def clean_rows(self, db_dump: dict[str, list[dict]], table: Table, rows: list[dict]) -> list[dict]:
