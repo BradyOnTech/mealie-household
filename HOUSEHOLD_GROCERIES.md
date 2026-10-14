@@ -26,6 +26,70 @@ The named Docker volume stores all recipes, preferences, users, and grocery list
 The supplied configuration uses Mealie's SQLite database; no separate database server is needed.
 Use Mealie's existing backup feature before moving an established installation onto this fork.
 
+## Home hosting and phone access
+
+For household testing, run this Docker Compose project on an always-on home computer or NAS,
+with Tailscale installed on that host and each phone. Tailscale Serve gives the app a private HTTPS
+address that works on home Wi-Fi and mobile data. The Personal plan currently includes up to six
+users for free; see [Tailscale pricing](https://tailscale.com/pricing).
+
+Install Docker with Compose on the host and put this checkout there. Install and sign in to
+Tailscale on the host and phones, and enable MagicDNS and HTTPS certificates in its admin console.
+See [Tailscale HTTPS setup](https://tailscale.com/docs/how-to/set-up-https-certificates).
+On NAS devices, install Tailscale using its instructions for your NAS model.
+
+On a Mac mini, install [Docker Desktop for Mac](https://docs.docker.com/desktop/setup/install/mac-install/)
+for its Intel or Apple silicon processor, open Docker, and finish its initial setup.
+Enable Docker's start-at-login setting and keep that macOS user signed in.
+Enable [Prevent automatic sleeping when the display is off](https://support.apple.com/guide/mac-help/mchle41a6ccd/mac)
+in System Settings so the phone can reach the app while you are away.
+After a reboot, verify Docker and Tailscale are running before testing phone access.
+
+If the `tailscale` command is unavailable on macOS, use the CLI included in the application:
+
+```bash
+/Applications/Tailscale.app/Contents/MacOS/Tailscale serve --bg --https=8443 http://127.0.0.1:9925
+/Applications/Tailscale.app/Contents/MacOS/Tailscale serve status
+```
+
+Run those commands after starting the app as described below.
+
+Start the app and then its HTTPS proxy on the same host:
+
+This project uses HTTPS port `8443` so an existing service on the host's default HTTPS port can keep running.
+Check `tailscale serve status` first; if `8443` is already used, choose another free HTTPS port
+and include that same port in `MEALIE_BASE_URL`.
+
+```bash
+MEALIE_BIND_IP=127.0.0.1 docker compose -f compose.household.yml up -d --build
+tailscale serve --bg --https=8443 http://127.0.0.1:9925
+tailscale serve status
+```
+
+Serve reports an address such as `https://your-host.your-tailnet.ts.net:8443`. Put the actual address
+and the bind setting in the project's `.env` file so they survive future Compose commands:
+
+```dotenv
+MEALIE_BIND_IP=127.0.0.1
+MEALIE_BASE_URL=https://your-host.your-tailnet.ts.net:8443
+```
+
+Run `docker compose -f compose.household.yml up -d` again to apply the address.
+Use the full HTTPS address on your phone with Tailscale connected. No router port forwarding
+or purchased domain is needed. [Serve](https://tailscale.com/docs/reference/tailscale-cli/serve)
+handles the certificate and limits access to your Tailscale network.
+
+Mealie already includes a web app manifest and service worker in its production build.
+On iPhone, open the HTTPS address in Safari and choose Share → Add to Home Screen.
+On Android, open it in Chrome and choose Install app or Add to Home screen.
+[PWA installation requires HTTPS](https://developer.mozilla.org/en-US/docs/Web/Progressive_web_apps/Guides/Making_PWAs_installable)
+when accessing another device; an ordinary `http://192.168...` LAN address does not meet that requirement.
+Shopping changes still require a connection to the host; the home-screen app does not queue offline purchases.
+
+Use Mealie's backup interface before updates, and copy downloaded backups off the host.
+The named volume persists data when the app is rebuilt or restarted. Keep the same Compose project directory
+when updating, and do not use `docker compose down -v`, which deletes its data volume.
+
 ## First use
 
 1. Import or enter recipes in Mealie. Parse/link recipe ingredients to Foods in the recipe editor;

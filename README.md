@@ -2,6 +2,7 @@
 
 This checkout adds preferred grocery products, multi-store weekly lists, pantry/staple rules, and dinner suggestions.
 See [HOUSEHOLD_GROCERIES.md](HOUSEHOLD_GROCERIES.md) for setup and usage.
+See [MAC_MINI_HANDOFF.md](MAC_MINI_HANDOFF.md) to continue deployment on the household Mac mini.
 
 [![Latest Release][latest-release-shield]][latest-release-url]
 [![Contributors][contributors-shield]][contributors-url]

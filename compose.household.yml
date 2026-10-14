@@ -6,12 +6,12 @@ services:
       dockerfile: docker/Dockerfile
     restart: unless-stopped
     ports:
-      - "9925:9000"
+      - "${MEALIE_BIND_IP:-0.0.0.0}:9925:9000"
     volumes:
       - mealie-household-data:/app/data
     environment:
       TZ: America/Chicago
-      BASE_URL: http://localhost:9925
+      BASE_URL: ${MEALIE_BASE_URL:-http://localhost:9925}
       ALLOW_SIGNUP: "false"
       DEFAULT_GROUP: Home
       DEFAULT_HOUSEHOLD: Family
