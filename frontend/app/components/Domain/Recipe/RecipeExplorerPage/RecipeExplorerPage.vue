@@ -1,19 +1,22 @@
 <template>
-  <v-container
-    fluid
-    class="px-0"
-  >
+  <div class="recipe-explorer paper-container">
+    <header class="recipe-explorer__head">
+      <span class="paper-kicker">{{ $t("general.recipes") }}</span>
+      <h1 class="recipe-explorer__title paper-headline">
+        {{ $t("recipe-explorer.title") }}
+      </h1>
+      <p class="recipe-explorer__dek paper-dek">
+        {{ $t("recipe-explorer.subtitle") }}
+      </p>
+    </header>
     <RecipeExplorerPageSearch
       ref="searchComponent"
       @ready="onSearchReady"
     />
-    <v-divider />
-    <v-container class="mt-6 px-md-6 pb-16">
+    <div class="recipe-explorer__results">
       <RecipeCardSection
         v-if="ready"
-        class="mt-n5"
         :icon="$globals.icons.silverwareForkKnife"
-        :title="$t('general.recipes')"
         :recipes="recipes"
         :query="searchQuery"
         disable-sort
@@ -21,8 +24,8 @@
         @replace-recipes="replaceRecipes"
         @append-recipes="appendRecipes"
       />
-    </v-container>
-  </v-container>
+    </div>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -54,3 +57,39 @@ function onItemSelected(item: any, urlPrefix: string) {
   searchComponent.value?.filterItems(item, urlPrefix);
 }
 </script>
+
+<style scoped>
+.recipe-explorer {
+  padding-top: 36px;
+  padding-bottom: 72px;
+}
+
+.recipe-explorer__title {
+  margin: 6px 0 10px;
+  font-size: 3rem;
+}
+
+.recipe-explorer__dek {
+  margin: 0;
+  max-width: 52ch;
+  font-size: 1.125rem;
+}
+
+.recipe-explorer__results {
+  padding-top: 8px;
+}
+
+@media (max-width: 599px) {
+  .recipe-explorer {
+    padding-top: 22px;
+  }
+
+  .recipe-explorer__title {
+    font-size: 2.25rem;
+  }
+
+  .recipe-explorer__dek {
+    font-size: 1rem;
+  }
+}
+</style>

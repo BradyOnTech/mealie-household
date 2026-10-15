@@ -60,7 +60,8 @@ function openLightbox() {
 }
 
 const imageHeight = computed(() => {
-  return display.xs.value ? "200" : "400";
+  if (display.xs.value) return "270";
+  return display.smAndDown.value ? "360" : "440";
 });
 
 const recipeFullImageUrl = computed(() => {

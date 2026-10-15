@@ -2,12 +2,10 @@
   <div class="text-subtitle-1 dense-markdown ingredient-item">
     <SafeMarkdown
       v-if="parsedIng.quantity"
-      class="d-inline"
+      class="d-inline ingredient-qty"
       :source="parsedIng.quantity"
     />
-    <template v-if="parsedIng.unit">
-      {{ parsedIng.unit }}
-    </template>
+    <span v-if="parsedIng.unit" class="ingredient-unit">{{ parsedIng.unit }}</span>
     <template v-if="parsedIng.note && !parsedIng.name">
       <SafeMarkdown class="text-bold d-inline" :source="parsedIng.note" />
       <RecipeIngredientSubstitutions v-if="showSubstitutions" :ingredient="ingredient" :scale="scale" />

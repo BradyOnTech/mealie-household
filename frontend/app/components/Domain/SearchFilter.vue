@@ -12,16 +12,19 @@
           v-memo="[selectedCount]"
           :model-value="selectedCount > 0"
           size="small"
-          color="primary"
+          color="tomato"
           :content="selectedCount"
         >
           <v-btn
             size="small"
-            color="accent"
-            dark
+            variant="text"
+            :class="{ 'search-filter--active': selectedCount > 0 }"
             v-bind="menuProps"
           >
             <slot />
+            <v-icon end size="small">
+              {{ $globals.icons.chevronDown }}
+            </v-icon>
           </v-btn>
         </v-badge>
       </template>
@@ -212,3 +215,9 @@ function clearSelection() {
   searchInput.value = "";
 }
 </script>
+
+<style scoped>
+.search-filter--active {
+  color: rgb(var(--v-theme-tomato));
+}
+</style>

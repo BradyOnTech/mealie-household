@@ -211,20 +211,20 @@ Setting the following environmental variables will change the theme of the front
 
 | Variables             | Default | Description                        |
 | --------------------- | :-----: | ---------------------------------- |
-| THEME_LIGHT_PRIMARY   | #E58325 | Main brand color and headers       |
-| THEME_LIGHT_ACCENT    | #007A99 | Buttons and interactive elements   |
-| THEME_LIGHT_SECONDARY | #973542 | Secondary UI elements and interactive accents |
-| THEME_LIGHT_SUCCESS   | #43A047 | Success messages and confirmations |
-| THEME_LIGHT_INFO      | #1976D2 | Information alerts and tooltips    |
-| THEME_LIGHT_WARNING   | #FF6D00 | Warning notifications              |
-| THEME_LIGHT_ERROR     | #EF5350 | Error messages and alerts          |
-| THEME_DARK_PRIMARY    | #E58325 | Main brand color and headers       |
-| THEME_DARK_ACCENT     | #007A99 | Buttons and interactive elements   |
-| THEME_DARK_SECONDARY  | #973542 | Secondary UI elements and interactive accents |
-| THEME_DARK_SUCCESS    | #43A047 | Success messages and confirmations |
-| THEME_DARK_INFO       | #1976D2 | Information alerts and tooltips    |
-| THEME_DARK_WARNING    | #FF6D00 | Warning notifications              |
-| THEME_DARK_ERROR      | #EF5350 | Error messages and alerts          |
+| THEME_LIGHT_PRIMARY   | #211C16 | Main brand color and headers       |
+| THEME_LIGHT_ACCENT    | #B3432A | Buttons and interactive elements   |
+| THEME_LIGHT_SECONDARY | #5D7253 | Secondary UI elements and interactive accents |
+| THEME_LIGHT_SUCCESS   | #4F7A4A | Success messages and confirmations |
+| THEME_LIGHT_INFO      | #3D6585 | Information alerts and tooltips    |
+| THEME_LIGHT_WARNING   | #A8701D | Warning notifications              |
+| THEME_LIGHT_ERROR     | #9F2D2D | Error messages and alerts          |
+| THEME_DARK_PRIMARY    | #F0E8DA | Main brand color and headers       |
+| THEME_DARK_ACCENT     | #E57B5D | Buttons and interactive elements   |
+| THEME_DARK_SECONDARY  | #9DB28E | Secondary UI elements and interactive accents |
+| THEME_DARK_SUCCESS    | #8FB386 | Success messages and confirmations |
+| THEME_DARK_INFO       | #8DB4D4 | Information alerts and tooltips    |
+| THEME_DARK_WARNING    | #E0A84F | Warning notifications              |
+| THEME_DARK_ERROR      | #E2675F | Error messages and alerts          |
 
 #### Theming Examples
 

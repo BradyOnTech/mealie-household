@@ -44,40 +44,29 @@
       </v-card-text>
     </BaseDialog>
 
-    <v-row density="comfortable">
-      <v-col>
-        <v-text-field
-          v-model="searchString"
-          variant="outlined"
-          autofocus
-          color="primary accent-3"
-          :placeholder="$t('search.search-placeholder')"
-          :prepend-inner-icon="$globals.icons.search"
-          clearable
-        />
-      </v-col>
-    </v-row>
-
-    <v-row
-      color="transparent"
-      flat
-      class="mt-n1 rounded align-center position-relative w-100 left-0 top-0"
-    >
-      <v-icon
-        size="large"
-        start
-      >
-        {{ icon }}
-      </v-icon>
-      <v-toolbar-title class="headline">
-        <slot name="title" />
-      </v-toolbar-title>
-      <v-spacer />
+    <header class="organizer-head">
+      <div>
+        <span class="paper-kicker">{{ $t("general.recipes") }}</span>
+        <h1 class="organizer-head__title paper-headline">
+          <slot name="title" />
+        </h1>
+      </div>
       <BaseButton
         create
         @click="dialogs.organizer = true"
       />
-    </v-row>
+    </header>
+    <v-text-field
+      v-model="searchString"
+      rounded="pill"
+      density="comfortable"
+      autofocus
+      hide-details
+      class="organizer-search"
+      :placeholder="$t('search.search-placeholder')"
+      :prepend-inner-icon="$globals.icons.search"
+      clearable
+    />
     <section
       v-for="(itms, key, idx) in itemsSorted"
       :key="'header' + idx"
@@ -99,15 +88,13 @@
         >
           <v-card
             v-if="item"
-            class="left-border"
-            hover
+            flat
+            color="transparent"
+            class="organizer-item"
             :to="`/g/${groupSlug}?${itemType}=${item.id}`"
           >
-            <v-card-actions>
-              <v-icon>
-                {{ icon }}
-              </v-icon>
-              <v-card-title class="py-1 text-truncate flex-shrink-1 flex-grow-1">
+            <v-card-actions class="px-0">
+              <v-card-title class="organizer-item__name py-1 px-0 text-truncate flex-shrink-1 flex-grow-1">
                 {{ item.name }}
               </v-card-title>
               <ContextMenu
@@ -263,3 +250,39 @@ function isTitle(str: number | string) {
   return typeof str === "string" && str.length === 1;
 }
 </script>
+
+<style scoped>
+.organizer-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px 24px;
+  margin: 16px 0 20px;
+}
+
+.organizer-head__title {
+  margin: 6px 0 0;
+  font-size: 2.75rem;
+}
+
+.organizer-search {
+  max-width: 560px;
+  margin-bottom: 8px;
+}
+
+.organizer-item {
+  border-bottom: 1px solid rgb(var(--v-theme-rule));
+  border-radius: 0;
+}
+
+.organizer-item__name {
+  font-size: 1.1875rem;
+}
+
+@media (max-width: 599px) {
+  .organizer-head__title {
+    font-size: 2.125rem;
+  }
+}
+</style>

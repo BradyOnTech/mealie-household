@@ -12,6 +12,7 @@ export type Activity = {
 };
 
 export const enum ActivityKey {
+  THIS_WEEK = "this_week",
   RECIPES = "recipes",
   MEALPLANNER = "mealplanner",
   SHOPPING_LIST = "shopping_list",

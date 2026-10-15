@@ -40,22 +40,18 @@
     </v-alert>
     <v-card
       tag="section"
-      class="d-flex flex-column align-center w-100"
-      max-width="600"
+      class="login-card d-flex flex-column align-center w-100"
+      max-width="460"
     >
-      <v-toolbar
-        color="primary"
-        class="d-flex justify-center mb-4"
-        dark
-      >
-        <v-toolbar-title class="text-h4 text-center">
+      <header class="login-card__head">
+        <div class="login-card__wordmark">
           Mealie
-        </v-toolbar-title>
-      </v-toolbar>
-      <AppLogo :size="100" />
-      <v-card-title class="text-h5 justify-center pb-3">
-        {{ $t('user.sign-in') }}
-      </v-card-title>
+        </div>
+        <p class="login-card__tagline paper-dek">
+          {{ $t('navigation.tagline') }}
+        </p>
+      </header>
+      <span class="paper-kicker login-card__kicker">{{ $t('user.sign-in') }}</span>
       <v-card-text class="w-100">
         <v-form @submit.prevent="authenticate">
           <v-text-field
@@ -63,8 +59,6 @@
             id="username"
             v-model="form.email"
             :prepend-inner-icon="$globals.icons.email"
-            variant="solo-filled"
-            flat
             width="100%"
             autofocus
             autocomplete="username"
@@ -78,8 +72,6 @@
             v-model="form.password"
             :prepend-inner-icon="$globals.icons.lock"
             :append-inner-icon="passwordIcon"
-            variant="solo-filled"
-            flat
             autocomplete="current-password"
             name="password"
             :label="$t('user.password')"
@@ -97,12 +89,10 @@
               <v-btn
                 :loading="loggingIn"
                 :disabled="oidcLoggingIn"
-                variant="elevated"
                 color="primary"
+                variant="flat"
                 type="submit"
                 size="large"
-                rounded
-                class="rounded-xl"
                 block
               >
                 {{ $t("user.login") }}
@@ -116,13 +106,7 @@
             width="80%"
           >
             <v-divider class="div-width" />
-            <span
-              class="absolute px-2"
-              :class="{
-                'bg-white': !$vuetify.theme.current.dark && !isDark,
-                'bg-grey-darken-4': $vuetify.theme.current.dark || isDark,
-              }"
-            >
+            <span class="absolute px-2 bg-surface">
               {{ $t("user.or") }}
             </span>
           </div>
@@ -135,9 +119,7 @@
                 :loading="oidcLoggingIn"
                 color="primary"
                 size="large"
-                variant="elevated"
-                rounded
-                class="rounded-xl"
+                variant="outlined"
                 block
                 @click="() => oidcAuthenticate()"
               >
@@ -427,7 +409,37 @@ function alertOnError(error: any) {
 }
 
 .bg-off-white {
-  background: #f5f8fa;
+  background: rgb(var(--v-theme-background));
+}
+
+.login-card {
+  padding: 8px 8px 4px;
+}
+
+.login-card__head {
+  width: 100%;
+  padding: 28px 24px 18px;
+  border-bottom: 1px solid rgb(var(--v-theme-rule));
+  text-align: center;
+}
+
+.login-card__wordmark {
+  font-family: var(--paper-serif);
+  font-optical-sizing: auto;
+  font-size: 3rem;
+  font-style: italic;
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: -0.015em;
+}
+
+.login-card__tagline {
+  margin: 10px 0 0;
+  font-size: 1rem;
+}
+
+.login-card__kicker {
+  margin-top: 22px;
 }
 
 .absolute {

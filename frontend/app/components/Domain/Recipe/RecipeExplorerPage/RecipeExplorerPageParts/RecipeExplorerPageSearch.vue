@@ -9,15 +9,18 @@
           ref="input"
           v-model="state.search"
           variant="outlined"
+          rounded="pill"
           hide-details
           clearable
           color="primary"
+          class="search-input"
           :placeholder="$t('search.search-placeholder')"
           :prepend-inner-icon="$globals.icons.search"
           @keyup.enter="hideKeyboard"
         />
       </div>
       <div class="search-row">
+        <span class="search-row__label">{{ $t("recipe-explorer.filter-by") }}</span>
         <RecipeExplorerPageSearchFilters />
         <!-- Sort Options -->
         <v-menu
@@ -28,7 +31,7 @@
             <v-btn
               class="ml-auto"
               size="small"
-              color="accent"
+              variant="text"
               v-bind="props"
             >
               <v-icon :start="!$vuetify.display.xs">
@@ -85,8 +88,9 @@
           <template #activator="{ props }">
             <v-btn
               size="small"
-              color="accent"
-              dark
+              variant="text"
+              icon
+              :aria-label="$t('general.settings')"
               v-bind="props"
             >
               <v-icon size="small">
@@ -235,17 +239,32 @@ async function setRandomOrderByWrapper() {
 .search-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.65rem;
-  margin-top: 1rem;
+  align-items: center;
+  gap: 0.25rem 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.search-row__label {
+  margin-right: 0.25rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: rgb(var(--v-theme-ink-muted));
 }
 
 .search-container {
   display: flex;
-  justify-content: center;
+  padding-top: 24px;
 }
 
 .search-box {
-  width: 950px;
+  width: 100%;
+  padding: 0 !important;
+}
+
+.search-input :deep(.v-field) {
+  min-height: 52px;
 }
 
 .search-button-container {

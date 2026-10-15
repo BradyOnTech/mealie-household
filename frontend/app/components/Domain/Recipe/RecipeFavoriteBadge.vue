@@ -2,24 +2,20 @@
   <v-tooltip
     location="bottom"
     nudge-right="50"
-    :color="buttonStyle ? 'info' : 'secondary'"
   >
     <template #activator="{ props: tooltipProps }">
       <v-btn
         v-if="isFavorite || showAlways"
         icon
-        :variant="buttonStyle ? 'flat' : undefined"
+        :variant="buttonStyle ? 'outlined' : 'text'"
         :rounded="buttonStyle ? 'circle' : undefined"
-        size="small"
-        :color="buttonStyle ? 'info' : 'secondary'"
+        :size="buttonStyle ? 'default' : 'small'"
+        :class="buttonStyle ? 'recipe-action-circle' : 'recipe-action-quiet'"
         :fab="buttonStyle"
         v-bind="{ ...tooltipProps, ...$attrs }"
         @click.prevent="toggleFavorite"
       >
-        <v-icon
-          :size="!buttonStyle ? undefined : 'x-large'"
-          :color="buttonStyle ? 'white' : 'secondary'"
-        >
+        <v-icon :color="isFavorite ? 'tomato' : undefined">
           {{ isFavorite ? $globals.icons.heart : $globals.icons.heartOutline }}
         </v-icon>
       </v-btn>

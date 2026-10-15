@@ -109,7 +109,19 @@
       </BaseDialog>
     </div>
     <div>
-      <div v-if="lastMadeReady" class="d-flex justify-center flex-wrap">
+      <button
+        v-if="lastMadeReady && compact"
+        type="button"
+        class="recipe-made"
+        :title="$t('recipe.made-this')"
+        @click="madeThisDialog = true"
+      >
+        <span>{{ lastMade ? lastMadeShort : $t("general.never") }}</span>
+        <v-icon size="16" class="recipe-made__plus">
+          {{ $globals.icons.createAlt }}
+        </v-icon>
+      </button>
+      <div v-else-if="lastMadeReady" class="d-flex justify-center flex-wrap">
         <v-row no-gutters class="d-flex flex-wrap align-center" style="font-size: larger">
           <v-tooltip location="bottom">
             <template #activator="{ props: tooltipProps }">
@@ -152,7 +164,7 @@ import { useHouseholdSelf } from "~/composables/use-households";
 import type { Recipe, RecipeTimelineEventIn, RecipeTimelineEventOut } from "~/lib/api/types/recipe";
 import type { VForm } from "~/types/auto-forms";
 
-const props = defineProps<{ recipe: Recipe }>();
+const props = withDefaults(defineProps<{ recipe: Recipe; compact?: boolean }>(), { compact: false });
 const emit = defineEmits<{
   eventCreated: [event: RecipeTimelineEventOut];
 }>();
@@ -179,6 +191,11 @@ const newTimelineEventTimestampString = computed(() => {
 });
 
 const lastMade = ref(props.recipe.lastMade);
+const lastMadeShort = computed(() =>
+  lastMade.value
+    ? new Intl.DateTimeFormat(i18n.locale.value, { month: "short", day: "numeric" }).format(new Date(lastMade.value))
+    : "",
+);
 const lastMadeReady = ref(false);
 onMounted(async () => {
   if (!auth.user?.value?.householdSlug) {
@@ -351,3 +368,32 @@ async function createTimelineEvent() {
   emit("eventCreated", newEvent);
 }
 </script>
+
+<style scoped>
+.recipe-made {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 0;
+  padding: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.recipe-made__plus {
+  color: rgb(var(--v-theme-tomato));
+}
+
+.recipe-made:hover span {
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.recipe-made:focus-visible {
+  outline: 2px solid rgb(var(--v-theme-tomato));
+  outline-offset: 2px;
+}
+</style>

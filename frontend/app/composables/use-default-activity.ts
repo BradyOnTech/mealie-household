@@ -4,12 +4,18 @@ import { ActivityKey } from "~/lib/api/types/activity";
 export const DEFAULT_ACTIVITY = "/g/home" as const;
 
 type ActivityRegistry = {
+  this_week: Activity;
   recipes: Activity;
   mealplanner: Activity;
   shopping_list: Activity;
 };
 
 const selectableActivities: ActivityRegistry = {
+  this_week: {
+    key: ActivityKey.THIS_WEEK,
+    route: () => "/household/week",
+    label: i18n => i18n.t("this-week.title"),
+  },
   recipes: {
     key: ActivityKey.RECIPES,
     route: groupSlug => groupSlug ? `/g/${groupSlug}` : DEFAULT_ACTIVITY,

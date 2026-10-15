@@ -1,12 +1,8 @@
 <template>
   <div>
-    <v-card-title class="headline pb-3">
-      <v-icon class="mr-2">
-        {{ $globals.icons.commentTextMultipleOutline }}
-      </v-icon>
+    <h2 class="recipe-comments__title">
       {{ $t("recipe.comments") }}
-    </v-card-title>
-    <v-divider class="mx-2" />
+    </h2>
     <div
       v-if="user.id"
       class="d-flex flex-column"
@@ -120,3 +116,15 @@ async function deleteComment(id: string) {
   }
 }
 </script>
+
+<style scoped>
+.recipe-comments__title {
+  margin: 0 0 8px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid rgb(var(--v-theme-on-background));
+  font-family: var(--paper-serif);
+  font-size: 1.375rem;
+  font-weight: 450;
+  letter-spacing: -0.01em;
+}
+</style>

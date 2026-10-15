@@ -12,19 +12,14 @@
       max-width="1200px"
       min-height="700px"
     >
-      <div>
-        <v-toolbar
-          width="100%"
-          color="primary"
-          style="margin-bottom: 4rem"
-          dark
-        >
-          <v-toolbar-title class="text-h4 text-center">
-            Mealie
-          </v-toolbar-title>
-        </v-toolbar>
-        <AppLogo />
-      </div>
+      <header class="paper-wordmark-head">
+        <div class="paper-wordmark">
+          Mealie
+        </div>
+        <p class="paper-dek mt-2 mb-0">
+          {{ $t('navigation.tagline') }}
+        </p>
+      </header>
 
       <!-- Form Container -->
       <div class="d-flex justify-center grow items-center my-4">
@@ -541,7 +536,7 @@ async function submitRegistration() {
 }
 
 .bg-off-white {
-  background: #f5f8fa;
+  background: rgb(var(--v-theme-background));
 }
 
 .preferred-width {

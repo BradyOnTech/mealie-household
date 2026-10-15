@@ -1,17 +1,12 @@
 <template>
   <div>
-    <v-row
+    <div
       v-if="!disableToolbar"
-      class="align-center pb-2"
+      class="recipe-section__head"
     >
-      <v-icon
-        v-if="title"
-        size="large"
-        start
-      >
-        {{ displayTitleIcon }}
-      </v-icon>
-      <span class="text-headline-small">{{ title }}</span>
+      <h2 class="recipe-section__title">
+        {{ title }}
+      </h2>
       <v-spacer />
       <v-btn
         :icon="$vuetify.display.xs"
@@ -104,15 +99,15 @@
         ]"
         @toggle-dense-view="toggleMobileCards()"
       />
-    </v-row>
+    </div>
     <div v-if="recipes && ready">
       <div class="mt-2">
-        <v-row v-if="!useMobileCards">
+        <v-row v-if="!useMobileCards" class="recipe-section__grid">
           <v-col
             v-for="recipe in recipes"
             :key="recipe.id!"
             :sm="6"
-            :md="6"
+            :md="4"
             :lg="4"
             :xl="3"
           >
@@ -130,11 +125,13 @@
         <v-row
           v-else
           density="comfortable"
+          class="recipe-section__rows"
         >
           <v-col
             v-for="recipe in recipes"
             :key="recipe.id!"
             cols="12"
+            class="py-0"
             :sm="singleColumn ? '12' : '12'"
             :md="singleColumn ? '12' : '6'"
             :lg="singleColumn ? '12' : '4'"
@@ -219,10 +216,6 @@ const { $globals } = useNuxtApp();
 const { isOwnGroup } = useLoggedInState();
 const useMobileCards = computed(() => {
   return display.smAndDown.value || preferences.value.useMobileCards;
-});
-
-const displayTitleIcon = computed(() => {
-  return props.icon || $globals.icons.tags;
 });
 
 const sortLoading = ref(false);
@@ -462,5 +455,30 @@ function toggleMobileCards() {
 <style>
 .transparent {
   opacity: 1;
+}
+
+.recipe-section__head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 18px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgb(var(--v-theme-on-background));
+}
+
+.recipe-section__title {
+  font-family: var(--paper-serif);
+  font-size: 1.5rem;
+  font-weight: 450;
+  letter-spacing: -0.012em;
+}
+
+.recipe-section__grid {
+  row-gap: 18px;
+}
+
+.recipe-section__grid > .v-col {
+  padding-top: 0;
+  padding-bottom: 0;
 }
 </style>

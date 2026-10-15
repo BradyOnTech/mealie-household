@@ -20,7 +20,7 @@
 
     <div class="mb-10">
       <v-form ref="refGroupPrefsEditForm" @submit.prevent="handlePrefsSubmit">
-        <v-card variant="outlined" style="border-color: lightgray;">
+        <v-card variant="outlined">
           <v-card-text>
             <GroupPreferencesEditor v-if="group.preferences" v-model="group.preferences" />
           </v-card-text>
@@ -35,7 +35,7 @@
 
     <div>
       <v-form ref="refGroupAISettingsForm" @submit.prevent="handleAISettingsSubmit">
-        <v-card variant="outlined" style="border-color: lightgray;">
+        <v-card variant="outlined">
           <v-card-text>
             <GroupAIProviderSettingsEditor
               v-if="group.aiProviderSettings"

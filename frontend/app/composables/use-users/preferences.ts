@@ -133,10 +133,12 @@ export function useUserSortPreferences(): Ref<UserRecipePreferences> {
 }
 
 export function useUserActivityPreferences(): Ref<UserActivityPreferences> {
+  // "v2": the redesign made This week the front page. The old key held "recipes" for everyone who never
+  // chose, because the default was written on first visit, so the new default needs a fresh key.
   const fromStorage = useLocalStorage(
-    "activity-preferences",
+    "activity-preferences-v2",
     {
-      defaultActivity: ActivityKey.RECIPES,
+      defaultActivity: ActivityKey.THIS_WEEK,
     },
     { mergeDefaults: true },
   );

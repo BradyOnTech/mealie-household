@@ -23,7 +23,7 @@
       ref="refGroupEditForm"
       @submit.prevent="handleSubmit"
     >
-      <v-card variant="outlined" style="border-color: lightgrey;">
+      <v-card variant="outlined">
         <v-card-text>
           <v-text-field
             v-model="group.name"

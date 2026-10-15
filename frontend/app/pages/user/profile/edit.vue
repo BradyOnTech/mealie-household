@@ -64,7 +64,6 @@
               <v-card
                 tag="article"
                 variant="outlined"
-                style="border-color: lightgrey;"
               >
                 <v-card-text class="pb-0">
                   <v-form ref="userUpdate">
@@ -111,7 +110,7 @@
                 class="mt-10"
                 :title="$t('settings.change-password')"
               />
-              <v-card variant="outlined" style="border-color: lightgrey;">
+              <v-card variant="outlined">
                 <v-card-text class="pb-0">
                   <v-form ref="passChange">
                     <v-text-field
@@ -171,7 +170,7 @@
         class="mt-10"
         :title="$t('profile.preferences')"
       />
-      <v-card variant="outlined" style="border-color: lightgrey;">
+      <v-card variant="outlined">
         <v-card-text>
           <v-combobox
             v-model="selectedDefaultActivity"

@@ -18,7 +18,6 @@
           <v-text-field
             v-model="state.email"
             :prepend-inner-icon="$globals.icons.email"
-            variant="solo-filled"
             flat
             autofocus
             name="login"
@@ -34,6 +33,7 @@
               <v-btn
                 :loading="state.loading"
                 color="primary"
+                variant="flat"
                 type="submit"
                 size="large"
                 rounded

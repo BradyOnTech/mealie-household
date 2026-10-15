@@ -1,6 +1,8 @@
 <template>
+  <!-- eslint-disable-next-line vue/no-v-html -->
+  <span v-if="yieldDisplay && inline" v-html="yieldDisplay" />
   <div
-    v-if="yieldDisplay"
+    v-else-if="yieldDisplay"
     class="d-flex align-center"
   >
     <v-row
@@ -33,12 +35,14 @@ interface Props {
   yieldText?: string;
   scale?: number;
   color?: string;
+  inline?: boolean;
 }
 const props = withDefaults(defineProps<Props>(), {
   yieldQuantity: 0,
   yieldText: "",
   scale: 1,
   color: "accent custom-transparent",
+  inline: false,
 });
 
 function sanitizeHTML(rawHtml: string) {

@@ -1,143 +1,111 @@
 <template>
-  <div :style="`height: ${height}px;`">
-    <v-expand-transition>
-      <v-card
-        :ripple="false"
-        :class="[
-          isFlat ? 'mx-auto flat' : 'mx-auto',
-          { 'disable-highlight': disableHighlight },
-        ]"
-        :style="{ cursor }"
-        hover
-        height="100%"
-        :to="$attrs.selected ? undefined : recipeRoute"
+  <div
+    class="recipe-row"
+    :class="{
+      'recipe-row--vertical': vertical,
+      'recipe-row--flat': isFlat,
+      'recipe-row--link': !!linkTarget,
+      'disable-highlight': disableHighlight,
+    }"
+    :style="{ cursor }"
+  >
+    <component
+      :is="linkTarget ? NuxtLink : 'div'"
+      :to="linkTarget"
+      class="recipe-row__figure"
+      tabindex="-1"
+      @click="$emit('selected')"
+    >
+      <slot v-if="!vertical" name="avatar">
+        <RecipeCardImage
+          tiny
+          :icon-size="40"
+          :slug="slug"
+          :recipe-id="recipeId"
+          :image-version="image"
+          :height="72"
+          :min-height="72"
+        />
+      </slot>
+      <RecipeCardImage
+        v-else
+        small
+        :icon-size="64"
+        :slug="slug"
+        :recipe-id="recipeId"
+        :image-version="image"
+        :height="height"
+        :min-height="height"
+      />
+    </component>
+    <div class="recipe-row__body">
+      <span v-if="kicker" class="paper-kicker recipe-row__kicker">{{ kicker }}</span>
+      <component
+        :is="linkTarget ? NuxtLink : 'span'"
+        :to="linkTarget"
+        class="recipe-row__title"
         @click="$emit('selected')"
       >
-        <v-img
-          v-if="vertical"
-          class="rounded-sm"
-          cover
-        >
-          <RecipeCardImage
-            tiny
-            :icon-size="100"
-            :slug="slug"
+        {{ name }}
+      </component>
+      <p v-if="plainDescription" class="recipe-row__dek">
+        {{ plainDescription }}
+      </p>
+      <slot name="actions">
+        <div v-if="showRecipeContent" class="recipe-row__actions">
+          <RecipeCardRating
+            :model-value="rating"
             :recipe-id="recipeId"
-            :image-version="image"
-            :height="height"
           />
-        </v-img>
-        <v-list-item
-          lines="two"
-          class="py-0"
-          :class="vertical ? 'px-2' : 'px-0'"
-          item-props
-          height="100%"
-          density="compact"
-        >
-          <template #prepend>
-            <slot
-              v-if="!vertical"
-              name="avatar"
-            >
-              <RecipeCardImage
-                tiny
-                :icon-size="100"
-                :slug="slug"
-                :recipe-id="recipeId"
-                :image-version="image"
-                width="125"
-                :height="height"
-              />
-            </slot>
-          </template>
-          <div class="pl-4 d-flex flex-column justify-space-between align-stretch pr-2">
-            <v-list-item-title class="mt-3 mb-1 text-top text-truncate w-100">
-              {{ name }}
-            </v-list-item-title>
-            <v-list-item-subtitle class="ma-0 text-top">
-              <SafeMarkdown v-if="description" :source="description" />
-              <p v-else>
-                <br>
-                <br>
-                <br>
-              </p>
-            </v-list-item-subtitle>
-            <div
-              class="d-flex flex-nowrap justify-start ma-0 pt-2 pb-0"
-              style="overflow-x: hidden; overflow-y: hidden; white-space: nowrap;"
-            >
-              <RecipeChips
-                :truncate="true"
-                :items="tags"
-                :title="false"
-                :limit="2"
-                small
-                url-prefix="tags"
-                v-bind="$attrs"
-              />
-            </div>
-          </div>
-          <slot name="actions">
-            <v-card-actions class="w-100 my-0 px-1 py-0">
-              <RecipeFavoriteBadge
-                v-if="isOwnGroup && showRecipeContent"
-                :recipe-id="recipeId"
-                show-always
-                class="ma-0 pa-0"
-              />
-              <div v-else class="my-0 px-1 py-0" /> <!-- Empty div to keep the layout consistent -->
-              <RecipeCardRating
-                v-if="showRecipeContent"
-                :class="[{ 'pb-2': !isOwnGroup }, 'ml-n2']"
-                :model-value="rating"
-                :recipe-id="recipeId"
-              />
-
-              <!-- If we're not logged-in, no items display, so we hide this menu -->
-              <!-- We also add padding to the v-rating above to compensate -->
-              <slot name="context-menu">
-                <RecipeContextMenu
-                  v-if="isOwnGroup && showRecipeContent"
-                  :slug="slug"
-                  :menu-icon="$globals.icons.dotsHorizontal"
-                  :name="name"
-                  :recipe-id="recipeId"
-                  class="ml-auto"
-                  :use-items="{
-                    delete: false,
-                    edit: false,
-                    download: true,
-                    mealplanner: true,
-                    shoppingList: true,
-                    print: false,
-                    printPreferences: false,
-                    share: true,
-                  }"
-                  :leading-items="contextMenuLeadingItems"
-                  :append-items="contextMenuAppendItems"
-                  @deleted="$emit('delete', slug)"
-                  @mealplan-remove="$emit('mealplanRemove')"
-                  @mealplan-edit="$emit('mealplanEdit')"
-                />
-              </slot>
-            </v-card-actions>
+          <v-spacer />
+          <RecipeFavoriteBadge
+            v-if="isOwnGroup"
+            :recipe-id="recipeId"
+            show-always
+          />
+          <!-- If we're not logged-in, no items display, so we hide this menu -->
+          <slot name="context-menu">
+            <RecipeContextMenu
+              v-if="isOwnGroup"
+              :slug="slug"
+              :menu-icon="$globals.icons.dotsHorizontal"
+              :name="name"
+              :recipe-id="recipeId"
+              :use-items="{
+                delete: false,
+                edit: false,
+                download: true,
+                mealplanner: true,
+                shoppingList: true,
+                print: false,
+                printPreferences: false,
+                share: true,
+              }"
+              :leading-items="contextMenuLeadingItems"
+              :append-items="contextMenuAppendItems"
+              @deleted="$emit('delete', slug)"
+              @mealplan-remove="$emit('mealplanRemove')"
+              @mealplan-edit="$emit('mealplanEdit')"
+            />
           </slot>
-        </v-list-item>
-        <slot />
-      </v-card>
-    </v-expand-transition>
+        </div>
+      </slot>
+    </div>
+    <slot />
   </div>
 </template>
 
 <script setup lang="ts">
 import { useLoggedInState } from "~/composables/use-logged-in-state";
+import { plainTextExcerpt } from "~/lib/sanitize/text";
 import RecipeCardImage from "./RecipeCardImage.vue";
 import RecipeCardRating from "./RecipeCardRating.vue";
-import RecipeChips from "./RecipeChips.vue";
 import RecipeContextMenu from "./RecipeContextMenu/RecipeContextMenu.vue";
 import RecipeFavoriteBadge from "./RecipeFavoriteBadge.vue";
 import type { ContextMenuItem } from "./RecipeContextMenu/RecipeContextMenu.vue";
+
+// Resolved by name so the template can switch between a link and a plain element.
+const NuxtLink = resolveComponent("NuxtLink");
 
 interface Props {
   name: string;
@@ -171,56 +139,98 @@ defineEmits<{
   delete: [slug: string];
 }>();
 
+const attrs = useAttrs();
 const auth = useMealieAuth();
 const { isOwnGroup } = useLoggedInState();
 
 const route = useRoute();
 const groupSlug = computed(() => route.params.groupSlug || auth.user.value?.groupSlug || "");
-const showRecipeContent = computed(() => props.recipeId && props.slug);
+const showRecipeContent = computed(() => !!(props.recipeId && props.slug));
 const recipeRoute = computed<string>(() => {
   return showRecipeContent.value ? `/g/${groupSlug.value}/r/${props.slug}` : "";
 });
-const cursor = computed(() => showRecipeContent.value ? "pointer" : "auto");
+// In pickers ("selected" is bound) a click chooses the recipe instead of opening it.
+const linkTarget = computed(() => (attrs.selected || !recipeRoute.value ? undefined : recipeRoute.value));
+const cursor = computed(() => (showRecipeContent.value || attrs.selected ? "pointer" : "auto"));
+
+const kicker = computed(() => props.tags.slice(0, 2).map(tag => tag.name).join(" · "));
+const plainDescription = computed(() => plainTextExcerpt(props.description || "", 110));
 </script>
 
 <style scoped>
-:deep(.v-list-item__prepend) {
-  height: 100%;
+.recipe-row {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  gap: 14px;
+  padding: 12px 0;
+  border-bottom: 1px solid rgb(var(--v-theme-rule));
 }
-.v-mobile-img {
-  padding-top: 0;
-  padding-bottom: 0;
-  padding-left: 0;
+
+.recipe-row--flat {
+  border-bottom: 0;
 }
-.v-card--reveal {
-  align-items: center;
-  bottom: 0;
-  justify-content: center;
-  opacity: 0.8;
-  position: absolute;
-  width: 100%;
+
+.recipe-row--vertical {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
 }
-.v-card--text-show {
-  opacity: 1 !important;
+
+.recipe-row__figure {
+  display: block;
+  overflow: hidden;
+  border-radius: 2px;
 }
-.headerClass {
-  white-space: nowrap;
-  word-break: normal;
+
+.recipe-row__body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.recipe-row__kicker {
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.text-top {
-  align-self: start !important;
+.recipe-row__title {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  font-family: var(--paper-serif);
+  font-optical-sizing: auto;
+  font-size: 1.125rem;
+  font-weight: 420;
+  line-height: 1.22;
+  letter-spacing: -0.005em;
+  color: rgb(var(--v-theme-on-background));
+  text-decoration: none;
 }
 
-.flat,
-.theme--dark .flat {
-  box-shadow: none !important;
-  background-color: transparent !important;
+.recipe-row--link a.recipe-row__title:hover {
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
 }
 
-.disable-highlight :deep(.v-card__overlay) {
-  opacity: 0 !important;
+.recipe-row__dek {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
+  line-clamp: 1;
+  overflow: hidden;
+  margin: 3px 0 0;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  color: rgb(var(--v-theme-ink-muted));
+}
+
+.recipe-row__actions {
+  display: flex;
+  align-items: center;
+  margin-top: 2px;
+  margin-bottom: -6px;
 }
 </style>

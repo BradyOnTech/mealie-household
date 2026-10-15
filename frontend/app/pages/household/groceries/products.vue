@@ -1,23 +1,23 @@
 <template>
-  <v-container class="grocery-catalog" max-width="1200">
-    <div class="d-flex flex-wrap align-center justify-space-between ga-4 mb-6">
+  <div class="grocery-catalog paper-container">
+    <header class="catalog-head">
       <div>
-        <NuxtLink to="/household/groceries" class="text-body-2">← {{ $t('groceries.title') }}</NuxtLink>
-        <h1 class="text-h4 mt-2">
+        <NuxtLink to="/household/groceries" class="paper-kicker catalog-head__back">← {{ $t('groceries.title') }}</NuxtLink>
+        <h1 class="catalog-head__title paper-headline">
           {{ $t('groceries.catalog') }}
         </h1>
-        <p class="text-body-1 text-medium-emphasis mt-2">
+        <p class="catalog-head__dek paper-dek">
           {{ $t('groceries.catalog-subtitle') }}
         </p>
       </div>
-      <v-btn color="primary" variant="flat" @click="openProduct()">
+      <v-btn color="primary" :prepend-icon="$globals.icons.createAlt" @click="openProduct()">
         {{ $t('groceries.add-product') }}
       </v-btn>
-    </div>
+    </header>
     <v-alert v-if="error" type="error" closable class="mb-4" @click:close="error = ''">
       {{ error }}
     </v-alert>
-    <v-tabs v-model="tab" color="primary" class="mb-5">
+    <v-tabs v-model="tab" color="primary" class="catalog-tabs mb-6">
       <v-tab value="products">
         {{ $t('groceries.catalog') }}
       </v-tab>
@@ -30,92 +30,99 @@
       <v-text-field
         v-model="search"
         :label="$t('groceries.search')"
+        :prepend-inner-icon="$globals.icons.search"
         clearable
-        variant="outlined"
+        rounded="pill"
         density="compact"
-        class="mb-5"
+        class="mb-6 catalog-search"
       />
-      <v-card v-if="!products.length && !loading" variant="tonal" class="pa-8 text-center">
-        <h2 class="text-h6">
+      <section v-if="!products.length && !loading" class="catalog-empty paper-box">
+        <h2 class="catalog-empty__title">
           {{ $t('groceries.no-products') }}
-        </h2><p class="mt-3 mb-5">
+        </h2>
+        <p class="paper-muted mt-2 mb-5">
           {{ $t('groceries.no-products-detail') }}
         </p>
         <v-btn color="primary" @click="openProduct()">
           {{ $t('groceries.add-product') }}
         </v-btn>
-      </v-card>
+      </section>
       <v-row>
         <v-col v-for="product in visibleProducts" :key="product.id" cols="12" sm="6" lg="4">
-          <v-card variant="outlined" height="100%" class="product-card" :class="{ 'opacity-60': !product.enabled }">
-            <v-card-text>
-              <div class="d-flex justify-space-between align-center ga-2 mb-3">
-                <v-chip size="small" :color="storeColor(product.store)">
-                  {{ storeTitle(product.store) }}
-                </v-chip>
-                <span class="text-caption text-medium-emphasis">{{ $t((product.priority ?? 0) === 0 ? 'groceries.first-choice' : 'groceries.backup-choice') }}</span>
-              </div>
-              <div class="text-overline text-medium-emphasis">
-                {{ product.food.name }}
-              </div>
-              <h2 class="text-h6">
-                {{ product.name }}
-              </h2>
-              <p v-if="product.packageQuantity" class="mt-2">
-                {{ product.packageQuantity }} {{ unitTitle(product.packageUnit) }} / {{ $t('groceries.packages') }}
-              </p>
-              <p v-if="product.notes" class="text-body-2 text-medium-emphasis mt-3">
-                {{ product.notes }}
-              </p>
-            </v-card-text>
-            <v-card-actions>
-              <v-btn v-if="product.url" :href="product.url" target="_blank" rel="noopener noreferrer" color="primary">
+          <article class="product-tile paper-box" :class="{ 'opacity-60': !product.enabled }">
+            <div class="product-tile__top">
+              <span class="product-tile__store" :style="{ '--store-color': storeColor(product.store) }"><i />{{ storeTitle(product.store) }}</span>
+              <span class="product-tile__rank">{{ $t((product.priority ?? 0) === 0 ? 'groceries.first-choice' : 'groceries.backup-choice') }}</span>
+            </div>
+            <span class="paper-kicker">{{ product.food.name }}</span>
+            <h2 class="product-tile__name">
+              {{ product.name }}
+            </h2>
+            <p v-if="product.packageQuantity" class="product-tile__size">
+              {{ product.packageQuantity }} {{ unitTitle(product.packageUnit) }} / {{ $t('groceries.packages') }}
+            </p>
+            <p v-if="product.notes" class="product-tile__notes">
+              {{ product.notes }}
+            </p>
+            <div class="product-tile__actions">
+              <v-btn
+                v-if="product.url"
+                :href="product.url"
+                target="_blank"
+                rel="noopener noreferrer"
+                variant="text"
+                size="small"
+                color="tomato"
+                :append-icon="$globals.icons.externalLink"
+              >
                 {{ $t('groceries.open-product') }}
               </v-btn>
-              <v-spacer /><v-btn @click="openProduct(product)">
+              <v-spacer />
+              <v-btn variant="text" size="small" @click="openProduct(product)">
                 {{ $t('groceries.edit') }}
               </v-btn>
-              <v-btn :aria-label="$t('groceries.remove')" @click="deleteTarget = { id: product.id, kind: 'product' }">
-                ×
+              <v-btn icon variant="text" size="small" :aria-label="$t('groceries.remove')" @click="deleteTarget = { id: product.id, kind: 'product' }">
+                <v-icon :icon="$globals.icons.delete" size="18" />
               </v-btn>
-            </v-card-actions>
-          </v-card>
+            </div>
+          </article>
         </v-col>
       </v-row>
     </template>
     <template v-else>
       <div class="d-flex justify-end mb-4">
-        <v-btn color="primary" variant="flat" @click="openRule()">
+        <v-btn color="primary" :prepend-icon="$globals.icons.createAlt" @click="openRule()">
           {{ $t('groceries.add-rule') }}
         </v-btn>
       </div>
       <v-row>
         <v-col v-for="kind in ruleKinds" :key="kind.value" cols="12" md="6">
-          <h2 class="text-h6 mb-3">
+          <h2 class="paper-section-title">
             {{ $t(kind.label) }}
           </h2>
-          <p class="text-body-2 text-medium-emphasis mb-4">
+          <p class="paper-muted text-body-2 mt-2 mb-2">
             {{ $t(kind.hint) }}
           </p>
-          <v-card v-for="rule in rules.filter(item => item.kind === kind.value)" :key="rule.id" variant="outlined" class="mb-3 pa-4" :class="{ 'opacity-60': !rule.enabled }">
-            <div class="d-flex align-center justify-space-between ga-3">
-              <div>
-                <strong>{{ rule.food.name }}</strong><p>{{ rule.quantity }} {{ unitTitle(rule.unit) }}</p>
-                <p v-if="rule.kind === 'recurring'" class="text-caption text-medium-emphasis">
-                  {{ $t(rule.mode === 'extra' ? 'groceries.extra' : 'groceries.minimum') }}
-                </p>
+          <div v-for="rule in rules.filter(item => item.kind === kind.value)" :key="rule.id" class="rule-row" :class="{ 'opacity-60': !rule.enabled }">
+            <div>
+              <div class="rule-row__food">
+                {{ rule.food.name }}
               </div>
-              <div>
-                <v-btn size="small" @click="openRule(rule)">
-                  {{ $t('groceries.edit') }}
-                </v-btn>
-                <v-btn size="small" :aria-label="$t('groceries.remove')" @click="deleteTarget = { id: rule.id, kind: 'rule' }">
-                  ×
-                </v-btn>
+              <div class="rule-row__amount">
+                {{ rule.quantity }} {{ unitTitle(rule.unit) }}
+                <span v-if="rule.kind === 'recurring'" class="paper-muted"> · {{ $t(rule.mode === 'extra' ? 'groceries.extra' : 'groceries.minimum') }}</span>
               </div>
             </div>
-          </v-card>
-          <p v-if="!rules.some(item => item.kind === kind.value)" class="text-medium-emphasis pa-4">
+            <div class="rule-row__actions">
+              <v-btn variant="text" size="small" @click="openRule(rule)">
+                {{ $t('groceries.edit') }}
+              </v-btn>
+              <v-btn icon variant="text" size="small" :aria-label="$t('groceries.remove')" @click="deleteTarget = { id: rule.id, kind: 'rule' }">
+                <v-icon :icon="$globals.icons.delete" size="18" />
+              </v-btn>
+            </div>
+          </div>
+          <p v-if="!rules.some(item => item.kind === kind.value)" class="paper-muted py-4">
             {{ $t('groceries.no-rules') }}
           </p>
         </v-col>
@@ -135,7 +142,7 @@
         </v-card-actions>
       </v-card>
     </v-dialog>
-  </v-container>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -191,10 +198,148 @@ onMounted(async () => {
 
 <style scoped>
 .grocery-catalog {
-  padding-top: 28px;
-  padding-bottom: 60px;
+  padding-top: 32px;
+  padding-bottom: 72px;
 }
-.product-card {
-  border-radius: 14px;
+
+.catalog-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px 24px;
+  margin-bottom: 24px;
+}
+
+.catalog-head__back {
+  text-decoration: none;
+}
+
+.catalog-head__title {
+  margin: 6px 0 8px;
+  font-size: 3rem;
+}
+
+.catalog-head__dek {
+  margin: 0;
+  max-width: 52ch;
+  font-size: 1.125rem;
+}
+
+.catalog-tabs {
+  border-bottom: 1px solid rgb(var(--v-theme-rule));
+}
+
+.catalog-search {
+  max-width: 520px;
+}
+
+.catalog-empty {
+  padding: 32px;
+  text-align: center;
+}
+
+.catalog-empty__title {
+  font-family: var(--paper-serif);
+  font-size: 1.5rem;
+  font-weight: 420;
+}
+
+.product-tile {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 16px 18px 8px;
+}
+
+.product-tile__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 12px;
+  font-size: 0.8125rem;
+}
+
+.product-tile__store {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-weight: 600;
+}
+
+.product-tile__store i {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--store-color);
+}
+
+.product-tile__rank {
+  color: rgb(var(--v-theme-ink-muted));
+}
+
+.product-tile__name {
+  margin: 2px 0 0;
+  font-family: var(--paper-serif);
+  font-size: 1.25rem;
+  font-weight: 420;
+  line-height: 1.25;
+}
+
+.product-tile__size {
+  margin: 6px 0 0;
+  font-family: var(--paper-serif);
+  font-size: 0.9375rem;
+}
+
+.product-tile__notes {
+  margin: 8px 0 0;
+  font-size: 0.875rem;
+  color: rgb(var(--v-theme-ink-muted));
+}
+
+.product-tile__actions {
+  display: flex;
+  align-items: center;
+  margin: auto -8px 0;
+  padding-top: 10px;
+}
+
+.rule-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid rgb(var(--v-theme-rule));
+}
+
+.rule-row__food {
+  font-family: var(--paper-serif);
+  font-size: 1.0625rem;
+}
+
+.rule-row__food::first-letter {
+  text-transform: uppercase;
+}
+
+.rule-row__amount {
+  font-size: 0.875rem;
+}
+
+.rule-row__actions {
+  display: flex;
+  align-items: center;
+}
+
+@media (max-width: 959px) {
+  .grocery-catalog {
+    padding-top: 22px;
+  }
+
+  .catalog-head__title {
+    font-size: 2.25rem;
+  }
 }
 </style>

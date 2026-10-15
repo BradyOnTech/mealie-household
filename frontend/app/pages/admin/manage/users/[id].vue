@@ -25,7 +25,6 @@
     >
       <v-card
         variant="outlined"
-        style="border-color: lightgrey;"
       >
         <v-sheet class="pt-4">
           <v-card-text>

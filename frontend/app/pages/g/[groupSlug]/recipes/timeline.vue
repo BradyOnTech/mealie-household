@@ -1,8 +1,8 @@
 <template>
-  <div>
+  <div class="paper-container pt-4">
     <BasePageTitle
       v-if="groupName"
-      class="mt-n4 pt-8"
+      divider
     >
       <template #header>
         <v-img

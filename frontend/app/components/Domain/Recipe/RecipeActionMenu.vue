@@ -19,31 +19,30 @@
       </v-card-text>
     </BaseDialog>
 
+    <slot name="start" />
     <v-spacer />
     <div v-if="!open" class="custom-btn-group ma-1">
-      <RecipeFavoriteBadge v-if="loggedIn" color="info" button-style :recipe-id="recipe.id!" show-always />
+      <RecipeFavoriteBadge v-if="loggedIn" button-style :recipe-id="recipe.id!" show-always />
       <RecipeTimelineBadge
         v-if="loggedIn"
         class="ml-1"
-        color="info"
         button-style
         :slug="recipe.slug"
         :recipe-name="recipe.name!"
       />
       <div v-if="loggedIn">
-        <v-tooltip v-if="canEdit" location="bottom" color="info">
+        <v-tooltip v-if="canEdit" location="bottom">
           <template #activator="{ props: tooltipProps }">
             <v-btn
               icon
-              variant="flat"
+              variant="outlined"
               rounded="circle"
-              size="small"
-              color="info"
-              class="ml-1"
+              class="ml-1 recipe-action-circle"
+              :aria-label="$t('general.edit')"
               v-bind="tooltipProps"
               @click="$emit('edit', true)"
             >
-              <v-icon size="x-large">
+              <v-icon>
                 {{ $globals.icons.edit }}
               </v-icon>
             </v-btn>
@@ -59,7 +58,6 @@
         :slug="recipe.slug!"
         :menu-icon="$globals.icons.dotsVertical"
         fab
-        color="info"
         :card-menu="false"
         :recipe="recipe"
         :recipe-id="recipe.id!"

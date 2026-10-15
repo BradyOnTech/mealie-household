@@ -25,29 +25,23 @@
       v-if="book"
       class="my-0"
     >
-      <v-sheet
-        color="transparent"
-        class="d-flex flex-column w-100 pa-0 ma-0"
-        elevation="0"
-      >
-        <div class="d-flex align-center w-100 mb-2">
-          <v-toolbar-title class="headline mb-0">
-            <v-icon size="large" class="mr-3">
-              {{ $globals.icons.pages }}
-            </v-icon>
+      <header class="cookbook-head">
+        <div>
+          <span class="paper-kicker">{{ $t("cookbook.cookbook") }}</span>
+          <h1 class="cookbook-head__title paper-headline">
             {{ book.name }}
-          </v-toolbar-title>
-          <BaseButton
-            v-if="canEdit"
-            class="mx-1"
-            :edit="true"
-            @click="handleEditCookbook"
-          />
+          </h1>
+          <p v-if="book.description" class="cookbook-head__dek paper-dek">
+            {{ book.description }}
+          </p>
         </div>
-        <div v-if="book.description" class="subtitle-1 text-grey-lighten-1 mb-2">
-          {{ book.description }}
-        </div>
-      </v-sheet>
+        <BaseButton
+          v-if="canEdit"
+          secondary
+          :edit="true"
+          @click="handleEditCookbook"
+        />
+      </header>
 
       <v-container class="pa-0">
         <RecipeCardSection
@@ -128,3 +122,31 @@ useSeoMeta({
   title: book?.value?.name || "Cookbook",
 });
 </script>
+
+<style scoped>
+.cookbook-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px 24px;
+  margin: 20px 0 28px;
+}
+
+.cookbook-head__title {
+  margin: 6px 0 8px;
+  font-size: 3rem;
+}
+
+.cookbook-head__dek {
+  margin: 0;
+  max-width: 54ch;
+  font-size: 1.125rem;
+}
+
+@media (max-width: 599px) {
+  .cookbook-head__title {
+    font-size: 2.25rem;
+  }
+}
+</style>

@@ -1,0 +1,548 @@
+/*
+ * "Sunday Paper" design system.
+ *
+ * Warm paper, ink, hairline rules, Fraunces headlines and Instrument Sans for the interface.
+ * Colors come from the Vuetify theme (plugins/theme.ts), so everything here follows light and
+ * dark mode. Component overrides live in Vuetify's own `vuetify-overrides` layer: they beat
+ * Vuetify's component styles while utility classes (pa-0, text-center, font-weight-bold, ...)
+ * still win over them.
+ */
+
+/* Mirror Vuetify's layer order so it holds regardless of which stylesheet loads first. */
+@layer vuetify-core, vuetify-components, vuetify-overrides, vuetify-utilities, vuetify-final;
+@layer vuetify-core.reset, vuetify-core.base;
+@layer vuetify-utilities.theme-base, vuetify-utilities.typography, vuetify-utilities.helpers,
+  vuetify-utilities.theme-background, vuetify-utilities.theme-foreground;
+@layer vuetify-final.transitions, vuetify-final.trumps;
+
+:root {
+  --paper-serif: "Fraunces", "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+  --paper-sans: "Instrument Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --v-font-body: var(--paper-sans);
+  --v-font-heading: var(--paper-serif);
+  --paper-radius: 4px;
+  --paper-gutter: 48px;
+}
+
+/* Theme-dependent aliases; declared on the theme classes so nested themes resolve correctly. */
+:root,
+.v-theme--light,
+.v-theme--dark {
+  --paper-ink: rgb(var(--v-theme-on-background));
+  --paper-ink-muted: rgb(var(--v-theme-ink-muted));
+  --paper-rule: rgb(var(--v-theme-rule));
+  --paper-accent: rgb(var(--v-theme-tomato));
+  --paper-sage: rgb(var(--v-theme-sage));
+  --paper-wash: rgb(var(--v-theme-wash));
+  --paper-shadow-pop: 0 1px 2px rgba(var(--v-shadow-color), 0.06), 0 18px 40px -18px rgba(var(--v-shadow-color), 0.32);
+}
+
+@media (max-width: 959px) {
+  :root {
+    --paper-gutter: 20px;
+  }
+}
+
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  scrollbar-color: rgba(var(--v-border-color), 0.28) transparent;
+}
+
+body,
+.v-application {
+  font-family:
+    "Instrument Sans",
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    Roboto,
+    sans-serif;
+  font-family: var(--paper-sans);
+}
+
+::selection {
+  background: rgb(var(--v-theme-wash));
+  color: rgb(var(--v-theme-on-background));
+}
+
+/* ------------------------------------------------------------------------------------------------
+ * Typography. Vuetify 4 dropped the Material 2 class names this app still uses, so they are
+ * defined here on the editorial scale, inside Vuetify's typography layer.
+ * ---------------------------------------------------------------------------------------------- */
+@layer vuetify-utilities.typography {
+  .text-h1,
+  .text-h2,
+  .text-h3,
+  .text-h4,
+  .text-h5,
+  .text-h6 {
+    font-family: "Fraunces", Georgia, serif;
+    font-family: var(--paper-serif);
+    font-optical-sizing: auto;
+    text-transform: none;
+  }
+  .text-h1 {
+    font-size: 3.5rem;
+    font-weight: 400;
+    line-height: 1.02;
+    letter-spacing: -0.025em;
+  }
+  .text-h2 {
+    font-size: 2.75rem;
+    font-weight: 400;
+    line-height: 1.05;
+    letter-spacing: -0.022em;
+  }
+  .text-h3 {
+    font-size: 2.25rem;
+    font-weight: 420;
+    line-height: 1.08;
+    letter-spacing: -0.02em;
+  }
+  .text-h4 {
+    font-size: 1.875rem;
+    font-weight: 420;
+    line-height: 1.12;
+    letter-spacing: -0.018em;
+  }
+  .text-h5 {
+    font-size: 1.5rem;
+    font-weight: 450;
+    line-height: 1.2;
+    letter-spacing: -0.012em;
+  }
+  .text-h6 {
+    font-size: 1.25rem;
+    font-weight: 480;
+    line-height: 1.25;
+    letter-spacing: -0.008em;
+  }
+  .text-subtitle-1,
+  .text-subtitle-2,
+  .text-body-1,
+  .text-body-2,
+  .text-caption,
+  .text-overline,
+  .text-button {
+    font-family: var(--paper-sans);
+    text-transform: none;
+  }
+  .text-subtitle-1 {
+    font-size: 1rem;
+    font-weight: 500;
+    line-height: 1.5;
+    letter-spacing: 0;
+  }
+  .text-subtitle-2 {
+    font-size: 0.875rem;
+    font-weight: 600;
+    line-height: 1.45;
+    letter-spacing: 0.005em;
+  }
+  .text-body-1 {
+    font-size: 1rem;
+    font-weight: 400;
+    line-height: 1.55;
+    letter-spacing: 0;
+  }
+  .text-body-2 {
+    font-size: 0.875rem;
+    font-weight: 400;
+    line-height: 1.5;
+    letter-spacing: 0.005em;
+  }
+  .text-caption {
+    font-size: 0.75rem;
+    font-weight: 400;
+    line-height: 1.4;
+    letter-spacing: 0.01em;
+  }
+  .text-overline {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    line-height: 1.6;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+  }
+  .text-button {
+    font-size: 0.875rem;
+    font-weight: 600;
+    letter-spacing: 0;
+  }
+
+  @media (max-width: 599px) {
+    .text-h1 {
+      font-size: 2.5rem;
+    }
+    .text-h2 {
+      font-size: 2.25rem;
+    }
+    .text-h3 {
+      font-size: 2rem;
+    }
+    .text-h4 {
+      font-size: 1.625rem;
+    }
+  }
+}
+
+@layer vuetify-overrides {
+  /* ----------------------------------------------------------------------------------------------
+   * Editorial building blocks, shared by the redesigned pages.
+   * -------------------------------------------------------------------------------------------- */
+  .paper-serif {
+    font-family: var(--paper-serif);
+    font-optical-sizing: auto;
+  }
+  .paper-kicker {
+    display: block;
+    font-family: var(--paper-sans);
+    font-size: 0.6875rem;
+    font-weight: 600;
+    line-height: 1.6;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: rgb(var(--v-theme-tomato));
+  }
+  .paper-headline {
+    font-family: var(--paper-serif);
+    font-optical-sizing: auto;
+    font-weight: 420;
+    line-height: 1.02;
+    letter-spacing: -0.025em;
+    text-wrap: balance;
+  }
+  .paper-dek {
+    font-family: var(--paper-serif);
+    font-optical-sizing: auto;
+    font-style: italic;
+    font-weight: 350;
+    line-height: 1.45;
+    color: rgb(var(--v-theme-ink-muted));
+  }
+  .paper-muted {
+    color: rgb(var(--v-theme-ink-muted));
+  }
+  .paper-accent {
+    color: rgb(var(--v-theme-tomato));
+  }
+  .paper-rule {
+    border-bottom: 1px solid rgb(var(--v-theme-rule));
+  }
+  .paper-rule-top {
+    border-top: 1px solid rgb(var(--v-theme-rule));
+  }
+  .paper-rule-ink {
+    border-bottom: 1px solid rgb(var(--v-theme-on-background));
+  }
+  .paper-double-rule {
+    border-bottom: 3px double rgb(var(--v-theme-rule));
+  }
+  .paper-section-title {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    margin: 0;
+    padding-bottom: 10px;
+    border-bottom: 1px solid rgb(var(--v-theme-on-background));
+    font-family: var(--paper-serif);
+    font-optical-sizing: auto;
+    font-size: 1.375rem;
+    font-weight: 450;
+    line-height: 1.2;
+    letter-spacing: -0.01em;
+  }
+  .paper-section-title > .paper-section-aside {
+    margin-left: auto;
+    font-family: var(--paper-sans);
+    font-size: 0.8125rem;
+    font-weight: 500;
+    letter-spacing: 0;
+    color: rgb(var(--v-theme-ink-muted));
+  }
+  .paper-link {
+    color: rgb(var(--v-theme-tomato));
+    font-weight: 600;
+    text-decoration: none;
+    cursor: pointer;
+  }
+  .paper-link:hover {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+  .paper-box {
+    background: rgb(var(--v-theme-surface));
+    border: 1px solid rgb(var(--v-theme-rule));
+    border-radius: var(--paper-radius);
+  }
+  .paper-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    font-size: 0.8125rem;
+    color: rgb(var(--v-theme-ink-muted));
+  }
+  .paper-meta > * + *::before {
+    content: "·";
+    margin: 0 0.6em;
+  }
+  .paper-image {
+    display: block;
+    width: 100%;
+    object-fit: cover;
+    border-radius: 2px;
+    background: rgb(var(--v-theme-surface-light));
+  }
+  .paper-container {
+    width: 100%;
+    max-width: 1200px;
+    margin-inline: auto;
+    padding-inline: var(--paper-gutter);
+  }
+
+  /* ----------------------------------------------------------------------------------------------
+   * Headings without typography classes read as editorial headings.
+   * -------------------------------------------------------------------------------------------- */
+  .v-application :is(h1, h2, h3, h4) {
+    font-family: var(--paper-serif);
+    font-optical-sizing: auto;
+    font-weight: 450;
+    letter-spacing: -0.01em;
+  }
+
+  /* ----------------------------------------------------------------------------------------------
+   * Cards: flat paper with a hairline frame instead of drop shadows.
+   * -------------------------------------------------------------------------------------------- */
+  .v-card {
+    border-radius: var(--paper-radius);
+  }
+  .v-card--variant-elevated:not(.v-card--flat) {
+    box-shadow: none;
+    border: 1px solid rgb(var(--v-theme-rule));
+  }
+  .v-card--variant-outlined:not([class*="text-"]) {
+    border-color: rgb(var(--v-theme-rule));
+  }
+  .v-card-title {
+    font-family: var(--paper-serif);
+    font-optical-sizing: auto;
+    font-weight: 450;
+    letter-spacing: -0.01em;
+  }
+  .v-card-subtitle {
+    color: rgb(var(--v-theme-ink-muted));
+    opacity: 1;
+  }
+
+  /* Overlays: dialogs float on a warm scrim, menus get a hairline frame and a soft lift. */
+  .v-overlay__scrim {
+    background: #1a140e;
+  }
+  .v-dialog > .v-overlay__content > .v-card,
+  .v-dialog > .v-overlay__content > form > .v-card {
+    border: none;
+    border-radius: 10px;
+    box-shadow: 0 30px 80px -24px rgba(var(--v-shadow-color), 0.5);
+  }
+  .v-dialog--fullscreen > .v-overlay__content > .v-card {
+    border-radius: 0;
+  }
+  .v-menu > .v-overlay__content > .v-list,
+  .v-menu > .v-overlay__content > .v-card,
+  .v-menu > .v-overlay__content > .v-sheet {
+    border: 1px solid rgb(var(--v-theme-rule));
+    border-radius: 8px;
+    box-shadow: var(--paper-shadow-pop);
+  }
+  .v-tooltip > .v-overlay__content {
+    border-radius: 6px;
+    font-size: 0.8125rem;
+    font-weight: 500;
+  }
+
+  /* ----------------------------------------------------------------------------------------------
+   * Buttons: pills, no shadows, medium-weight labels.
+   * -------------------------------------------------------------------------------------------- */
+  .v-btn {
+    font-weight: 600;
+    letter-spacing: 0;
+    text-transform: none;
+  }
+  .v-btn:not(.v-btn--icon):not(.v-tab):not(.v-btn-group > .v-btn):not(.v-bottom-navigation .v-btn) {
+    border-radius: 999px;
+  }
+  .v-btn--variant-elevated:not(.v-fab__container .v-btn) {
+    box-shadow: none;
+  }
+  .v-btn-group {
+    border-radius: 999px;
+  }
+  .v-btn:focus-visible {
+    outline: 2px solid rgb(var(--v-theme-tomato));
+    outline-offset: 2px;
+  }
+
+  /* ----------------------------------------------------------------------------------------------
+   * Form fields: outlined, on a slightly lighter surface, hairline borders that firm up on focus.
+   * -------------------------------------------------------------------------------------------- */
+  .v-field--variant-outlined,
+  .v-field--variant-solo,
+  .v-field--variant-solo-filled,
+  .v-field--variant-filled {
+    background: rgb(var(--v-theme-surface));
+  }
+  /* Solo and filled fields drop their shadow and grey wash for the same hairline as outlined ones. */
+  .v-field--variant-solo,
+  .v-field--variant-solo-filled,
+  .v-field--variant-filled {
+    box-shadow: inset 0 0 0 1px rgba(var(--v-border-color), 0.22);
+  }
+  .v-field--variant-solo.v-field--focused,
+  .v-field--variant-solo-filled.v-field--focused {
+    box-shadow: inset 0 0 0 2px rgb(var(--v-theme-on-surface));
+  }
+  .v-field--variant-solo-filled .v-field__overlay,
+  .v-field--variant-filled .v-field__overlay {
+    opacity: 0;
+  }
+  .v-field--variant-outlined {
+    border-radius: 6px;
+  }
+  .v-field__outline {
+    --v-field-border-opacity: 0.24;
+  }
+  @media (hover: hover) {
+    .v-field:hover .v-field__outline {
+      --v-field-border-opacity: 0.55;
+    }
+  }
+  .v-field.v-field--focused .v-field__outline,
+  .v-input.v-input--error .v-field__outline {
+    --v-field-border-opacity: 1;
+  }
+  .v-label {
+    font-family: var(--paper-sans);
+    letter-spacing: 0;
+  }
+  .v-messages__message {
+    line-height: 1.4;
+  }
+
+  /* ----------------------------------------------------------------------------------------------
+   * Lists, chips, tabs, tables and panels.
+   * -------------------------------------------------------------------------------------------- */
+  .v-list-subheader {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: rgb(var(--v-theme-tomato));
+  }
+  .v-list-subheader .v-list-subheader__text {
+    opacity: 1;
+  }
+  .v-chip {
+    font-weight: 500;
+    letter-spacing: 0.01em;
+  }
+  .v-tab.v-btn {
+    font-weight: 500;
+    letter-spacing: 0;
+  }
+  .v-tab--selected {
+    font-weight: 600;
+  }
+  .v-table {
+    background: transparent;
+  }
+  .v-table > .v-table__wrapper > table > thead > tr > th {
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: rgb(var(--v-theme-ink-muted));
+  }
+  .v-expansion-panel__shadow {
+    box-shadow: none;
+  }
+  .v-expansion-panels:not(.v-expansion-panels--variant-accordion) > .v-expansion-panel {
+    border: 1px solid rgb(var(--v-theme-rule));
+  }
+  .v-expansion-panels--variant-accordion {
+    border: 1px solid rgb(var(--v-theme-rule));
+    border-radius: var(--paper-radius);
+  }
+  .v-expansion-panel-title {
+    font-weight: 600;
+  }
+  .v-alert {
+    border-radius: 6px;
+  }
+  .v-alert-title {
+    font-family: var(--paper-serif);
+    font-weight: 500;
+    letter-spacing: -0.005em;
+  }
+  .v-snackbar__wrapper {
+    border-radius: 10px;
+    box-shadow: var(--paper-shadow-pop);
+  }
+  .v-navigation-drawer {
+    background: rgb(var(--v-theme-background));
+    border-color: rgb(var(--v-theme-rule));
+  }
+  .v-bottom-sheet > .v-bottom-sheet__content.v-overlay__content > .v-card,
+  .v-bottom-sheet > .v-bottom-sheet__content.v-overlay__content > .v-sheet {
+    border-radius: 16px 16px 0 0;
+  }
+
+  /* The wordmark masthead used on sign-in, registration and first-run setup. */
+  .paper-wordmark-head {
+    padding: 28px 24px 20px;
+    border-bottom: 1px solid rgb(var(--v-theme-rule));
+    text-align: center;
+  }
+  .paper-wordmark {
+    font-family: var(--paper-serif);
+    font-optical-sizing: auto;
+    font-size: 3rem;
+    font-style: italic;
+    font-weight: 500;
+    line-height: 1;
+    letter-spacing: -0.015em;
+  }
+
+  /* Page titles stay typographic: decorative illustrations passed to the header slot are hidden. */
+  .page-title__header > .v-img {
+    display: none;
+  }
+
+  /* Icon actions on recipe cards and pages: quiet inline icons, or outlined ink circles. */
+  .recipe-action-quiet {
+    color: rgb(var(--v-theme-ink-muted));
+  }
+  .recipe-action-quiet:hover {
+    color: rgb(var(--v-theme-on-background));
+  }
+  .recipe-action-circle.v-btn--variant-outlined {
+    border-color: rgb(var(--v-theme-rule));
+    background: rgb(var(--v-theme-surface));
+    color: rgb(var(--v-theme-on-background));
+  }
+
+  /* Rich text from recipes and notes. */
+  .v-application .markdown-content a,
+  .v-application .safe-markdown a {
+    color: rgb(var(--v-theme-tomato));
+    text-underline-offset: 3px;
+  }
+}
+
+@media print {
+  .v-application,
+  .v-main {
+    background: #fff !important;
+  }
+}

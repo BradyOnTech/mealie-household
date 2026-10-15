@@ -25,7 +25,9 @@
               hide-details
               density="compact"
               class="mt-0 flex-shrink-0"
-              color="null"
+              color="secondary"
+              :false-icon="$globals.icons.checkboxBlankCircleOutline"
+              :true-icon="$globals.icons.checkboxMarkedCircle"
               @click="toggleChecked"
             />
             <div

@@ -70,78 +70,67 @@
       </v-card>
     </BaseDialog>
 
-    <BasePageTitle divider class="shopping-list-title">
-      <template #header>
-        <v-container class="px-0">
-          <v-row no-gutters>
-            <ButtonLink
-              :to="`/shopping-lists?disableRedirect=true`"
-              :text="$t('shopping-list.all-lists')"
-              :icon="$globals.icons.backArrow"
-            />
-            <v-spacer />
-            <h2 v-if="smAndUp" class="text-h5">
-              {{ shoppingList.name }}
-            </h2>
-            <v-spacer />
-            <BaseButtonGroup
-              class="d-flex"
-              :buttons="[
+    <header class="list-head">
+      <NuxtLink :to="`/shopping-lists?disableRedirect=true`" class="paper-kicker list-head__back">
+        ← {{ $t('shopping-list.all-lists') }}
+      </NuxtLink>
+      <div class="list-head__row">
+        <h1 class="list-head__title paper-headline">
+          {{ shoppingList.name }}
+        </h1>
+        <BaseButtonGroup
+          class="d-flex"
+          :buttons="[
+            {
+              icon: $globals.icons.contentCopy,
+              text: '',
+              event: 'edit',
+              children: [
                 {
                   icon: $globals.icons.contentCopy,
-                  text: '',
-                  event: 'edit',
-                  children: [
-                    {
-                      icon: $globals.icons.contentCopy,
-                      text: $t('shopping-list.copy-as-text'),
-                      event: 'copy-plain',
-                    },
-                    {
-                      icon: $globals.icons.contentCopy,
-                      text: $t('shopping-list.copy-as-markdown'),
-                      event: 'copy-markdown',
-                    },
-                  ],
+                  text: $t('shopping-list.copy-as-text'),
+                  event: 'copy-plain',
                 },
                 {
-                  icon: $globals.icons.checkboxMultipleMarkedOutline,
-                  text: $t('shopping-list.check-all-items'),
-                  event: 'check',
+                  icon: $globals.icons.contentCopy,
+                  text: $t('shopping-list.copy-as-markdown'),
+                  event: 'copy-markdown',
+                },
+              ],
+            },
+            {
+              icon: $globals.icons.checkboxMultipleMarkedOutline,
+              text: $t('shopping-list.check-all-items'),
+              event: 'check',
+            },
+            {
+              icon: $globals.icons.dotsVertical,
+              text: '',
+              event: 'three-dot',
+              children: [
+                {
+                  icon: $globals.icons.tags,
+                  text: $t('shopping-list.reorder-labels'),
+                  event: 'reorder-labels',
                 },
                 {
-                  icon: $globals.icons.dotsVertical,
-                  text: '',
-                  event: 'three-dot',
-                  children: [
-                    {
-                      icon: $globals.icons.tags,
-                      text: $t('shopping-list.reorder-labels'),
-                      event: 'reorder-labels',
-                    },
-                    {
-                      icon: $globals.icons.tags,
-                      text: $t('shopping-list.manage-labels'),
-                      event: 'manage-labels',
-                    },
-                  ],
+                  icon: $globals.icons.tags,
+                  text: $t('shopping-list.manage-labels'),
+                  event: 'manage-labels',
                 },
-              ]"
-              @edit="edit = true"
-              @three-dot="threeDot = true"
-              @check="openCheckAll"
-              @copy-plain="copyListItems('plain')"
-              @copy-markdown="copyListItems('markdown')"
-              @reorder-labels="toggleReorderLabelsDialog()"
-              @manage-labels="$router.push(`/group/data/labels`)"
-            />
-          </v-row>
-        </v-container>
-      </template>
-      <template #title>
-        {{ smAndUp ? "" : shoppingList.name }}
-      </template>
-    </BasePageTitle>
+              ],
+            },
+          ]"
+          @edit="edit = true"
+          @three-dot="threeDot = true"
+          @check="openCheckAll"
+          @copy-plain="copyListItems('plain')"
+          @copy-markdown="copyListItems('markdown')"
+          @reorder-labels="toggleReorderLabelsDialog()"
+          @manage-labels="$router.push(`/group/data/labels`)"
+        />
+      </div>
+    </header>
     <BannerWarning
       v-if="isOffline"
       :title="$t('shopping-list.you-are-offline')"
@@ -193,11 +182,11 @@
           <v-expansion-panel class="shopping-list-section">
             <!-- the label colour fills the header bar; an uncoloured (or unlabelled) header is muted instead -->
             <v-expansion-panel-title
-              :color="getLabelColor(key)"
-              class="body-1 section-title"
-              :class="getLabelColor(key) ? '' : 'text-medium-emphasis'"
+              class="section-title"
+              :style="{ '--label-color': getLabelColor(key) || 'rgb(var(--v-theme-ink-muted))' }"
             >
-              {{ key }}
+              <span class="list-section__dot" />
+              <span class="list-section__name">{{ key }}</span>
             </v-expansion-panel-title>
             <v-expansion-panel-text eager>
               <VueDraggable
@@ -363,7 +352,6 @@ import { useLabelStore, useUnitStore, useFoodStore } from "~/composables/store";
 import { alert } from "~/composables/use-toast";
 import type { ShoppingListItemOut } from "~/lib/api/types/household";
 
-const { smAndUp } = useDisplay();
 const i18n = useI18n();
 
 useSeoMeta({
@@ -439,40 +427,74 @@ const {
   max-width: 50px;
 }
 
-/* The page header reserves room for an icon row, a subtitle and generous margins; pull
-   those in so the list starts near the top of the screen */
-.shopping-list-title {
-  margin-top: 0 !important;
+.list-head {
+  margin: 20px 0 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgb(var(--v-theme-on-background));
+}
 
-  .v-container {
-    padding-top: 4px;
-    padding-bottom: 0;
-  }
+.list-head__back {
+  text-decoration: none;
+}
 
-  h2 {
-    font-size: 1.1rem !important;
-    line-height: 1.4;
-  }
+.list-head__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  margin-top: 4px;
+}
 
-  h3 {
-    display: none;
-  }
+.list-head__title {
+  margin: 0;
+  font-size: 2.5rem;
+}
 
-  .v-divider {
-    margin-top: 6px !important;
-    margin-bottom: 2px !important;
+@media (max-width: 599px) {
+  .list-head__title {
+    font-size: 2rem;
   }
 }
 
 /* Strip most of the vertical padding so more items fit on a phone screen, and lean on
    indentation (label header flush left, items inset) to keep sections readable */
 .shopping-list-view {
-  /* slim header: a low bar with bold text, keeping the label colour as its fill */
+  /* label sections read like aisles: an italic heading with the label's colour as a dot */
+  .shopping-list-section {
+    background: transparent;
+  }
+
   .shopping-list-section .section-title {
-    min-height: 30px !important;
-    padding: 2px 10px;
-    font-size: 0.9rem;
-    font-weight: 700;
+    min-height: 34px !important;
+    padding: 8px 0 2px;
+    background: transparent;
+  }
+
+  .list-section__dot {
+    width: 9px;
+    height: 9px;
+    margin-right: 10px;
+    border-radius: 50%;
+    background: var(--label-color);
+  }
+
+  .list-section__name {
+    font-family: var(--paper-serif);
+    font-size: 1.125rem;
+    font-style: italic;
+    font-weight: 400;
+    color: rgb(var(--v-theme-ink-muted));
+  }
+
+  .shopping-list-item-row {
+    border-bottom: 1px solid rgb(var(--v-theme-rule));
+  }
+
+  .shopping-list-item-row .ingredient-qty,
+  .shopping-list-item-row .ingredient-unit {
+    font-family: var(--paper-serif);
+    color: rgb(var(--v-theme-tomato));
   }
 
   .shopping-list-section .v-expansion-panel-text__wrapper,

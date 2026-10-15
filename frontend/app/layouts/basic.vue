@@ -1,14 +1,10 @@
 <template>
-  <v-app dark>
+  <v-app>
     <TheSnackbar />
 
     <AppHeader :menu="false" />
     <v-main>
-      <v-scroll-x-transition>
-        <div>
-          <NuxtPage />
-        </div>
-      </v-scroll-x-transition>
+      <NuxtPage />
     </v-main>
   </v-app>
 </template>

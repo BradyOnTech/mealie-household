@@ -1,12 +1,11 @@
 <template>
-  <div class="d-flex justify-space-between align-center pt-2 pb-3">
-    <RecipeScaleEditButton
-      v-if="!isEditMode"
-      v-model.number="scale"
-      :recipe-servings="recipeServings"
-      :edit-scale="hasFoodOrUnit && !isEditMode"
-    />
-  </div>
+  <RecipeScaleEditButton
+    v-if="!isEditMode"
+    v-model.number="scale"
+    :recipe-servings="recipeServings"
+    :edit-scale="hasFoodOrUnit && !isEditMode"
+    :label="label"
+  />
 </template>
 
 <script setup lang="ts">
@@ -15,7 +14,9 @@ import type { NoUndefinedField } from "~/lib/api/types/non-generated";
 import type { Recipe } from "~/lib/api/types/recipe";
 import { usePageState } from "~/composables/recipe-page/shared-state";
 
-const props = defineProps<{ recipe: NoUndefinedField<Recipe> }>();
+const props = withDefaults(defineProps<{ recipe: NoUndefinedField<Recipe>; label?: string }>(), {
+  label: "",
+});
 
 const scale = defineModel<number>({ default: 1 });
 

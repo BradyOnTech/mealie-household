@@ -10,7 +10,7 @@
   >
     <template #activator="{ props: hoverProps }">
       <v-btn
-        variant="flat"
+        :variant="icon ? 'text' : 'flat'"
         :icon="icon"
         :color="color"
         retain-focus-on-click

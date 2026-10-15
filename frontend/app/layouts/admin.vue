@@ -1,115 +1,79 @@
 <template>
-  <v-app dark>
+  <v-app>
     <TheSnackbar />
 
-    <AppHeader>
-      <v-btn
-        icon
-        @click.stop="sidebar = !sidebar"
-      >
-        <v-icon> {{ $globals.icons.menu }}</v-icon>
-      </v-btn>
-    </AppHeader>
+    <AppHeader />
 
-    <AppSidebar
-      v-model="sidebar"
-      :top-link="topLinks"
-      :user="{ data: true }"
-      :secondary-header="$t('sidebar.developer')"
-      :secondary-links="developerLinks"
-    />
-
-    <v-main>
-      <v-scroll-x-transition>
-        <div>
-          <NuxtPage />
-        </div>
-      </v-scroll-x-transition>
+    <v-main class="app-main" :class="{ 'app-main--tabbar': showTabBar }">
+      <AppSectionNav :links="adminLinks" :label="$t('settings.admin-settings')" />
+      <NuxtPage />
     </v-main>
+    <AppTabBar v-if="showTabBar" />
   </v-app>
 </template>
 
 <script setup lang="ts">
 import AppHeader from "@/components/Layout/LayoutParts/AppHeader.vue";
-import AppSidebar from "@/components/Layout/LayoutParts/AppSidebar.vue";
+import AppSectionNav from "@/components/Layout/LayoutParts/AppSectionNav.vue";
+import AppTabBar from "@/components/Layout/LayoutParts/AppTabBar.vue";
 import TheSnackbar from "~/components/Layout/LayoutParts/TheSnackbar.vue";
-import type { SidebarLinks } from "~/types/application-types";
+import type { AppNavLink } from "~/composables/use-app-navigation";
 import { useGlobalI18n } from "~/composables/use-global-i18n";
 
 const i18n = useGlobalI18n();
-const display = useDisplay();
+const { smAndDown } = useDisplay();
 const { $globals } = useNuxtApp();
 
-const sidebar = ref<boolean>(false);
-onMounted(() => {
-  sidebar.value = display.lgAndUp.value;
-});
+const showTabBar = computed(() => smAndDown.value);
 
-const topLinks: SidebarLinks = [
+const adminLinks: AppNavLink[] = [
   {
+    key: "site-settings",
     icon: $globals.icons.cog,
     to: "/admin/site-settings",
     title: i18n.t("sidebar.site-settings"),
-    restricted: true,
   },
-
-  // {
-  //   icon: $globals.icons.chart,
-  //   to: "/admin/analytics",
-  //   title: "Analytics",
-  //   restricted: true,
-  // },
   {
+    key: "users",
     icon: $globals.icons.user,
     to: "/admin/manage/users",
     title: i18n.t("user.users"),
-    restricted: true,
   },
   {
+    key: "households",
     icon: $globals.icons.household,
     to: "/admin/manage/households",
     title: i18n.t("household.households"),
-    restricted: true,
   },
   {
+    key: "groups",
     icon: $globals.icons.group,
     to: "/admin/manage/groups",
     title: i18n.t("group.groups"),
-    restricted: true,
   },
   {
+    key: "backups",
     icon: $globals.icons.database,
     to: "/admin/backups",
     title: i18n.t("sidebar.backups"),
-    restricted: true,
   },
-];
-
-const developerLinks: SidebarLinks = [
   {
+    key: "maintenance",
     icon: $globals.icons.wrench,
     to: "/admin/maintenance",
     title: i18n.t("sidebar.maintenance"),
-    restricted: true,
   },
   {
+    key: "openai",
     icon: $globals.icons.robot,
-    title: i18n.t("recipe.debug"),
-    restricted: true,
-    children: [
-      {
-        icon: $globals.icons.robot,
-        to: "/admin/debug/openai",
-        title: i18n.t("admin.openai"),
-        restricted: true,
-      },
-      {
-        icon: $globals.icons.slotMachine,
-        to: "/admin/debug/parser",
-        title: i18n.t("sidebar.parser"),
-        restricted: true,
-      },
-    ],
+    to: "/admin/debug/openai",
+    title: i18n.t("admin.openai"),
+  },
+  {
+    key: "parser",
+    icon: $globals.icons.slotMachine,
+    to: "/admin/debug/parser",
+    title: i18n.t("sidebar.parser"),
   },
 ];
 </script>

@@ -2,29 +2,19 @@
   <v-card
     :min-width="minWidth"
     :to="to"
-    :hover="to ? true : false"
+    variant="outlined"
+    class="stat-card"
+    :class="{ 'stat-card--link': !!to }"
   >
-    <div class="d-flex flex-no-wrap">
-      <v-avatar
-        class="ml-3 mr-0 mt-3"
-        color="primary"
-        size="36"
-      >
-        <v-icon
-          color="white"
-          class="pa-1"
-          size="x-large"
-        >
-          {{ activeIcon }}
-        </v-icon>
-      </v-avatar>
-      <div>
-        <v-card-title class="text-subtitle-1 pt-2 pb-2">
-          <slot name="title" />
-        </v-card-title>
-        <v-card-subtitle class="pb-2">
-          <slot name="value" />
-        </v-card-subtitle>
+    <div class="stat-card__body">
+      <v-icon class="stat-card__icon" size="18">
+        {{ activeIcon }}
+      </v-icon>
+      <div class="stat-card__value">
+        <slot name="value" />
+      </div>
+      <div class="stat-card__label">
+        <slot name="title" />
       </div>
     </div>
   </v-card>
@@ -53,4 +43,40 @@ const activeIcon = computed(() => {
 });
 </script>
 
-<style scoped></style>
+<style scoped>
+.stat-card {
+  background: rgb(var(--v-theme-surface));
+}
+
+.stat-card__body {
+  display: flex;
+  flex-direction: column;
+  padding: 14px 16px 12px;
+}
+
+.stat-card__icon {
+  margin-bottom: 8px;
+  color: rgb(var(--v-theme-tomato));
+}
+
+.stat-card__value {
+  font-family: var(--paper-serif);
+  font-optical-sizing: auto;
+  font-size: 2rem;
+  font-weight: 400;
+  line-height: 1;
+}
+
+.stat-card__label {
+  margin-top: 6px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: rgb(var(--v-theme-ink-muted));
+}
+
+.stat-card--link:hover .stat-card__value {
+  color: rgb(var(--v-theme-tomato));
+}
+</style>

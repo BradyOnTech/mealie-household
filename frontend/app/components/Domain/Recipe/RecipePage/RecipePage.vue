@@ -21,12 +21,12 @@
       @update:model-value="toggleIsParsing"
       @save="saveParsedIngredients"
     />
-    <v-container v-show="!isCookMode" key="recipe-page" class="px-0" :class="{ 'pa-0': $vuetify.display.smAndDown }">
-      <v-card flat class="d-print-none">
+    <v-container v-show="!isCookMode" key="recipe-page" class="recipe-page px-0" :class="{ 'pa-0': $vuetify.display.smAndDown }">
+      <v-card flat color="transparent" class="d-print-none">
         <RecipePageHeader
           ref="recipeToolbar"
+          v-model:recipe-scale="scale"
           :recipe="recipe"
-          :recipe-scale="scale"
           :landscape="landscape"
           @save="saveRecipe"
           @delete="deleteRecipe"
@@ -58,9 +58,6 @@
           </div>
           <div>
             <RecipePageIngredientEditor v-if="isEditForm" v-model="recipe" />
-          </div>
-          <div>
-            <RecipePageScale v-model="scale" :recipe="recipe" />
           </div>
 
           <!--
@@ -138,18 +135,18 @@
       </v-tooltip>
     </v-fab>
     <!-- Cook mode displayes two columns with ingredients and instructions side by side, each being scrolled individually, allowing to view both at the same time -->
-    <!-- The calc is to account for the navabar height (48px) -->
+    <!-- The calc is to account for the masthead height (68px on desktop, 56px below that) -->
     <v-sheet
       v-show="isCookMode && !hasLinkedIngredients"
       key="cookmode"
-      :height="$vuetify.display.smAndUp ? 'calc(100vh - 48px)' : 'auto'"
+      :height="$vuetify.display.smAndUp ? `calc(100vh - ${$vuetify.display.mdAndUp ? 68 : 56}px)` : 'auto'"
       class-name="overflow-hidden"
     >
       <!-- the calc is to account for the toolbar a more dynamic solution could be needed  -->
       <v-row style="height: 100%" no-gutters class="overflow-hidden">
         <v-col cols="12" sm="5" class="overflow-y-auto pl-4 pr-3 py-2" style="height: 100%">
-          <div class="d-flex align-center">
-            <RecipePageScale v-model="scale" :recipe="recipe" />
+          <div class="d-flex align-center py-2">
+            <RecipePageScale v-model="scale" :recipe="recipe" :label="$t('recipe.servings')" />
           </div>
           <RecipePageIngredientToolsView
             v-if="!isEditForm"
@@ -183,7 +180,7 @@
     </v-sheet>
     <v-sheet v-show="isCookMode && hasLinkedIngredients">
       <div class="mt-2 px-2 px-md-4">
-        <RecipePageScale v-model="scale" :recipe="recipe" />
+        <RecipePageScale v-model="scale" :recipe="recipe" :label="$t('recipe.servings')" />
       </div>
       <RecipePageInstructions
         v-model="recipe.recipeInstructions"
@@ -211,7 +208,8 @@
       v-if="isCookMode"
       icon
       color="primary"
-      style="position: fixed; right: 12px; top: 60px"
+      class="recipe-cook-close"
+      :aria-label="$t('general.close')"
       @click="toggleCookMode()"
     >
       <v-icon>{{ $globals.icons.close }}</v-icon>
@@ -543,5 +541,19 @@ const scale = ref(1);
 
 .list-group-item i {
   cursor: pointer;
+}
+
+.recipe-cook-close {
+  position: fixed !important;
+  top: 80px;
+  right: 16px;
+  z-index: 3;
+}
+
+@media (max-width: 959px) {
+  .recipe-cook-close {
+    top: 66px;
+    right: 12px;
+  }
 }
 </style>

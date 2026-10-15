@@ -69,7 +69,7 @@
       <BaseButton create @click="createCookbook" />
 
       <!-- Cookbook List -->
-      <v-expansion-panels class="mt-2">
+      <v-expansion-panels class="cookbook-shelf mt-4" variant="accordion">
         <VueDraggable
           v-model="myCookbooks"
           handle=".handle"
@@ -81,23 +81,27 @@
           <v-expansion-panel
             v-for="(cookbook, index) in myCookbooks"
             :key="cookbook.id"
-            class="my-2 left-border rounded"
+            class="cookbook-row"
           >
-            <v-expansion-panel-title disable-icon-rotate class="text-h6 opacity-80">
-              <div class="d-flex align-center">
-                <v-icon size="large" start>
-                  {{ $globals.icons.pages }}
-                </v-icon>
-                {{ cookbook.name }}
+            <v-expansion-panel-title disable-icon-rotate class="cookbook-row__title">
+              <div class="cookbook-row__text">
+                <NuxtLink
+                  :to="`/g/${groupSlug}/cookbooks/${cookbook.slug}`"
+                  class="cookbook-row__name"
+                  @click.stop
+                >
+                  {{ cookbook.name }}
+                </NuxtLink>
+                <span v-if="cookbook.description" class="cookbook-row__dek">{{ cookbook.description }}</span>
               </div>
               <template #actions>
                 <div class="d-flex align-center">
-                  <v-btn icon variant="text" class="ml-2">
+                  <v-btn icon variant="text" class="ml-2" :aria-label="$t('general.edit')">
                     <v-icon>
                       {{ $globals.icons.edit }}
                     </v-icon>
                   </v-btn>
-                  <v-icon class="handle" :size="40">
+                  <v-icon class="handle cookbook-row__handle" :size="24">
                     {{ $globals.icons.arrowUpDown }}
                   </v-icon>
                 </div>
@@ -161,6 +165,8 @@ useSeoMeta({
 });
 
 const auth = useMealieAuth();
+const route = useRoute();
+const groupSlug = computed(() => (route.params.groupSlug as string) || auth.user.value?.groupSlug || "");
 const { store: allCookbooks, actions, updateAll } = useCookbookStore();
 
 // Make a local reactive copy of myCookbooks
@@ -240,3 +246,56 @@ onBeforeUnmount(() => {
   window.removeEventListener("beforeunload", handleUnmount);
 });
 </script>
+
+<style scoped>
+.cookbook-shelf {
+  border: 0;
+  border-top: 1px solid rgb(var(--v-theme-on-background));
+  border-radius: 0;
+}
+
+.cookbook-row {
+  background: transparent;
+}
+
+.cookbook-row__title {
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.cookbook-row__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.cookbook-row__name {
+  font-family: var(--paper-serif);
+  font-optical-sizing: auto;
+  font-size: 1.5rem;
+  font-weight: 420;
+  letter-spacing: -0.012em;
+  color: rgb(var(--v-theme-on-background));
+  text-decoration: none;
+}
+
+.cookbook-row__name:hover {
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 5px;
+}
+
+.cookbook-row__dek {
+  font-family: var(--paper-serif);
+  font-style: italic;
+  font-size: 0.9375rem;
+  color: rgb(var(--v-theme-ink-muted));
+}
+
+.cookbook-row__handle {
+  margin-left: 4px;
+  color: rgb(var(--v-theme-ink-muted));
+  cursor: grab;
+}
+</style>

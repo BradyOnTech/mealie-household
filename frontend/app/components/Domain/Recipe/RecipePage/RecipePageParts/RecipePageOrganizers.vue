@@ -1,15 +1,14 @@
 <template>
   <div>
     <!-- Recipe Categories -->
-    <v-card
+    <section
       v-if="recipe.recipeCategory.length > 0 || isEditForm"
-      :class="{ 'mt-10': !isEditForm }"
+      class="recipe-filed"
     >
-      <v-card-title class="py-2">
+      <h3 class="recipe-filed__title">
         {{ $t("recipe.categories") }}
-      </v-card-title>
-      <v-divider class="mx-2" />
-      <v-card-text>
+      </h3>
+      <div class="recipe-filed__body">
         <RecipeOrganizerSelector
           v-if="isEditForm"
           v-model="recipe.recipeCategory"
@@ -22,19 +21,18 @@
           :items="recipe.recipeCategory"
           v-bind="$attrs"
         />
-      </v-card-text>
-    </v-card>
+      </div>
+    </section>
 
     <!-- Recipe Tags -->
-    <v-card
+    <section
       v-if="recipe.tags.length > 0 || isEditForm"
-      class="mt-4"
+      class="recipe-filed"
     >
-      <v-card-title class="py-2">
+      <h3 class="recipe-filed__title">
         {{ $t("tag.tags") }}
-      </v-card-title>
-      <v-divider class="mx-2" />
-      <v-card-text>
+      </h3>
+      <div class="recipe-filed__body">
         <RecipeOrganizerSelector
           v-if="isEditForm"
           v-model="recipe.tags"
@@ -48,25 +46,24 @@
           url-prefix="tags"
           v-bind="$attrs"
         />
-      </v-card-text>
-    </v-card>
+      </div>
+    </section>
 
     <!-- Recipe Tools Edit -->
-    <v-card
+    <section
       v-if="isEditForm"
-      class="mt-4"
+      class="recipe-filed"
     >
-      <v-card-title class="py-2">
+      <h3 class="recipe-filed__title">
         {{ $t('tool.required-tools') }}
-      </v-card-title>
-      <v-divider class="mx-2" />
-      <v-card-text>
+      </h3>
+      <div class="recipe-filed__body">
         <RecipeOrganizerSelector
           v-model="recipe.tools"
           selector-type="tools"
         />
-      </v-card-text>
-    </v-card>
+      </div>
+    </section>
 
     <RecipeNutrition
       v-if="recipe.settings.showNutrition"
@@ -96,3 +93,24 @@ import RecipeAssets from "@/components/Domain/Recipe/RecipeAssets.vue";
 const recipe = defineModel<NoUndefinedField<Recipe>>({ required: true });
 const { isEditForm } = usePageState(recipe.value.slug);
 </script>
+
+<style scoped>
+.recipe-filed {
+  margin-top: 28px;
+}
+
+.recipe-filed__title {
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgb(var(--v-theme-rule));
+  font-family: var(--paper-sans);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: rgb(var(--v-theme-tomato));
+}
+
+.recipe-filed__body {
+  padding-top: 10px;
+}
+</style>

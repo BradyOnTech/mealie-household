@@ -6,19 +6,16 @@
         indeterminate
       />
     </template>
-    <v-toolbar
-      dark
-      density="comfortable"
-      :color="color"
-      class="px-3 position-relative top-0 left-0 w-100"
-    >
-      <v-icon size="large">
-        {{ icon }}
-      </v-icon>
-      <v-toolbar-title class="headline">
+    <div class="base-dialog__head">
+      <span v-if="icon" class="base-dialog__icon" :class="`text-${accentColor}`">
+        <v-icon size="20">
+          {{ icon }}
+        </v-icon>
+      </span>
+      <h2 class="base-dialog__title">
         {{ title }}
-      </v-toolbar-title>
-    </v-toolbar>
+      </h2>
+    </div>
 
     <div style="flex: 1 1 auto; min-height: 0; overflow: auto">
       <slot />
@@ -121,6 +118,8 @@ const emit = defineEmits<DialogEmits>();
 const i18n = useGlobalI18n();
 
 const submitLabel = computed(() => props.submitText ?? i18n.t("general.create"));
+// The dialog's color tints its icon; the default reads as the editorial accent.
+const accentColor = computed(() => (props.color === "primary" ? "tomato" : props.color));
 const cancelLabel = computed(() => props.cancelText ?? i18n.t("general.cancel"));
 </script>
 
@@ -132,5 +131,36 @@ const cancelLabel = computed(() => props.cancelText ?? i18n.t("general.cancel"))
   display: grid;
   grid-auto-flow: column;
   grid-auto-columns: minmax(min-content, 1fr);
+}
+
+.base-dialog__head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 20px 24px 14px;
+  border-bottom: 1px solid rgb(var(--v-theme-rule));
+}
+
+.base-dialog__icon {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.base-dialog__icon .v-icon {
+  color: rgb(var(--v-theme-surface));
+}
+
+.base-dialog__title {
+  margin: 0;
+  font-family: var(--paper-serif);
+  font-size: 1.375rem;
+  font-weight: 450;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
 }
 </style>

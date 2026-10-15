@@ -20,7 +20,6 @@
       <v-card
         variant="outlined"
         :loading="state.loading"
-        style="border-color: lightgrey;"
       >
         <v-card-title> {{ $t('migration.choose-migration-type') }} </v-card-title>
         <v-card-text

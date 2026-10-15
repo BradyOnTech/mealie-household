@@ -5,7 +5,7 @@
     :x-small="xSmall"
     :loading="loading"
     :disabled="disabled"
-    :variant="disabled ? 'tonal' : btnStyle.outlined ? 'outlined' : btnStyle.text ? 'text' : 'elevated'"
+    :variant="disabled ? 'tonal' : btnStyle.outlined ? 'outlined' : btnStyle.text ? 'text' : 'flat'"
     :to="to"
     v-bind="$attrs"
     @click="download ? downloadFile() : undefined"
@@ -120,22 +120,22 @@ const buttonOptions = {
   create: {
     text: i18n.t("general.create"),
     icon: $globals.icons.createAlt,
-    color: "success",
+    color: "primary",
   },
   update: {
     text: i18n.t("general.update"),
     icon: $globals.icons.edit,
-    color: "success",
+    color: "primary",
   },
   save: {
     text: i18n.t("general.save"),
     icon: $globals.icons.save,
-    color: "success",
+    color: "primary",
   },
   edit: {
     text: i18n.t("general.edit"),
     icon: $globals.icons.edit,
-    color: "info",
+    color: "primary",
   },
   delete: {
     text: i18n.t("general.delete"),
@@ -150,7 +150,7 @@ const buttonOptions = {
   download: {
     text: i18n.t("general.download"),
     icon: $globals.icons.download,
-    color: "info",
+    color: "primary",
   },
 };
 

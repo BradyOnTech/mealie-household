@@ -2,9 +2,9 @@
   <div v-if="value && value.length > 0">
     <div
       v-if="!isCookMode"
-      class="d-flex justify-start"
+      class="recipe-ingredients__head"
     >
-      <h2 class="mt-1 text-h5 font-weight-medium opacity-80">
+      <h2 class="recipe-ingredients__title">
         {{ $t("recipe.ingredients") }}
       </h2>
       <AppButtonCopy
@@ -19,11 +19,10 @@
       >
         <h3
           v-if="showTitleEditor[index]"
-          class="mt-4 mb-0"
+          class="recipe-ingredients__section"
         >
           {{ ingredient.title }}
         </h3>
-        <v-divider v-if="showTitleEditor[index]" class="my-2" />
         <v-list-item
           density="compact"
           class="px-0 py-1 ingredient-list-item"
@@ -35,6 +34,8 @@
               hide-details
               class="pt-0 mt-0"
               color="secondary"
+              :false-icon="icons.checkboxBlankCircleOutline"
+              :true-icon="icons.checkboxMarkedCircle"
               density="comfortable"
               @click.stop
               @update:model-value="setChecked(index, !!$event)"
@@ -57,6 +58,7 @@
 import RecipeIngredientListItem from "./RecipeIngredientListItem.vue";
 import { useSessionStorage } from "@vueuse/core";
 import { useIngredientTextParser } from "~/composables/recipes";
+import { icons } from "~/lib/icons";
 import type { RecipeIngredient } from "~/lib/api/types/recipe";
 
 interface Props {
@@ -145,6 +147,41 @@ function setChecked(index: number, value: boolean) {
 
 .ingredient-list-item {
   align-items: flex-start;
+  border-bottom: 1px solid rgb(var(--v-theme-rule));
+  border-radius: 0;
+}
+
+.ingredient-list-item .ingredient-qty,
+.ingredient-list-item .ingredient-unit {
+  font-family: var(--paper-serif);
+  color: rgb(var(--v-theme-tomato));
+}
+
+.ingredient-list-item .text-bold {
+  font-weight: 550;
+}
+
+.recipe-ingredients__head {
+  display: flex;
+  align-items: center;
+  padding-bottom: 4px;
+  border-bottom: 1px solid rgb(var(--v-theme-on-background));
+}
+
+.recipe-ingredients__title {
+  font-family: var(--paper-serif);
+  font-size: 1.375rem;
+  font-weight: 450;
+  letter-spacing: -0.01em;
+}
+
+.recipe-ingredients__section {
+  margin: 18px 0 2px;
+  font-family: var(--paper-serif);
+  font-size: 1.0625rem;
+  font-style: italic;
+  font-weight: 400;
+  color: rgb(var(--v-theme-ink-muted));
 }
 
 .ingredient-list-item .v-list-item__prepend,

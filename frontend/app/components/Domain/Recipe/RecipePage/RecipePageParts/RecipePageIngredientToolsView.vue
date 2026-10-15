@@ -7,10 +7,10 @@
       :storage-key="ingredientStorageKey"
     />
     <div v-if="!isEditMode && recipe.tools && recipe.tools.length > 0">
-      <h2 class="mt-4 text-h5 font-weight-medium opacity-80">
+      <h2 class="recipe-tools__title">
         {{ $t('tool.required-tools') }}
       </h2>
-      <v-list density="compact">
+      <v-list density="compact" bg-color="transparent" class="py-0">
         <v-list-item
           v-for="(tool, index) in recipe.tools"
           :key="index"
@@ -24,6 +24,8 @@
               class="pt-0 py-auto"
               color="secondary"
               density="compact"
+              :false-icon="$globals.icons.checkboxBlankCircleOutline"
+              :true-icon="$globals.icons.checkboxMarkedCircle"
               @change="updateTool(index)"
             />
           </template>
@@ -100,3 +102,15 @@ function updateTool(index: number) {
   }
 }
 </script>
+
+<style scoped>
+.recipe-tools__title {
+  margin-top: 28px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid rgb(var(--v-theme-on-background));
+  font-family: var(--paper-serif);
+  font-size: 1.1875rem;
+  font-weight: 450;
+  letter-spacing: -0.01em;
+}
+</style>

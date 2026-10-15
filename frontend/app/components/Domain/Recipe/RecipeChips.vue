@@ -9,13 +9,9 @@
     <v-chip
       v-for="category in items.slice(0, limit)"
       :key="category.name"
-      label
-      class="mr-1 mt-1"
-      color="accent"
-      variant="flat"
+      class="recipe-chip mr-1 mt-1"
+      variant="outlined"
       :size="small ? 'small' : 'default'"
-      dark
-
       @click.prevent="() => $emit('item-selected', category, urlPrefix)"
     >
       {{ truncateText(category.name) }}
@@ -55,4 +51,13 @@ function truncateText(text: string, length = 20, clamp = "...") {
 }
 </script>
 
-<style></style>
+<style scoped>
+.recipe-chip.v-chip--variant-outlined {
+  border-color: rgb(var(--v-theme-rule));
+  background: rgb(var(--v-theme-surface));
+}
+
+.recipe-chip:hover {
+  border-color: rgb(var(--v-theme-on-background));
+}
+</style>

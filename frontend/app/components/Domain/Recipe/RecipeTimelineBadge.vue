@@ -2,23 +2,20 @@
   <v-tooltip
     location="bottom"
     nudge-right="50"
-    :color="buttonStyle ? 'info' : 'secondary'"
   >
     <template #activator="{ props: activatorProps }">
       <v-btn
         icon
-        :variant="buttonStyle ? 'flat' : undefined"
+        :variant="buttonStyle ? 'outlined' : 'text'"
         :rounded="buttonStyle ? 'circle' : undefined"
-        size="small"
-        :color="buttonStyle ? 'info' : 'secondary'"
+        :size="buttonStyle ? 'default' : 'small'"
+        :class="buttonStyle ? 'recipe-action-circle' : 'recipe-action-quiet'"
         :fab="buttonStyle"
+        :aria-label="$t('recipe.open-timeline')"
         v-bind="{ ...activatorProps, ...$attrs }"
         @click.prevent="toggleTimeline"
       >
-        <v-icon
-          :size="!buttonStyle ? undefined : 'x-large'"
-          :color="buttonStyle ? 'white' : 'secondary'"
-        >
+        <v-icon>
           {{ $globals.icons.timelineText }}
         </v-icon>
       </v-btn>

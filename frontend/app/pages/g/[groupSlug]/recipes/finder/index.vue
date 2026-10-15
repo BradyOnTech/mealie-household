@@ -53,13 +53,12 @@
                   <v-badge
                     :model-value="!!state.queryFilterJSON.parts && state.queryFilterJSON.parts.length > 0"
                     size="small"
-                    color="primary"
+                    color="tomato"
                     :content="(state.queryFilterJSON.parts || []).length"
                   >
                     <v-btn
                       size="small"
-                      color="accent"
-                      dark
+                      variant="text"
                       @click="state.queryFilterMenu = !state.queryFilterMenu"
                     >
                       <v-icon start>

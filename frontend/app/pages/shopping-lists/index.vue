@@ -91,18 +91,17 @@
       </BasePageTitle>
     </v-container>
 
-    <section>
+    <section class="list-index">
       <v-card
         v-for="list in shoppingListChoices"
         :key="list.id"
-        class="my-2 left-border"
+        flat
+        color="transparent"
+        class="list-index__row"
         :to="`/shopping-lists/${list.id}`"
       >
-        <v-card-title class="d-flex align-center">
-          <v-icon class="mr-2">
-            {{ $globals.icons.cartCheck }}
-          </v-icon>
-          <span class="flex-grow-1">
+        <v-card-title class="d-flex align-center px-0">
+          <span class="list-index__name flex-grow-1">
             {{ list.name }}
           </span>
           <v-btn
@@ -278,3 +277,23 @@ async function deleteOne() {
   }
 }
 </script>
+
+<style scoped>
+.list-index {
+  border-top: 1px solid rgb(var(--v-theme-on-background));
+}
+
+.list-index__row {
+  border-bottom: 1px solid rgb(var(--v-theme-rule));
+  border-radius: 0;
+}
+
+.list-index__name {
+  font-family: var(--paper-serif);
+  font-optical-sizing: auto;
+  font-size: 1.375rem;
+  font-weight: 420;
+  letter-spacing: -0.01em;
+  white-space: normal;
+}
+</style>

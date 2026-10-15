@@ -44,7 +44,9 @@ export default defineNuxtConfig({
             "https://raw.githubusercontent.com/mealie-recipes/mealie/9571816ac4eed5beacfc0abf6c03eff1427fd0eb/frontend/static/icons/android-chrome-512x512.png",
         },
         { charset: "utf-8" },
-        { name: "viewport", content: "width=device-width, initial-scale=1" },
+        { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" },
+        { name: "theme-color", content: "#F6F1E7", media: "(prefers-color-scheme: light)" },
+        { name: "theme-color", content: "#15120E", media: "(prefers-color-scheme: dark)" },
         {
           name: "description",
           content: "Mealie is a recipe management app for your kitchen.",
@@ -52,7 +54,7 @@ export default defineNuxtConfig({
       ],
       script: [
         {
-          innerHTML: `(function(){try{var d=localStorage.getItem('vueuse-color-scheme');var m=d==='dark'||(d!=='light'&&matchMedia('(prefers-color-scheme:dark)').matches);document.documentElement.style.backgroundColor=m?'#1E1E1E':'#FFFFFF'}catch(e){}})()`,
+          innerHTML: `(function(){try{var d=localStorage.getItem('vueuse-color-scheme');var m=d==='dark'||(d!=='light'&&matchMedia('(prefers-color-scheme:dark)').matches);document.documentElement.style.backgroundColor=m?'#15120E':'#F6F1E7'}catch(e){}})()`,
           type: "text/javascript",
         },
       ],
@@ -72,7 +74,7 @@ export default defineNuxtConfig({
     viewTransition: true,
   },
 
-  css: ["~/assets/main.css", "~/assets/style-overrides.scss"],
+  css: ["~/assets/main.css", "~/assets/style-overrides.scss", "~/assets/paper.css"],
 
   runtimeConfig: {
     sessionPassword: process.env.SESSION_PASSWORD || "password-with-at-least-32-characters",
@@ -86,23 +88,23 @@ export default defineNuxtConfig({
       useDark: Boolean(process.env.THEME_USE_DARK) || false,
       themes: {
         dark: {
-          primary: process.env.THEME_DARK_PRIMARY || "#E58325",
-          accent: process.env.THEME_DARK_ACCENT || "#007A99",
-          secondary: process.env.THEME_DARK_SECONDARY || "#973542",
-          success: process.env.THEME_DARK_SUCCESS || "#43A047",
-          info: process.env.THEME_DARK_INFO || "#1976d2",
-          warning: process.env.THEME_DARK_WARNING || "#FF6D00",
-          error: process.env.THEME_DARK_ERROR || "#EF5350",
-          background: "#1E1E1E",
+          primary: process.env.THEME_DARK_PRIMARY || "#F0E8DA",
+          accent: process.env.THEME_DARK_ACCENT || "#E57B5D",
+          secondary: process.env.THEME_DARK_SECONDARY || "#9DB28E",
+          success: process.env.THEME_DARK_SUCCESS || "#8FB386",
+          info: process.env.THEME_DARK_INFO || "#8DB4D4",
+          warning: process.env.THEME_DARK_WARNING || "#E0A84F",
+          error: process.env.THEME_DARK_ERROR || "#E2675F",
+          background: "#15120E",
         },
         light: {
-          primary: process.env.THEME_LIGHT_PRIMARY || "#E58325",
-          accent: process.env.THEME_LIGHT_ACCENT || "#007A99",
-          secondary: process.env.THEME_LIGHT_SECONDARY || "#973542",
-          success: process.env.THEME_LIGHT_SUCCESS || "#43A047",
-          info: process.env.THEME_LIGHT_INFO || "#1976d2",
-          warning: process.env.THEME_LIGHT_WARNING || "#FF6D00",
-          error: process.env.THEME_LIGHT_ERROR || "#EF5350",
+          primary: process.env.THEME_LIGHT_PRIMARY || "#211C16",
+          accent: process.env.THEME_LIGHT_ACCENT || "#B3432A",
+          secondary: process.env.THEME_LIGHT_SECONDARY || "#5D7253",
+          success: process.env.THEME_LIGHT_SUCCESS || "#4F7A4A",
+          info: process.env.THEME_LIGHT_INFO || "#3D6585",
+          warning: process.env.THEME_LIGHT_WARNING || "#A8701D",
+          error: process.env.THEME_LIGHT_ERROR || "#9F2D2D",
         },
       },
     },
@@ -146,6 +148,18 @@ export default defineNuxtConfig({
       weights: ["100 900"],
       styles: ["normal", "italic"],
       subsets: ["cyrillic-ext", "cyrillic", "greek-ext", "greek", "vietnamese", "latin-ext", "latin"],
+    },
+    // "Sunday Paper" type: Fraunces for headlines, Instrument Sans for the interface.
+    families: [
+      { name: "Fraunces", provider: "google", global: true, weights: ["300 700"] },
+      { name: "Instrument Sans", provider: "google", global: true, weights: ["400 700"] },
+    ],
+    google: {
+      experimental: {
+        variableAxis: {
+          Fraunces: { opsz: [["9", "144"]] },
+        },
+      },
     },
   },
 
@@ -252,6 +266,7 @@ export default defineNuxtConfig({
         locale: "en-US",
         fallback: "en-US",
       },
+      // Component defaults for the "Sunday Paper" design; the visual details live in assets/paper.css.
       defaults: {
         VOverlay: {
           scrollStrategy: "close",
@@ -259,14 +274,44 @@ export default defineNuxtConfig({
         VMenu: {
           scrollStrategy: "close",
         },
+        VBtn: {
+          variant: "flat",
+        },
+        VTextField: {
+          variant: "outlined",
+        },
+        VTextarea: {
+          variant: "outlined",
+        },
+        VNumberInput: {
+          variant: "outlined",
+        },
+        VFileInput: {
+          variant: "outlined",
+        },
         VAutocomplete: {
           scrollStrategy: "close",
+          variant: "outlined",
         },
         VCombobox: {
           scrollStrategy: "close",
+          variant: "outlined",
         },
         VSelect: {
           scrollStrategy: "close",
+          variant: "outlined",
+        },
+        VAlert: {
+          variant: "tonal",
+        },
+        VCheckbox: {
+          color: "secondary",
+        },
+        VCheckboxBtn: {
+          color: "secondary",
+        },
+        VSwitch: {
+          color: "secondary",
         },
       },
     },

@@ -6,8 +6,14 @@
       :recipes="weekRecipesWithScales"
       :shopping-lists="shoppingLists"
     />
-    <div :class="`d-flex ga-2 ${$vuetify.display.xs ? 'justify-center' : 'justify-start'}`">
-      <v-btn :icon="$globals.icons.chevronLeft" flat rounded="md" density="comfortable" @click="() => changeWeek(-1)" />
+    <header class="planner-head">
+      <span class="paper-kicker">{{ $t("meal-plan.meal-planner") }}</span>
+      <h1 class="planner-head__title paper-headline">
+        {{ rangeTitle }}
+      </h1>
+    </header>
+    <div class="planner-controls">
+      <v-btn :icon="$globals.icons.chevronLeft" variant="text" density="comfortable" :aria-label="$t('general.back')" @click="() => changeWeek(-1)" />
       <v-menu
         v-model="state.picker"
         :close-on-content-click="false"
@@ -17,8 +23,7 @@
       >
         <template #activator="{ props }">
           <v-btn
-            color="primary"
-            class="mb-2"
+            variant="outlined"
             v-bind="props"
           >
             <v-icon start>
@@ -60,9 +65,8 @@
           </v-card-text>
         </v-card>
       </v-menu>
-      <v-btn :icon="$globals.icons.chevronRight" flat rounded="md" density="comfortable" @click="() => changeWeek(1)" />
-    </div>
-    <div class="d-flex justify-end">
+      <v-btn :icon="$globals.icons.chevronRight" variant="text" density="comfortable" :aria-label="$t('general.next')" @click="() => changeWeek(1)" />
+      <v-spacer />
       <BaseButtonGroup
         class="d-flex"
         :buttons="[
@@ -100,7 +104,7 @@
         @settings="router.push('/household/mealplan/settings')"
       />
     </div>
-    <div>
+    <div class="planner-body">
       <NuxtPage
         :mealplans="mealsByDate"
         :actions="actions"
@@ -213,6 +217,11 @@ const weekRange = computed(() => {
   };
 });
 
+// "October 15 – 21": the planner's headline is the range it shows.
+const rangeTitle = computed(() =>
+  new Intl.DateTimeFormat(i18n.locale.value, { month: "long", day: "numeric" }).formatRange(weekRange.value.start, weekRange.value.end),
+);
+
 // Update query parameters when date range changes
 watch(weekRange, (newRange) => {
   // Keep current route name and params, just update the query
@@ -277,3 +286,33 @@ const weekRecipesWithScales = computed(() => {
     .map(recipe => ({ scale: 1, ...recipe }));
 });
 </script>
+
+<style scoped>
+.planner-head {
+  padding-top: 16px;
+}
+
+.planner-head__title {
+  margin: 6px 0 14px;
+  font-size: 3rem;
+}
+
+.planner-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding-bottom: 12px;
+  border-bottom: 3px double rgb(var(--v-theme-rule));
+}
+
+.planner-body {
+  padding-top: 18px;
+}
+
+@media (max-width: 599px) {
+  .planner-head__title {
+    font-size: 2.125rem;
+  }
+}
+</style>

@@ -1,54 +1,20 @@
 <template>
   <v-card
     variant="outlined"
-    style="border-color: lightgrey;"
     :to="link.to"
     height="100%"
-    class="d-flex flex-column mt-4 pa-2"
+    class="profile-link-card d-flex flex-column mt-4"
   >
-    <div
-      v-if="$vuetify.display.smAndDown"
-      class="pa-2 mx-auto"
-    >
-      <v-img
-        width="150px"
-        height="125"
-        :src="image"
-      />
-    </div>
-    <div class="d-flex justify-space-between">
-      <div>
-        <v-card-title class="text-subtitle-1 pb-0">
-          <slot name="title" />
-        </v-card-title>
-        <div class="d-flex justify-center align-center">
-          <v-card-text class="d-flex flex-row mb-auto">
-            <slot name="default" />
-          </v-card-text>
-        </div>
-      </div>
-      <div
-        v-if="$vuetify.display.mdAndUp"
-        class="py-2 px-10 my-auto"
-      >
-        <v-img
-          width="150px"
-          height="125"
-          :src="image"
-        />
-      </div>
-    </div>
+    <v-card-title class="profile-link-card__title">
+      <slot name="title" />
+    </v-card-title>
+    <v-card-text class="profile-link-card__text">
+      <slot name="default" />
+    </v-card-text>
     <v-spacer />
-    <v-divider />
-    <v-card-actions>
-      <v-btn
-        variant="text"
-        color="info"
-        :to="link.to"
-      >
-        {{ link.text }}
-      </v-btn>
-    </v-card-actions>
+    <div class="profile-link-card__action">
+      {{ link.text }} →
+    </div>
   </v-card>
 </template>
 
@@ -71,3 +37,27 @@ defineProps({
   },
 });
 </script>
+
+<style scoped>
+.profile-link-card {
+  padding: 6px 4px 4px;
+  background: rgb(var(--v-theme-surface));
+}
+
+.profile-link-card__title {
+  font-size: 1.25rem;
+  white-space: normal;
+}
+
+.profile-link-card__text {
+  font-size: 0.9375rem;
+  color: rgb(var(--v-theme-ink-muted));
+}
+
+.profile-link-card__action {
+  padding: 4px 16px 14px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: rgb(var(--v-theme-tomato));
+}
+</style>

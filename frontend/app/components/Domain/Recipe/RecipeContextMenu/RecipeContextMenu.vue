@@ -16,18 +16,15 @@
       <template #activator="{ props: activatorProps }">
         <v-btn
           icon
-          :variant="fab ? 'flat' : undefined"
+          :variant="fab ? 'outlined' : 'text'"
           :rounded="fab ? 'circle' : undefined"
-          :size="fab ? 'small' : undefined"
-          :color="fab ? 'info' : 'secondary'"
+          :size="fab ? 'default' : 'small'"
+          :class="fab ? 'recipe-action-circle' : 'recipe-action-quiet'"
           :fab="fab"
           v-bind="activatorProps"
           @click.prevent
         >
-          <v-icon
-            :size="!fab ? undefined : 'x-large'"
-            :color="fab ? 'white' : 'secondary'"
-          >
+          <v-icon :size="fab ? 'default' : undefined">
             {{ icon }}
           </v-icon>
         </v-btn>

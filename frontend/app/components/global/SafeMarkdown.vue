@@ -1,6 +1,6 @@
 <template>
   <!-- eslint-disable-next-line vue/no-v-html is safe here because all HTML is sanitized with DOMPurify in setup() -->
-  <div v-html="value" />
+  <div class="safe-markdown" v-html="value" />
 </template>
 
 <script setup lang="ts">

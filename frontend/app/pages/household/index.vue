@@ -18,7 +18,7 @@
       {{ $t("profile.household-description") }}
     </BasePageTitle>
     <v-form ref="refHouseholdEditForm" @submit.prevent="handleSubmit">
-      <v-card variant="outlined" style="border-color: lightgray;">
+      <v-card variant="outlined">
         <v-card-text>
           <HouseholdPreferencesEditor v-if="household.preferences" v-model="household.preferences" />
         </v-card-text>

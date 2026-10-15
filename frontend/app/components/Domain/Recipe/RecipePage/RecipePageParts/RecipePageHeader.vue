@@ -1,11 +1,10 @@
 <template>
   <div>
     <RecipePageInfoCard
+      v-model:recipe-scale="recipeScale"
       :recipe="recipe"
-      :recipe-scale="recipeScale"
       :landscape="landscape"
     />
-    <v-divider />
     <RecipeActionMenu
       :recipe="recipe"
       :slug="recipe.slug"
@@ -15,14 +14,26 @@
       :logged-in="isOwnGroup"
       :open="isEditMode"
       :recipe-id="recipe.id"
-      class="ml-auto mt-n7 pb-4"
+      class="recipe-actions"
       @close="$emit('close')"
       @json="toggleEditMode()"
       @edit="setMode(PageMode.EDIT)"
       @save="$emit('save')"
       @delete="$emit('delete')"
       @print="printRecipe"
-    />
+    >
+      <template v-if="!isEditMode && recipe.recipeInstructions?.length" #start>
+        <v-btn
+          color="primary"
+          variant="flat"
+          :size="$vuetify.display.xs ? 'default' : 'large'"
+          :prepend-icon="$globals.icons.primary"
+          @click="toggleCookMode()"
+        >
+          {{ $t("this-week.start-cooking") }}
+        </v-btn>
+      </template>
+    </RecipeActionMenu>
   </div>
 </template>
 
@@ -39,18 +50,18 @@ import { usePageState, usePageUser, PageMode } from "~/composables/recipe-page/s
 
 interface Props {
   recipe: NoUndefinedField<Recipe>;
-  recipeScale?: number;
   landscape?: boolean;
 }
 const props = withDefaults(defineProps<Props>(), {
-  recipeScale: 1,
   landscape: false,
 });
+
+const recipeScale = defineModel<number>("recipeScale", { default: 1 });
 
 defineEmits(["save", "delete", "print", "close"]);
 
 const { recipeImage } = useStaticRoutes();
-const { imageKey, setMode, toggleEditMode, isEditMode } = usePageState(props.recipe.slug);
+const { imageKey, setMode, toggleEditMode, toggleCookMode, isEditMode } = usePageState(props.recipe.slug);
 const { user } = usePageUser();
 const { isOwnGroup } = useLoggedInState();
 
@@ -80,3 +91,20 @@ watch(
   },
 );
 </script>
+
+<style scoped>
+.recipe-actions {
+  margin-top: 14px;
+}
+
+.recipe-actions.fixed-bar {
+  height: 60px;
+  padding: 0;
+}
+
+@media (max-width: 959px) {
+  .recipe-actions.fixed-bar {
+    padding: 0 16px;
+  }
+}
+</style>

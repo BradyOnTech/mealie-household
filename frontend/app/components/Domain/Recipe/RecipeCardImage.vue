@@ -14,13 +14,13 @@
   </v-img>
   <div
     v-else
-    class="icon-slot"
+    class="recipe-image-empty"
+    :style="{ height: cssSize(height), minHeight: cssSize(minHeight) }"
     @click="$emit('click')"
   >
     <v-icon
-      color="primary"
-      class="icon-position"
-      :size="iconSize"
+      class="recipe-image-empty__glyph"
+      :size="glyphSize"
     >
       {{ $globals.icons.primary }}
     </v-icon>
@@ -81,6 +81,13 @@ watch(
   },
 );
 
+// Recipes without photos get a quiet paper block rather than a full-size icon.
+const glyphSize = computed(() => Math.min(Number(props.iconSize) || 64, 64));
+
+function cssSize(value: number | string) {
+  return typeof value === "number" || /^\d+$/.test(value) ? `${value}px` : value;
+}
+
 function getImage(recipeId: string) {
   switch (imageSize.value) {
     case "tiny":
@@ -94,21 +101,23 @@ function getImage(recipeId: string) {
 </script>
 
 <style scoped>
-.icon-slot {
+.recipe-image-empty {
   position: relative;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  border-radius: 2px;
+  background: rgb(var(--v-theme-surface-light));
 }
 
-.icon-slot > div {
+.recipe-image-empty > div {
   top: 0;
   position: absolute;
   z-index: 1;
 }
 
-.icon-position {
-  opacity: 0.8;
-  display: flex !important;
-  position: relative;
-  margin-left: auto !important;
-  margin-right: auto !important;
+.recipe-image-empty__glyph {
+  color: rgb(var(--v-theme-ink-muted));
+  opacity: 0.45;
 }
 </style>

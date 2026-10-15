@@ -8,15 +8,11 @@
   >
     <!-- Header Toolbar -->
     <v-card class="elevation-4" width="1200" :class="{ 'my-10': $vuetify.display.mdAndUp }">
-      <v-toolbar
-        color="primary"
-        class="d-flex justify-center"
-        dark
-      >
-        <v-toolbar-title class="headline text-h4 text-center mx-0">
+      <header class="paper-wordmark-head">
+        <div class="paper-wordmark">
           Mealie
-        </v-toolbar-title>
-      </v-toolbar>
+        </div>
+      </header>
 
       <!-- Stepper Wizard -->
       <v-stepper v-model="currentPage" mobile-breakpoint="sm" alt-labels>
@@ -669,7 +665,7 @@ async function onFinish() {
 }
 
 .bg-off-white {
-  background: #f5f8fa;
+  background: rgb(var(--v-theme-background));
 }
 
 .v-stepper-item__avatar.v-avatar.v-stepper-item__avatar.v-avatar {

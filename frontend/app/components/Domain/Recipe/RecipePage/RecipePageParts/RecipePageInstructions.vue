@@ -132,10 +132,10 @@
       </template>
     </BaseDialog>
 
-    <div class="d-flex justify-space-between justify-start">
+    <div class="recipe-method__head" :class="{ 'recipe-method__head--cook': isCookMode }">
       <h2
         v-if="!isCookMode"
-        class="mt-1 text-h5 font-weight-medium opacity-80"
+        class="recipe-method__title"
       >
         {{ $t("recipe.instructions") }}
       </h2>
@@ -216,10 +216,9 @@
         >
           <v-sheet
             v-if="step.id && showTitleEditor[step.id]"
-            color="primary"
-            class="mt-6 mb-2 d-flex align-center"
-            :class="isEditForm ? 'pa-2' : 'pa-3'"
-            style="border-radius: 6px; cursor: pointer; width: 100%;"
+            :color="isEditForm ? 'surface-light' : 'transparent'"
+            class="recipe-method__section d-flex align-center"
+            :class="isEditForm ? 'pa-2' : 'px-0 pt-3 pb-1'"
             @click="toggleCollapseSection(index)"
           >
             <template v-if="isEditForm">
@@ -230,7 +229,7 @@
                 variant="solo"
                 flat
                 :placeholder="$t('recipe.section-title')"
-                bg-color="primary"
+                bg-color="surface"
                 hide-details
               />
             </template>
@@ -242,9 +241,9 @@
           </v-sheet>
           <v-hover v-slot="{ isHovering }">
             <v-card
-              class="my-3"
-              :class="[{ 'on-hover': isHovering }, { 'cursor-default': isEditForm }, isChecked(index)]"
-              :elevation="isHovering ? 12 : 2"
+              class="recipe-step"
+              :class="[{ 'on-hover': isHovering }, { 'cursor-default': isEditForm, 'recipe-step--editing': isEditForm, 'recipe-step--bare': !isEditForm && !step.summary }, isChecked(index)]"
+              :elevation="0"
               :ripple="false"
               @click="toggleDisabled(index)"
             >
@@ -270,17 +269,15 @@
                     v-else
                     class="summary-wrapper"
                   >
-                    <template v-if="step.summary">
-                      <SafeMarkdown
-                        class="pr-2"
-                        :source="step.summary"
-                      />
-                    </template>
-                    <template v-else>
-                      <span>
-                        {{ $t('recipe.step-index', { step: index + 1 }) }}
-                      </span>
-                    </template>
+                    <span
+                      class="recipe-step__number"
+                      :aria-label="$t('recipe.step-index', { step: index + 1 })"
+                    >{{ index + 1 }}</span>
+                    <SafeMarkdown
+                      v-if="step.summary"
+                      class="recipe-step__summary pr-2"
+                      :source="step.summary"
+                    />
                   </div>
                   <template v-if="isEditForm">
                     <div class="ml-auto">
@@ -1113,6 +1110,118 @@ function openImageUpload(index: number) {
   font-size: 1rem;
 }
 
+.recipe-method__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 4px;
+  border-bottom: 1px solid rgb(var(--v-theme-on-background));
+}
+
+.recipe-method__head--cook {
+  justify-content: flex-end;
+  border-bottom: 0;
+}
+
+.recipe-method__title {
+  font-family: var(--paper-serif);
+  font-size: 1.375rem;
+  font-weight: 450;
+  letter-spacing: -0.01em;
+}
+
+.recipe-method__section {
+  width: 100%;
+  margin-top: 18px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.recipe-method__section .section-title-text {
+  font-family: var(--paper-serif);
+  font-size: 1.1875rem;
+  font-style: italic;
+  font-weight: 400;
+  color: rgb(var(--v-theme-ink-muted));
+}
+
+.recipe-step:not(.recipe-step--editing) {
+  margin: 0;
+  border: 0;
+  border-bottom: 1px solid rgb(var(--v-theme-rule));
+  border-radius: 0;
+  background: transparent;
+}
+
+.recipe-step--editing {
+  margin: 12px 0;
+}
+
+.recipe-step:not(.recipe-step--editing) :deep(.v-card__overlay) {
+  display: none;
+}
+
+.recipe-step:not(.recipe-step--editing) .recipe-step-title {
+  padding: 18px 0 0;
+}
+
+.recipe-step:not(.recipe-step--editing) .v-card-text {
+  padding: 6px 0 18px 46px;
+  font-size: 1.0625rem;
+  line-height: 1.6;
+}
+
+.recipe-step.disabled-card .recipe-step-title {
+  padding-bottom: 14px;
+}
+
+/* Steps without a summary: the numeral sits beside the first line of the step. */
+.recipe-step--bare:not(.disabled-card) .recipe-step-title {
+  position: absolute;
+  inset: 0 0 auto 0;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.recipe-step--bare:not(.disabled-card) .recipe-step-title :deep(.v-btn) {
+  pointer-events: auto;
+}
+
+.recipe-step--bare:not(.disabled-card) .v-card-text {
+  padding-top: 20px;
+  padding-right: 36px;
+}
+
+.recipe-step__number {
+  display: inline-block;
+  min-width: 46px;
+  font-family: var(--paper-serif);
+  font-optical-sizing: auto;
+  font-size: 1.75rem;
+  font-weight: 400;
+  line-height: 1;
+  color: rgb(var(--v-theme-tomato));
+}
+
+.recipe-step.disabled-card .recipe-step__number {
+  color: rgb(var(--v-theme-sage));
+}
+
+.recipe-step__summary {
+  display: inline;
+  font-family: var(--paper-serif);
+  font-size: 1.1875rem;
+  font-weight: 450;
+}
+
+.recipe-step__summary :deep(p) {
+  display: inline;
+}
+
+.recipe-step.disabled-card .recipe-step__summary {
+  color: rgb(var(--v-theme-ink-muted));
+}
+
 .recipe-step-title {
   /* Multiline display */
   white-space: normal;
@@ -1120,6 +1229,8 @@ function openImageUpload(index: number) {
   word-break: break-word;
 }
 .summary-wrapper {
+  display: flex;
+  align-items: baseline;
   flex: 1 1 auto;
   min-width: 0; /* wrapping in flex container */
   white-space: normal;

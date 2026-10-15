@@ -1,25 +1,20 @@
 <template>
   <v-container v-if="user" class="mb-8">
-    <section class="d-flex flex-column align-center mt-4">
-      <UserAvatar
-        :tooltip="false"
-        size="96"
-        :user-id="user.id"
-      />
-
-      <h2 class="text-h4 text-center">
-        {{ $t('profile.welcome-user', [user.fullName]) }}
-      </h2>
-      <p class="subtitle-1 mb-0 text-center">
-        {{ $t('profile.description') }}
-      </p>
+    <section class="profile-head">
+      <div>
+        <span class="paper-kicker">{{ $t('profile.user-settings') }}</span>
+        <h1 class="profile-head__title paper-headline">
+          {{ $t('profile.welcome-user', [user.fullName]) }}
+        </h1>
+        <p class="profile-head__dek paper-dek">
+          {{ $t('profile.description') }}
+        </p>
+      </div>
       <v-card
         flat
         color="transparent"
-        width="100%"
-        max-width="600px"
       >
-        <v-card-actions class="d-flex justify-center my-4">
+        <v-card-actions class="pa-0">
           <v-btn
             v-if="user.canInvite"
             variant="outlined"
@@ -45,7 +40,7 @@
           sm="12"
           md="12"
         >
-          <v-card variant="outlined" style="border-color: lightgray;" class="mt-4 pa-2">
+          <v-card variant="outlined" class="mt-4 pa-2">
             <v-card-title class="text-h6 pb-0">
               {{ $t('profile.household-statistics') }}
             </v-card-title>
@@ -277,7 +272,6 @@
 <script setup lang="ts">
 import UserProfileLinkCard from "@/components/Domain/User/UserProfileLinkCard.vue";
 import { useUserApi } from "~/composables/api";
-import UserAvatar from "@/components/Domain/User/UserAvatar.vue";
 import { useAsyncKey } from "~/composables/use-utils";
 import StatsCards from "~/components/global/StatsCards.vue";
 import type { UserOut } from "~/lib/api/types/user";
@@ -371,3 +365,32 @@ function getStatsTo(key: string) {
   return statsTo.value[key] ?? "unknown";
 }
 </script>
+
+<style scoped>
+.profile-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px 24px;
+  margin: 16px 0 28px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid rgb(var(--v-theme-on-background));
+}
+
+.profile-head__title {
+  margin: 6px 0 8px;
+  font-size: 2.75rem;
+}
+
+.profile-head__dek {
+  margin: 0;
+  font-size: 1.0625rem;
+}
+
+@media (max-width: 599px) {
+  .profile-head__title {
+    font-size: 2.125rem;
+  }
+}
+</style>

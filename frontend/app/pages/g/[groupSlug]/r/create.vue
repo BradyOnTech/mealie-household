@@ -13,17 +13,13 @@
         <template #title>
           {{ $t('recipe.recipe-creation') }}
         </template>
+        {{ $t('recipe.select-one-of-the-various-ways-to-create-a-recipe') }}
         <template #content>
-          <div class="flex-1-1 d-flex flex-column justify-center align-center ga-2">
-            <p>{{ $t('recipe.select-one-of-the-various-ways-to-create-a-recipe') }}</p>
-            <div class="ml-auto">
-              <BaseOverflowButton
-                v-model="subpage"
-                rounded
-                :items="subpages"
-              />
-            </div>
-          </div>
+          <BaseOverflowButton
+            v-model="subpage"
+            rounded
+            :items="subpages"
+          />
         </template>
       </BasePageTitle>
       <section>

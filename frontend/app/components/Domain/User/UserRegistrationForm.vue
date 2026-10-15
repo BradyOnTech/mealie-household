@@ -143,7 +143,7 @@ watch(
 }
 
 .bg-off-white {
-  background: #f5f8fa;
+  background: rgb(var(--v-theme-background));
 }
 
 .preferred-width {
