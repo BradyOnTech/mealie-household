@@ -1,5 +1,6 @@
 import { useUserApi } from "~/composables/api";
 import type { AIProviderCreate, AIProviderUpdate } from "~/lib/api/types/group";
+import type { AIProviderPayload } from "~/lib/api/user/group-ai-providers";
 
 export function useAIProviders() {
   const api = useUserApi();
@@ -45,12 +46,24 @@ export function useAIProviders() {
     }
   }
 
-  async function testOne(payload: AIProviderCreate) {
+  async function testOne(payload: AIProviderPayload) {
     return await api.aiProviders.testOne(payload);
   }
 
-  async function testSavedOne(id: string, overrides?: AIProviderUpdate & { apiKey?: string }) {
+  async function testSavedOne(id: string, overrides?: AIProviderPayload) {
     return await api.aiProviders.testSavedOne(id, overrides);
+  }
+
+  async function startChatGPTLogin() {
+    return await api.aiProviders.startChatGPTLogin();
+  }
+
+  async function getChatGPTLogin(id: string) {
+    return await api.aiProviders.getChatGPTLogin(id);
+  }
+
+  async function cancelChatGPTLogin(id: string) {
+    return await api.aiProviders.cancelChatGPTLogin(id);
   }
 
   return {
@@ -61,5 +74,8 @@ export function useAIProviders() {
     deleteOne,
     testOne,
     testSavedOne,
+    startChatGPTLogin,
+    getChatGPTLogin,
+    cancelChatGPTLogin,
   };
 }

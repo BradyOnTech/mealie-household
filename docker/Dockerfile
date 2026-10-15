@@ -138,6 +138,27 @@ RUN apt-get update \
     unzip \
     && rm -rf /var/lib/apt/lists/*
 
+# Codex CLI, which ChatGPT subscription AI providers run their requests through. Its app-server
+# protocol is still experimental, so it's pinned to the version Mealie was tested against.
+# Build with --build-arg CODEX_VERSION= to leave it out.
+ARG TARGETARCH
+ARG CODEX_VERSION=0.162.1
+ARG CODEX_SHA256_AMD64=86f268d81b898f3e144c5ecff2ad2fda2c5802e042d6195b72538fe0fa125057
+ARG CODEX_SHA256_ARM64=bf3ca2719f1143b1440fbd85c149379e696c782c50ad7991f8bfcec60b2600c1
+RUN if [ -n "$CODEX_VERSION" ]; then \
+        case "$TARGETARCH" in \
+            amd64) arch=x86_64; sha256=$CODEX_SHA256_AMD64 ;; \
+            arm64) arch=aarch64; sha256=$CODEX_SHA256_ARM64 ;; \
+            *) echo "No Codex build for $TARGETARCH" >&2; exit 1 ;; \
+        esac \
+        && curl -fsSL -o /tmp/codex.tar.gz \
+            "https://github.com/openai/codex/releases/download/rust-v${CODEX_VERSION}/codex-${arch}-unknown-linux-musl.tar.gz" \
+        && echo "$sha256  /tmp/codex.tar.gz" | sha256sum -c - \
+        && tar -xzf /tmp/codex.tar.gz -C /tmp \
+        && install -m 0755 "/tmp/codex-${arch}-unknown-linux-musl" /usr/local/bin/codex \
+        && rm -f /tmp/codex.tar.gz "/tmp/codex-${arch}-unknown-linux-musl"; \
+    fi
+
 # create directory used for Docker Secrets
 RUN mkdir -p /run/secrets
 

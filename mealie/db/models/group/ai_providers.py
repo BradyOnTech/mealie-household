@@ -75,10 +75,16 @@ class AIProvider(SqlAlchemyBase, BaseMixins):
     )
 
     name: orm.Mapped[str] = orm.mapped_column(sa.String, index=True, nullable=False)
+    provider_type: orm.Mapped[str] = orm.mapped_column(
+        sa.String, nullable=False, default="openai", server_default="openai"
+    )
     base_url: orm.Mapped[str | None] = orm.mapped_column(sa.String, nullable=True)
     api_key: orm.Mapped[str] = orm.mapped_column(sa.String, nullable=False)
     model: orm.Mapped[str] = orm.mapped_column(sa.String, nullable=False)
     timeout: orm.Mapped[int] = orm.mapped_column(sa.Integer, nullable=False, default=300)
+
+    # Codex's auth.json for a ChatGPT subscription provider; unused by API-key providers
+    chatgpt_credential: orm.Mapped[str | None] = orm.mapped_column(sa.Text, nullable=True)
 
     request_headers: orm.Mapped[list[AIProviderHeaders]] = orm.relationship(
         "AIProviderHeaders", cascade="all, delete-orphan"

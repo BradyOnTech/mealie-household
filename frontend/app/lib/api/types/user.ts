@@ -6,6 +6,7 @@
 */
 
 export type WebhookType = "mealplan";
+export type AIProviderType = "openai" | "chatgpt";
 export type AuthMethod = "Mealie" | "LDAP" | "OIDC";
 
 export interface ChangePassword {
@@ -102,6 +103,7 @@ export interface AIProviderSettingsOut {
 export interface AIProviderSummary {
   id: string;
   name: string;
+  providerType?: AIProviderType;
 }
 export interface GroupSummary {
   name: string;

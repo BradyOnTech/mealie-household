@@ -59,6 +59,8 @@ foods = "/api/foods"
 """`/api/foods`"""
 foods_merge = "/api/foods/merge"
 """`/api/foods/merge`"""
+groups_ai_providers_chatgpt_login = "/api/groups/ai-providers/chatgpt-login"
+"""`/api/groups/ai-providers/chatgpt-login`"""
 groups_ai_providers_providers = "/api/groups/ai-providers/providers"
 """`/api/groups/ai-providers/providers`"""
 groups_ai_providers_providers_test = "/api/groups/ai-providers/providers/test"
@@ -338,6 +340,11 @@ def explore_groups_group_slug_recipes_suggestions(group_slug):
 def foods_item_id(item_id):
     """`/api/foods/{item_id}`"""
     return f"{prefix}/foods/{item_id}"
+
+
+def groups_ai_providers_chatgpt_login_login_id(login_id):
+    """`/api/groups/ai-providers/chatgpt-login/{login_id}`"""
+    return f"{prefix}/groups/ai-providers/chatgpt-login/{login_id}"
 
 
 def groups_ai_providers_providers_provider_id(provider_id):

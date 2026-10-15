@@ -37,7 +37,7 @@
         <v-autocomplete
           v-model="local.audioProviderId"
           :label="$t('group.ai-provider-settings.audio-provider')"
-          :items="local.providers"
+          :items="audioProviders"
           item-title="name"
           item-value="id"
           clearable
@@ -100,6 +100,9 @@
         <v-col :cols="10">
           <v-card-text>
             {{ provider.name }}
+            <div v-if="provider.providerType === 'chatgpt'" class="text-caption text-medium-emphasis">
+              {{ $t('group.ai-provider-settings.provider-type-chatgpt') }}
+            </div>
           </v-card-text>
         </v-col>
 
@@ -144,6 +147,9 @@ const local = reactive({ ...providerSettings.value });
 watch(local, (newVal) => { providerSettings.value = { ...newVal }; });
 // Sync back when the parent refreshes after create/update/delete
 watch(providerSettings, (newVal) => { if (newVal) Object.assign(local, newVal); });
+
+// ChatGPT subscription providers can't transcribe audio
+const audioProviders = computed(() => local.providers.filter(provider => provider.providerType !== "chatgpt"));
 
 const noDefaultProviderWarning = computed(
   () => local.providers.length > 0 && !local.defaultProviderId,
