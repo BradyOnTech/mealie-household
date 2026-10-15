@@ -406,7 +406,20 @@
       "test-connection-succeeded": "Connection successful",
       "test-connection-failed": "Connection failed",
       "supports-images": "Supports images",
-      "text-only-provider": "Text-only, can't be your image provider"
+      "text-only-provider": "Text-only, can't be your image provider",
+      "provider-type": "Provider Type",
+      "provider-type-api-key": "API key (OpenAI-compatible)",
+      "provider-type-chatgpt": "ChatGPT subscription",
+      "chatgpt-description": "Uses your ChatGPT plan's usage limits instead of paying for API usage. It can read text and images, but can't transcribe audio, so it can't be your audio provider.",
+      "chatgpt-model-description": "Leave this blank to use your plan's default model.",
+      "chatgpt-sign-in": "Sign in with ChatGPT",
+      "chatgpt-use-different-account": "Use a different account",
+      "chatgpt-sign-in-instructions": "On any device, open this link, sign in to ChatGPT, and enter the code below:",
+      "chatgpt-waiting": "Waiting for you to finish signing in…",
+      "chatgpt-signed-in": "Signed in to ChatGPT",
+      "chatgpt-signed-in-as": "Signed in to ChatGPT as {0}",
+      "chatgpt-sign-in-failed": "Couldn't sign in to ChatGPT",
+      "chatgpt-device-code-help": "If OpenAI won't accept the code, turn on device code sign-in for Codex in your ChatGPT security settings (or ask your workspace admin to allow it)."
     }
   },
   "household": {

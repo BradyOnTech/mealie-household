@@ -19,11 +19,12 @@ from mealie.core import exceptions, root_logger
 from mealie.core.config import get_app_settings
 from mealie.pkgs import img
 from mealie.repos.repository_factory import AllRepositories
-from mealie.schema.group.ai_providers import AIProviderOut, AIProviderTestResult
+from mealie.schema.group.ai_providers import AIProviderOut, AIProviderTestResult, AIProviderType
 from mealie.schema.openai._base import OpenAIBase
 from mealie.schema.openai.general import OpenAIText
 
 from .._base_service import BaseService
+from . import chatgpt
 
 T = TypeVar("T", bound=OpenAIBase)
 logger = root_logger.get_logger(__name__)
@@ -187,6 +188,10 @@ class OpenAIService(BaseService):
             # where it's only visible to whoever runs the server.
             self.logger.exception("AI provider connection test failed")
             cause = e.__cause__ or e
+            if isinstance(cause, chatgpt.ChatGPTError):
+                # These come from Codex, not from a user-supplied URL, so they're safe to show
+                return AIProviderTestResult(success=False, message=str(cause))
+
             status = getattr(cause, "status_code", None)
             name = type(cause).__name__
             return AIProviderTestResult(success=False, message=f"{name} (HTTP {status})" if status else name)
@@ -347,6 +352,9 @@ class OpenAIService(BaseService):
         import openai
         from openai.types.chat import ChatCompletion
 
+        if provider.provider_type == AIProviderType.chatgpt:
+            return await self._get_chatgpt_response(prompt, content, response_schema, provider)
+
         client = self.get_client(provider)
         # parse() builds the same response_format payload create() would send, but its
         # client-side validation runs as a post_parser that the raw-response path never
@@ -379,6 +387,46 @@ class OpenAIService(BaseService):
 
         return response_schema.parse_openai_response(completion.choices[0].message.content)
 
+    async def _get_chatgpt_response(
+        self, prompt: str, content: list[dict], response_schema: type[T], provider: AIProviderOut
+    ) -> T | None:
+        from openai.lib._pydantic import to_strict_json_schema
+
+        inputs = chatgpt.to_codex_input(content)
+        async with chatgpt.credential_lock(provider.id):
+            text = await chatgpt.run_chatgpt_turn(
+                self._load_chatgpt_credential(provider),
+                instructions=prompt,
+                inputs=inputs,
+                # The same strict schema the Chat Completions path sends as its response_format
+                output_schema=to_strict_json_schema(response_schema),
+                model=provider.model or None,
+                timeout=provider.timeout,
+                save_credential=lambda credential: self._save_chatgpt_credential(provider, credential),
+            )
+
+        return response_schema.parse_openai_response(text)
+
+    def _load_chatgpt_credential(self, provider: AIProviderOut) -> str:
+        # Read it fresh rather than trusting `provider`: another request may have refreshed the
+        # tokens since that was loaded. A provider being tested before it's saved has the id of
+        # the sign-in it's using.
+        if login := chatgpt.chatgpt_logins.find(provider.id):
+            credential = login.credential
+        else:
+            stored = self.repos.group_ai_providers.get_chatgpt_credential(provider.id)
+            credential = stored or provider.chatgpt_credential
+
+        if not credential:
+            raise chatgpt.ChatGPTAuthError("This provider isn't signed in to ChatGPT")
+        return credential
+
+    def _save_chatgpt_credential(self, provider: AIProviderOut, credential: str) -> None:
+        if login := chatgpt.chatgpt_logins.find(provider.id):
+            login.credential = credential
+        else:
+            self.repos.group_ai_providers.set_chatgpt_credential(provider.id, credential)
+
     async def get_response(
         self,
         prompt: str,
@@ -398,7 +446,7 @@ class OpenAIService(BaseService):
                 user_messages.append(attachment.build_message())
 
             return await self._get_raw_response(prompt, user_messages, response_schema, provider)
-        except openai.RateLimitError as e:
+        except (openai.RateLimitError, chatgpt.ChatGPTUsageLimitError) as e:
             raise exceptions.RateLimitError(str(e)) from e
         except Exception as e:
             raise Exception(f"OpenAI Request Failed. {e.__class__.__name__}: {e}") from e
@@ -408,6 +456,8 @@ class OpenAIService(BaseService):
 
         if not self.audio_provider:
             raise OpenAINotEnabledException("No audio provider set")
+        if self.audio_provider.provider_type == AIProviderType.chatgpt:
+            raise OpenAINotEnabledException("ChatGPT subscription providers can't transcribe audio")
 
         client = self.get_client(self.audio_provider)
 

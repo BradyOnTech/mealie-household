@@ -39,7 +39,7 @@ from mealie.db.models.recipe.tool import Tool
 from mealie.db.models.users import LongLiveToken, User
 from mealie.db.models.users.password_reset import PasswordResetModel
 from mealie.db.models.users.user_to_recipe import UserToRecipe
-from mealie.repos.repository_ai_provider import GroupRepositoryAIProvider
+from mealie.repos.repository_ai_provider import GroupRepositoryAIProvider, GroupRepositoryAIProviderSettings
 from mealie.repos.repository_cookbooks import RepositoryCookbooks
 from mealie.repos.repository_foods import RepositoryFood
 from mealie.repos.repository_household import RepositoryHousehold, RepositoryHouseholdRecipes
@@ -294,8 +294,8 @@ class AllRepositories:
         return GroupRepositoryGeneric(self.session, PK_ID, ReportEntryModel, ReportEntryOut, group_id=self.group_id)
 
     @cached_property
-    def group_ai_provider_settings(self) -> GroupRepositoryGeneric[AIProviderSettingsOut, AIProviderSettings]:
-        return GroupRepositoryGeneric(
+    def group_ai_provider_settings(self) -> GroupRepositoryAIProviderSettings:
+        return GroupRepositoryAIProviderSettings(
             self.session, PK_GROUP_ID, AIProviderSettings, AIProviderSettingsOut, group_id=self.group_id
         )
 

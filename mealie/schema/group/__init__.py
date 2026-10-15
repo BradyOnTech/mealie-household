@@ -8,7 +8,10 @@ from .ai_providers import (
     AIProviderSettingsUpdate,
     AIProviderSummary,
     AIProviderTestResult,
+    AIProviderType,
     AIProviderUpdate,
+    ChatGPTLoginOut,
+    ChatGPTLoginState,
 )
 from .group import GroupAdminUpdate
 from .group_exports import GroupDataExport
@@ -34,6 +37,9 @@ __all__ = [
     "AIProviderSettingsUpdate",
     "AIProviderSummary",
     "AIProviderTestResult",
+    "AIProviderType",
     "AIProviderUpdate",
+    "ChatGPTLoginOut",
+    "ChatGPTLoginState",
     "GroupStorage",
 ]

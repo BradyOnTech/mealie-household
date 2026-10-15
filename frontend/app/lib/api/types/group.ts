@@ -5,6 +5,8 @@
 /* Do not modify it by hand - just update the pydantic models and then re-run the script
 */
 
+export type AIProviderType = "openai" | "chatgpt";
+export type ChatGPTLoginState = "waiting" | "connected" | "failed" | "expired";
 export type SupportedMigrations =
   | "nextcloud"
   | "chowdown"
@@ -19,8 +21,9 @@ export type SupportedMigrations =
 
 export interface AIProviderCreate {
   name: string;
+  providerType?: AIProviderType;
   baseUrl?: string | null;
-  model: string;
+  model?: string;
   timeout?: number;
   requestHeaders?: {
     [k: string]: string;
@@ -31,8 +34,9 @@ export interface AIProviderCreate {
 }
 export interface AIProviderOut {
   name: string;
+  providerType?: AIProviderType;
   baseUrl?: string | null;
-  model: string;
+  model?: string;
   timeout?: number;
   requestHeaders?: {
     [k: string]: string;
@@ -41,11 +45,13 @@ export interface AIProviderOut {
     [k: string]: string;
   };
   id: string;
+  chatgptAccount: string | null;
 }
 export interface AIProviderSave {
   name: string;
+  providerType?: AIProviderType;
   baseUrl?: string | null;
-  model: string;
+  model?: string;
   timeout?: number;
   requestHeaders?: {
     [k: string]: string;
@@ -70,6 +76,7 @@ export interface AIProviderSettingsOut {
 export interface AIProviderSummary {
   id: string;
   name: string;
+  providerType?: AIProviderType;
 }
 export interface AIProviderSettingsUpdate {
   defaultProviderId: string | null;
@@ -83,8 +90,9 @@ export interface AIProviderTestResult {
 }
 export interface AIProviderUpdate {
   name: string;
+  providerType?: AIProviderType;
   baseUrl?: string | null;
-  model: string;
+  model?: string;
   timeout?: number;
   requestHeaders?: {
     [k: string]: string;
@@ -92,6 +100,14 @@ export interface AIProviderUpdate {
   requestParams?: {
     [k: string]: string;
   };
+}
+export interface ChatGPTLoginOut {
+  id: string;
+  state: ChatGPTLoginState;
+  verificationUrl?: string | null;
+  userCode?: string | null;
+  account?: string | null;
+  error?: string | null;
 }
 export interface CreateGroupPreferences {
   privateGroup?: boolean;

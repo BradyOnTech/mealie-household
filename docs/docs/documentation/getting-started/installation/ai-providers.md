@@ -22,6 +22,21 @@ Note that some models are capable of handling multiple features (e.g. `gpt-5` ca
 
 While Mealie has prompts for each AI task, you can override these with your own prompts if you'd like. For more information, check out the [backend configuration](../installation/backend-config.md).
 
+### Using a ChatGPT subscription
+
+Instead of an API key, a provider can use a ChatGPT plan (Plus, Pro, Business, and so on), so its requests count against the plan's usage limits rather than being billed as API usage. When you create the provider, choose **ChatGPT subscription** as the provider type and click **Sign in with ChatGPT**. Mealie shows a link and a short code: open the link on any device, sign in to ChatGPT, and enter the code. Nothing has to reach Mealie from OpenAI's site, so this works however Mealie is hosted.
+
+If OpenAI won't accept the code, turn on device code sign-in for Codex in your ChatGPT security settings. On a workspace plan, a workspace admin may need to allow it.
+
+A few things to know:
+
+- Requests go through the [Codex CLI](https://github.com/openai/codex), which the Docker image includes. Outside Docker, install it and, if it isn't on your `PATH`, set [`CODEX_BIN`](./backend-config.md#openai). Each request starts its own short-lived Codex process, which adds a second or so.
+- It can read text and images, so it can be your default and image provider, but it can't transcribe audio. Use an API-key provider as your audio provider.
+- Leave the model blank to use your plan's default model.
+- Everyone in your group shares the one ChatGPT account and its usage limits. When those run out, AI features fail until the limit resets.
+- The sign-in is stored in Mealie's database, the same way an API key is, and Codex refreshes it as needed. To switch accounts, edit the provider and sign in again.
+- Mealie keeps a sign-in that's in progress in memory, so if you've raised `UVICORN_WORKERS` above 1, signing in may not complete reliably.
+
 ## AI Features
 - The OpenAI Ingredient Parser can be used as an alternative to the NLP and Brute Force parsers. Simply choose the OpenAI parser while parsing ingredients (:octicons-tag-24: v1.7.0)
 - When importing a recipe via URL, if the default recipe scraper is unable to read the recipe data from a webpage, the webpage contents will be parsed by AI (:octicons-tag-24: v1.9.0)

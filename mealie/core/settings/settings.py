@@ -452,6 +452,12 @@ class AppSettings(AppLoggingSettings):
     files are individually optional, each prompt name will fall back to the default if no custom file exists
     """
 
+    CODEX_BIN: str = "codex"
+    """
+    The Codex CLI, as a name on PATH or an absolute path. ChatGPT subscription AI providers run their
+    requests through it; the Docker image includes it.
+    """
+
     # ===============================================
     # Scraper Configuration
 
