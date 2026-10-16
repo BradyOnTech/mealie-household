@@ -17,6 +17,9 @@ from mealie.schema.grocery.grocery import (
     GroceryManualItemCreate,
     GroceryProductCreate,
     GroceryProductOut,
+    GroceryRestockBought,
+    GroceryRestockCreate,
+    GroceryRestockList,
     GrocerySuggestionOut,
     GroceryWeekGenerate,
     GroceryWeekView,
@@ -51,6 +54,44 @@ class GroceryController(BaseCrudController):
                 household_id=shopping_list.household_id,
             )
         return view
+
+    def publish_restock(self, result: GroceryRestockList) -> GroceryRestockList:
+        """Out of items live on the newest list, so that's the list a change to them touches"""
+        week = self.repos.grocery_weeks.get_by_date(result.next_list_week) if result.next_list_week else None
+        if week:
+            self.publish_event(
+                EventTypes.shopping_list_updated,
+                document_data=EventShoppingListData(
+                    operation=EventOperation.update, shopping_list_id=week.shopping_list_id
+                ),
+                group_id=week.group_id,
+                household_id=week.household_id,
+            )
+        return result
+
+    @router.get("/restock", response_model=GroceryRestockList)
+    def restock(self) -> GroceryRestockList:
+        return self.service.restock_list()
+
+    @router.post("/restock", response_model=GroceryRestockList, status_code=201)
+    def add_restock(self, data: GroceryRestockCreate) -> GroceryRestockList:
+        self.service.add_restock(data, added_by=self.user.full_name or self.user.username or "")
+        return self.publish_restock(self.service.restock_list())
+
+    @router.put("/restock/{item_id}", response_model=GroceryRestockList)
+    def update_restock(self, item_id: UUID4, data: GroceryRestockCreate) -> GroceryRestockList:
+        self.service.update_restock(item_id, data)
+        return self.publish_restock(self.service.restock_list())
+
+    @router.delete("/restock/{item_id}", response_model=GroceryRestockList)
+    def remove_restock(self, item_id: UUID4) -> GroceryRestockList:
+        self.service.remove_restock(item_id)
+        return self.publish_restock(self.service.restock_list())
+
+    @router.put("/restock/{item_id}/bought", response_model=GroceryRestockList)
+    def restock_bought(self, item_id: UUID4, data: GroceryRestockBought) -> GroceryRestockList:
+        self.service.set_restock_bought(item_id, data.bought)
+        return self.publish_restock(self.service.restock_list())
 
     @router.get("/products", response_model=list[GroceryProductOut])
     def products(self) -> list[GroceryProductOut]:

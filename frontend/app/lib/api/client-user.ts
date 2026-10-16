@@ -1,5 +1,6 @@
 import { RecipeAPI } from "./user/recipes";
 import { GroceriesAPI } from "./user/groceries";
+import { AssistantAPI } from "./user/assistant";
 import { UserApi } from "./user/users";
 import { HouseholdAPI } from "./user/households";
 import { GroupAPI } from "./user/groups";
@@ -30,6 +31,7 @@ import type { ApiRequestInstance } from "~/lib/api/types/non-generated";
 
 export class UserApiClient {
   public groceries: GroceriesAPI;
+  public assistant: AssistantAPI;
   public recipes: RecipeAPI;
   public users: UserApi;
   public households: HouseholdAPI;
@@ -60,6 +62,7 @@ export class UserApiClient {
 
   constructor(requests: ApiRequestInstance) {
     this.groceries = new GroceriesAPI(requests);
+    this.assistant = new AssistantAPI(requests);
     // Recipes
     this.recipes = new RecipeAPI(requests);
     this.categories = new CategoriesAPI(requests);

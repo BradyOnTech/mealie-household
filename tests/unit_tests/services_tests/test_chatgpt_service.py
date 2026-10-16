@@ -25,7 +25,7 @@ from mealie.schema.group.ai_providers import (
 )
 from mealie.schema.openai.general import OpenAIText
 from mealie.services.openai import chatgpt
-from mealie.services.openai.openai import OpenAIService
+from mealie.services.openai.openai import OpenAIChatMessage, OpenAIService, OpenAITool
 
 FAKE_CODEX = """
 import json, os, sys, threading, time
@@ -74,6 +74,9 @@ for line in sys.stdin:
     elif method == "thread/start":
         record("thread", params)
         send({{"id": request_id, "result": {{"thread": {{"id": "thread-1"}}}}}})
+    elif method == "thread/inject_items":
+        record("history", params["items"])
+        send({{"id": request_id, "result": {{}}}})
     elif method == "turn/start":
         record("turn", params)
         # Simulate Codex refreshing the tokens partway through
@@ -84,7 +87,19 @@ for line in sys.stdin:
             json.dump(credential, f)
 
         send({{"id": request_id, "result": {{"turn": {{"id": "turn-1"}}}}}})
-        if MODE == "usage_limit":
+        if MODE == "tools":
+            # Call the first tool the client offered, the way the model would, then answer with its result
+            with open(os.path.join(RECORD, "thread")) as f:
+                tool = json.load(f)["dynamicTools"][0]["name"]
+            call = {{"threadId": "thread-1", "turnId": "turn-1", "callId": "call-1", "namespace": None, "tool": tool}}
+            call["arguments"] = {{"items": [{{"name": "rice"}}]}}
+            send({{"id": "codex-1", "method": "item/tool/call", "params": call}})
+            response = json.loads(sys.stdin.readline())
+            record("tool_response", response)
+            text = response["result"]["contentItems"][0]["text"]
+            item = {{"type": "agentMessage", "text": f"Tool said: {{text}}", "phase": "final_answer"}}
+            turn = {{"status": "completed", "items": [item]}}
+        elif MODE == "usage_limit":
             error = {{"message": "You've hit your usage limit.", "codexErrorInfo": "usageLimitExceeded"}}
             turn = {{"status": "failed", "items": [], "error": error}}
         else:
@@ -182,6 +197,9 @@ async def test_run_chatgpt_turn_returns_the_final_answer(fake_codex):
     assert thread["model"] == "gpt-test"
     assert thread["config"]["features"]["shell_tool"] is False
 
+    assert "dynamicTools" not in thread
+    assert not (record / "history").exists()
+
     turn = _recorded(record, "turn")
     assert turn["outputSchema"] == {"type": "object"}
     assert turn["effort"] == chatgpt.REASONING_EFFORT
@@ -229,6 +247,87 @@ async def test_run_chatgpt_turn_without_codex_installed(monkeypatch, tmp_path):
 
     with pytest.raises(chatgpt.ChatGPTError, match="Codex CLI isn't installed"):
         await _run()
+
+
+TOOLS = [
+    {
+        "type": "function",
+        "name": "add_out_of_items",
+        "description": "Add things the household is out of",
+        "inputSchema": {"type": "object"},
+    }
+]
+
+
+@pytest.mark.asyncio
+async def test_run_chatgpt_turn_offers_tools_and_answers_their_calls(fake_codex):
+    record = fake_codex("tools")
+    calls = []
+
+    async def call_tool(name, arguments):
+        calls.append((name, arguments))
+        return True, "Added rice"
+
+    history = [chatgpt.to_codex_history("user", "Hi"), chatgpt.to_codex_history("assistant", "Hello!")]
+    text, _ = await _run(output_schema=None, tools=TOOLS, call_tool=call_tool, history=history)
+
+    assert text == "Tool said: Added rice"
+    assert calls == [("add_out_of_items", {"items": [{"name": "rice"}]})]
+
+    thread = _recorded(record, "thread")
+    assert thread["dynamicTools"] == TOOLS
+    assert thread["developerInstructions"] == chatgpt.TOOL_DEVELOPER_INSTRUCTIONS
+    assert _recorded(record, "history") == [
+        {"type": "message", "role": "user", "content": [{"type": "input_text", "text": "Hi"}]},
+        {"type": "message", "role": "assistant", "content": [{"type": "output_text", "text": "Hello!"}]},
+    ]
+    assert _recorded(record, "tool_response") == {
+        "id": "codex-1",
+        "result": {"contentItems": [{"type": "inputText", "text": "Added rice"}], "success": True},
+    }
+    assert "outputSchema" not in _recorded(record, "turn")
+
+
+@pytest.mark.asyncio
+async def test_a_failing_tool_is_reported_to_the_model_without_details(fake_codex):
+    record = fake_codex("tools")
+
+    async def call_tool(name, arguments):
+        raise RuntimeError("the database password is hunter2")
+
+    text, _ = await _run(output_schema=None, tools=TOOLS, call_tool=call_tool)
+
+    result = _recorded(record, "tool_response")["result"]
+    assert result["success"] is False
+    assert "hunter2" not in result["contentItems"][0]["text"]
+    assert "hunter2" not in text
+
+
+@pytest.mark.asyncio
+async def test_openai_service_chats_through_codex_with_tools(fake_codex):
+    record = fake_codex("tools")
+    service, _ = _service()
+    seen = []
+
+    async def add(arguments):
+        seen.append(arguments)
+        return "Added rice to Out of"
+
+    tool = OpenAITool(name="add_out_of_items", description="Add", parameters={"type": "object"}, run=add)
+    messages = [
+        OpenAIChatMessage("user", "Hi"),
+        OpenAIChatMessage("assistant", "Hello!"),
+        OpenAIChatMessage("user", "We're out of rice"),
+    ]
+
+    reply = await service.chat("Be helpful", messages, [tool], provider=_chatgpt_provider())
+
+    assert reply == "Tool said: Added rice to Out of"
+    assert seen == [{"items": [{"name": "rice"}]}]
+    assert _recorded(record, "thread")["baseInstructions"] == "Be helpful"
+    assert _recorded(record, "thread")["dynamicTools"][0]["inputSchema"] == {"type": "object"}
+    assert _recorded(record, "turn")["input"] == [{"type": "text", "text": "We're out of rice"}]
+    assert [item["role"] for item in _recorded(record, "history")] == ["user", "assistant"]
 
 
 def test_to_codex_input_converts_text_and_images():

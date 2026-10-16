@@ -40,6 +40,7 @@
             {{ $t("this-week.earlier") }}: {{ earlierNames.join(", ") }}.
           </p>
           <WeekGroceries :view="groceries" />
+          <GroceryRestockPanel class="week-restock" />
         </aside>
       </div>
     </div>
@@ -47,9 +48,11 @@
 </template>
 
 <script setup lang="ts">
+import GroceryRestockPanel from "~/components/Domain/Grocery/GroceryRestockPanel.vue";
 import WeekAhead from "~/components/Domain/Week/WeekAhead.vue";
 import WeekGroceries from "~/components/Domain/Week/WeekGroceries.vue";
 import WeekLead from "~/components/Domain/Week/WeekLead.vue";
+import { useGroceryRestock } from "~/composables/groceries/use-grocery-restock";
 import { leadDinner, parsePlanDay, useHouseholdWeek } from "~/composables/use-household-week";
 import { alert } from "~/composables/use-toast";
 
@@ -61,8 +64,11 @@ useSeoMeta({ title: i18n.t("this-week.title") });
 
 const groupSlug = computed(() => auth.user.value?.groupSlug ?? "");
 const {
-  today, weekNumber, tonight, earlier, ahead, thisWeek, groceries, suggestions, loading, busy, error, load, planDinner,
+  today, weekNumber, tonight, earlier, ahead, thisWeek, groceries, suggestions, loading, busy, error, load, loadGroceries, planDinner,
 } = useHouseholdWeek();
+const { version: restockVersion } = useGroceryRestock();
+// Out of items ride on the grocery list, so its counts change with them
+watch(restockVersion, () => { void loadGroceries(); });
 
 const longDate = computed(() =>
   new Intl.DateTimeFormat(i18n.locale.value, { weekday: "long", month: "long", day: "numeric" }).format(today),
@@ -130,6 +136,10 @@ onMounted(load);
   grid-template-columns: minmax(0, 1fr) 352px;
   gap: 52px;
   padding-top: 28px;
+}
+
+.week-restock {
+  margin-top: 22px;
 }
 
 .week-earlier {

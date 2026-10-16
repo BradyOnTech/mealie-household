@@ -157,6 +157,7 @@ export function useHouseholdWeek() {
     busy,
     error,
     load,
+    loadGroceries,
     planDinner,
   };
 }

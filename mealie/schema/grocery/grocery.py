@@ -6,7 +6,7 @@ from pydantic import UUID4, ConfigDict, Field, HttpUrl, TypeAdapter, field_valid
 from sqlalchemy.orm import selectinload
 from sqlalchemy.orm.interfaces import LoaderOption
 
-from mealie.db.models.household.grocery import GroceryFoodRule, GroceryProduct
+from mealie.db.models.household.grocery import GroceryFoodRule, GroceryProduct, GroceryRestockItem
 from mealie.schema._mealie import MealieModel
 from mealie.schema._mealie.mealie_model import UpdatedAtField
 from mealie.schema.household.group_shopping_list import ShoppingListItemOut, ShoppingListOut
@@ -212,3 +212,75 @@ class GrocerySuggestionOut(MealieModel):
 class GroceryItemDelete(MealieModel):
     item_ids: list[UUID4] = Field(min_length=1, max_length=100)
     expected_revision: int = Field(ge=0)
+
+
+class GroceryRestockStatus(StrEnum):
+    waiting = "waiting"
+    """Not on a grocery list yet. It joins the next list that's made."""
+    listed = "listed"
+    """On the newest grocery list, not bought yet"""
+    bought = "bought"
+
+
+class GroceryRestockCreate(MealieModel):
+    """Something the household has run out of. An empty quantity means "the usual amount"."""
+
+    name: str = Field(min_length=1, max_length=255)
+    food_id: UUID4 | None = None
+    """The ingredient this is. Found by name when it's left empty."""
+    quantity: float | None = Field(default=None, gt=0, allow_inf_nan=False)
+    unit: GroceryUnit | None = None
+    store: GroceryStore | None = None
+    note: str = Field(default="", max_length=2000)
+
+    @field_validator("name")
+    @classmethod
+    def clean_name(cls, value: str) -> str:
+        value = " ".join(value.split())
+        if not value:
+            raise ValueError("Name what you're out of")
+        return value
+
+    @field_validator("note")
+    @classmethod
+    def clean_note(cls, value: str) -> str:
+        return value.strip()
+
+    @model_validator(mode="after")
+    def unit_needs_quantity(self) -> Self:
+        if self.unit and self.quantity is None:
+            raise ValueError("Enter an amount to go with the unit")
+        return self
+
+
+class GroceryRestockOut(GroceryRestockCreate):
+    id: UUID4
+    group_id: UUID4
+    household_id: UUID4
+    food: IngredientFoodSummary | None = None
+    added_by: str = ""
+    shopping_list_item_id: UUID4 | None = None
+    week_start: date | None = None
+    """The week of the grocery list it's on"""
+    bought_at: datetime | None = None
+    status: GroceryRestockStatus = GroceryRestockStatus.waiting
+    created_at: datetime | None = None
+    updated_at: datetime | None = UpdatedAtField(None)
+    model_config = ConfigDict(from_attributes=True)
+
+    @classmethod
+    def loader_options(cls) -> list[LoaderOption]:
+        return [selectinload(GroceryRestockItem.food)]
+
+
+class GroceryRestockList(MealieModel):
+    items: list[GroceryRestockOut] = Field(default_factory=list)
+    """Still needed, oldest first"""
+    recently_bought: list[GroceryRestockOut] = Field(default_factory=list)
+    """Bought in the last two weeks, newest first"""
+    next_list_week: date | None = None
+    """The week of the list new items go on, or empty when they wait for the next list"""
+
+
+class GroceryRestockBought(MealieModel):
+    bought: bool = True

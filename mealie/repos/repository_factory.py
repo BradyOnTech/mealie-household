@@ -12,7 +12,7 @@ from mealie.db.models.group.exports import GroupDataExportsModel
 from mealie.db.models.group.preferences import GroupPreferencesModel
 from mealie.db.models.household.cookbook import CookBook
 from mealie.db.models.household.events import GroupEventNotifierModel
-from mealie.db.models.household.grocery import GroceryFoodRule, GroceryProduct, GroceryWeek
+from mealie.db.models.household.grocery import GroceryFoodRule, GroceryProduct, GroceryRestockItem, GroceryWeek
 from mealie.db.models.household.household import Household
 from mealie.db.models.household.household_to_recipe import HouseholdToRecipe
 from mealie.db.models.household.invite_tokens import GroupInviteToken
@@ -46,7 +46,7 @@ from mealie.repos.repository_household import RepositoryHousehold, RepositoryHou
 from mealie.repos.repository_meal_plan_rules import RepositoryMealPlanRules
 from mealie.repos.repository_units import RepositoryUnit
 from mealie.schema.cookbook.cookbook import ReadCookBook
-from mealie.schema.grocery.grocery import GroceryFoodRuleOut, GroceryProductOut, GroceryWeekOut
+from mealie.schema.grocery.grocery import GroceryFoodRuleOut, GroceryProductOut, GroceryRestockOut, GroceryWeekOut
 from mealie.schema.group.ai_providers import AIProviderOut, AIProviderSettingsOut
 from mealie.schema.group.group_exports import GroupDataExport
 from mealie.schema.group.group_preferences import ReadGroupPreferences
@@ -78,7 +78,7 @@ from mealie.schema.user.user_passwords import PrivatePasswordResetToken
 
 from ._utils import NOT_SET, NotSet
 from .repository_generic import GroupRepositoryGeneric, HouseholdRepositoryGeneric
-from .repository_grocery import RepositoryGroceryWeek
+from .repository_grocery import RepositoryGroceryRestock, RepositoryGroceryWeek
 from .repository_group import RepositoryGroup
 from .repository_meals import RepositoryMeals
 from .repository_recipes import RepositoryRecipes
@@ -335,6 +335,17 @@ class AllRepositories:
             PK_ID,
             GroceryWeek,
             GroceryWeekOut,
+            group_id=self.group_id,
+            household_id=self.household_id,
+        )
+
+    @cached_property
+    def grocery_restock_items(self) -> RepositoryGroceryRestock:
+        return RepositoryGroceryRestock(
+            self.session,
+            PK_ID,
+            GroceryRestockItem,
+            GroceryRestockOut,
             group_id=self.group_id,
             household_id=self.household_id,
         )

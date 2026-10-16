@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 from typing import TYPE_CHECKING
 
 from pydantic import ConfigDict
@@ -7,6 +7,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from mealie.db.models._model_base import BaseMixins, FilterableColumn, SqlAlchemyBase
 from mealie.db.models._model_utils.auto_init import auto_init
+from mealie.db.models._model_utils.datetime import NaiveDateTime
 from mealie.db.models._model_utils.guid import GUID
 
 if TYPE_CHECKING:
@@ -83,6 +84,42 @@ class GroceryWeek(SqlAlchemyBase, BaseMixins):
     pantry_snapshot: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
 
     model_config = ConfigDict(exclude={"household", "shopping_list"})
+
+    @auto_init()
+    def __init__(self, **_) -> None:
+        pass
+
+
+class GroceryRestockItem(SqlAlchemyBase, BaseMixins):
+    """
+    Something the household has run out of (the app's "Out of" list). It rides on the newest grocery
+    list until someone checks it off, whether or not a recipe needs it.
+
+    `shopping_list_item_id` points at the list row standing in for it, without a foreign key: that row
+    belongs to the shopping list, and moves between weeks' lists or disappears without asking this one.
+    """
+
+    __tablename__ = "grocery_restock_items"
+
+    id: FilterableColumn[GUID] = mapped_column(GUID, primary_key=True, default=GUID.generate)
+    group_id: FilterableColumn[GUID] = mapped_column(GUID, ForeignKey("groups.id"), nullable=False, index=True)
+    household_id: FilterableColumn[GUID] = mapped_column(GUID, ForeignKey("households.id"), nullable=False, index=True)
+    household: Mapped[Household] = relationship("Household", back_populates="grocery_restock_items")
+    name: FilterableColumn[str] = mapped_column(String, nullable=False)
+    food_id: FilterableColumn[GUID | None] = mapped_column(GUID, ForeignKey("ingredient_foods.id"), index=True)
+    food: Mapped[IngredientFoodModel | None] = relationship(
+        "IngredientFoodModel", back_populates="grocery_restock_items"
+    )
+    quantity: Mapped[float | None] = mapped_column(Float)
+    unit: Mapped[str | None] = mapped_column(String)
+    store: Mapped[str | None] = mapped_column(String)
+    note: Mapped[str] = mapped_column(String, nullable=False, default="")
+    added_by: Mapped[str] = mapped_column(String, nullable=False, default="")
+    shopping_list_item_id: Mapped[GUID | None] = mapped_column(GUID, index=True)
+    week_start: Mapped[date | None] = mapped_column(Date)
+    bought_at: FilterableColumn[datetime | None] = mapped_column(NaiveDateTime, index=True)
+
+    model_config = ConfigDict(exclude={"food", "household"})
 
     @auto_init()
     def __init__(self, **_) -> None:

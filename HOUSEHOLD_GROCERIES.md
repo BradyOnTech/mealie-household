@@ -142,6 +142,27 @@ Later pantry edits apply to future weeks. Update pantry quantities yourself afte
 A minimum weekly staple brings recipe requirements up to the saved weekly total. An extra weekly staple
 adds that amount to recipe requirements. Pantry is deducted once after combining these requirements.
 
+### Out of list
+
+The Out of list is for things the household has run out of, whether or not a recipe uses them. Type them
+into **We're out of…** on the This week or Groceries page, or tell the assistant. Each item goes on the
+newest grocery list for this week or later and stays there until someone checks it off. If there's no such
+list yet, it waits and joins the next list you make. A newer list picks up anything still not bought.
+
+An item whose name matches an ingredient (by name, plural, or alias) is linked to it, so it uses your
+preferred products and stores and shares a card with any recipe demand for the same ingredient. Without an
+amount it means one of whatever you usually buy, so a product with a package size counts at least one
+package. Checking the row off on any list, including Mealie's standard shopping list, marks the item bought;
+deleting the row from a list removes it from the Out of list. Bought items stay under **Bought lately** for
+two weeks, where one tap adds them again.
+
+### Ask (the kitchen assistant)
+
+With a default AI provider set in group settings, **Ask** in the navigation opens a chat that keeps the Out of
+list and answers questions about the grocery list, the meal plan, and your recipes. It can also suggest and
+plan dinners. It uses tool calling through either an API-key provider or a ChatGPT subscription provider, and
+its tools act only on the signed-in member's household.
+
 ### Household collaboration
 
 Product preferences, pantry/staple rules, and weeks are scoped to the authenticated household.
@@ -189,14 +210,18 @@ it requires a signed-in household user and contains source/build instructions wi
 
 ## Main extension points
 
-- `mealie/db/models/household/grocery.py`: household products, pantry/staple rules, and managed weeks.
-- `mealie/services/household_services/groceries.py`: routing, purchase quantities, pantry, reconciliation, suggestions.
+- `mealie/db/models/household/grocery.py`: household products, pantry/staple rules, managed weeks, and the Out of list.
+- `mealie/services/household_services/groceries.py`: routing, purchase quantities, pantry, reconciliation, suggestions,
+  and keeping Out of items on the newest list (`_sync_restock`).
 - `mealie/repos/repository_grocery.py`: scoped data access, revision checks, and atomic list/week writes.
 - `mealie/routes/households/controller_groceries.py`: authenticated `/api/households/groceries` endpoints.
+- `mealie/services/household_services/assistant.py`: the assistant's tools and prompt context;
+  `mealie/services/openai/openai.py` (`OpenAIService.chat`) runs the tool-calling conversation for either provider type.
 - `frontend/app/pages/household/groceries/`: shopping and catalog pages.
-- `frontend/app/components/Domain/Grocery/`: product and pantry/staple editors.
+- `frontend/app/pages/household/assistant.vue`: the Ask page.
+- `frontend/app/components/Domain/Grocery/`: product and pantry/staple editors, and the Out of panel.
 
-One Alembic migration adds the three grocery tables. When merging a later upstream release with new migrations,
+One Alembic migration adds the three grocery tables, and a second adds the Out of list. When merging a later upstream release with new migrations,
 check for multiple Alembic heads and create/test an Alembic merge revision when required.
 Preferences live in household tables so a shared Food does not impose one household's preferred products on another.
 

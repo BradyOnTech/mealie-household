@@ -28,7 +28,7 @@ import shutil
 import tempfile
 import time
 from collections import deque
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from pathlib import Path
 from typing import Any
 from uuid import UUID, uuid4
@@ -72,12 +72,24 @@ CODEX_CONFIG: dict[str, Any] = {
         "unified_exec": False,
         "view_image": False,
     },
+    # Leave out the prompt sections about skills, sandboxing and apps, none of which Mealie uses
+    "skills": {"include_instructions": False},
+    "include_permissions_instructions": False,
+    "include_apps_instructions": False,
 }
 DEVELOPER_INSTRUCTIONS = (
     "Answer directly from the content you're given. Don't run commands, read files, or browse the web."
 )
+TOOL_DEVELOPER_INSTRUCTIONS = (
+    "The tools you're given are how you see and change the household's data, so use them rather than guessing. "
+    "Don't run commands, read files, or browse the web."
+)
 REASONING_EFFORT = "low"
 """Mealie's requests are extraction and formatting, which don't benefit from long reasoning"""
+
+ToolHandler = Callable[[str, Any], Awaitable[tuple[bool, str]]]
+"""Runs a tool Mealie offered the model: given the tool's name and arguments, returns whether it
+worked and the text to hand back to the model"""
 
 RPC_TIMEOUT = 60
 LOGIN_TIMEOUT = 15 * 60
@@ -126,6 +138,8 @@ class _AppServer:
         self.home = root / "home"
         self.cwd = root / "work"
         self.on_notification: Callable[[str, dict[str, Any]], None] | None = None
+        self.on_request: Callable[[str, dict[str, Any]], Awaitable[dict[str, Any] | None]] | None = None
+        """Answers a request from Codex, or returns None to turn it down"""
 
         self._process: asyncio.subprocess.Process | None = None
         self._tasks: list[asyncio.Task[None]] = []
@@ -258,10 +272,19 @@ class _AppServer:
             if future and not future.done():
                 future.set_result(message)
         elif request_id is not None:
-            # Codex asks the client things like approvals and tool results. Mealie never offers
-            # tools or allows approvals, so there's never anything to answer with.
+            # Codex asks the client things like approvals and tool results. Mealie answers calls to
+            # the tools it offered, and turns everything else down, approvals included.
+            result = None
+            if self.on_request:
+                try:
+                    result = await self.on_request(method, params)
+                except Exception:
+                    logger.exception(f"Failed to answer Codex's {method} request")
             with contextlib.suppress(ChatGPTError):
-                await self._send({"id": request_id, "error": {"code": -32601, "message": f"Unsupported: {method}"}})
+                if result is None:
+                    await self._send({"id": request_id, "error": {"code": -32601, "message": f"Unsupported: {method}"}})
+                else:
+                    await self._send({"id": request_id, "result": result})
         elif self.on_notification:
             self.on_notification(method, params)
 
@@ -340,6 +363,13 @@ def to_codex_input(content: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return inputs
 
 
+def to_codex_history(role: str, text: str) -> dict[str, Any]:
+    """An earlier chat message, as the Responses API item Codex keeps in a thread's history"""
+    if role == "assistant":
+        return {"type": "message", "role": "assistant", "content": [{"type": "output_text", "text": text}]}
+    return {"type": "message", "role": "user", "content": [{"type": "input_text", "text": text}]}
+
+
 async def run_chatgpt_turn(
     credential: str,
     *,
@@ -349,10 +379,18 @@ async def run_chatgpt_turn(
     model: str | None,
     timeout: float,
     save_credential: Callable[[str], None],
+    tools: list[dict[str, Any]] | None = None,
+    call_tool: ToolHandler | None = None,
+    history: list[dict[str, Any]] | None = None,
 ) -> str:
     """
     Run one request through a throwaway Codex thread, signed in with `credential`, and return the
     reply's text.
+
+    `tools` are offered to the model as Codex dynamic tools (`{"type": "function", "name": ...,
+    "description": ..., "inputSchema": ...}`), and each call the model makes is run with
+    `call_tool`. `history` is the conversation so far, from `to_codex_history`, put ahead of
+    `inputs`.
 
     `save_credential` is called with Codex's auth.json afterwards if Codex changed it, which it
     does when it refreshes the tokens. That happens even when the request itself fails, since
@@ -375,7 +413,18 @@ async def run_chatgpt_turn(
         elif method == "turn/completed" and not turn_done.done():
             turn_done.set_result(params)
 
+    async def on_request(method: str, params: dict[str, Any]) -> dict[str, Any] | None:
+        if method != "item/tool/call" or not call_tool:
+            return None
+        try:
+            success, text = await call_tool(str(params.get("tool") or ""), params.get("arguments"))
+        except Exception:
+            logger.exception("A tool offered to ChatGPT failed")
+            success, text = False, "That didn't work because of an error in Mealie."
+        return {"contentItems": [{"type": "inputText", "text": text}], "success": success}
+
     server.on_notification = on_notification
+    server.on_request = on_request
     try:
         await server.start()
 
@@ -389,15 +438,19 @@ async def run_chatgpt_turn(
             "approvalPolicy": "never",
             "ephemeral": True,
             "baseInstructions": instructions,
-            "developerInstructions": DEVELOPER_INSTRUCTIONS,
+            "developerInstructions": TOOL_DEVELOPER_INSTRUCTIONS if tools else DEVELOPER_INSTRUCTIONS,
             "config": CODEX_CONFIG,
         }
         if model:
             thread_params["model"] = model
+        if tools:
+            thread_params["dynamicTools"] = tools
         thread = await server.request("thread/start", thread_params)
         thread_id = (thread.get("thread") or {}).get("id")
         if not thread_id:
             raise ChatGPTError("Codex didn't start a thread")
+        if history:
+            await server.request("thread/inject_items", {"threadId": thread_id, "items": history})
 
         turn_params: dict[str, Any] = {"threadId": thread_id, "input": inputs, "effort": REASONING_EFFORT}
         if output_schema:

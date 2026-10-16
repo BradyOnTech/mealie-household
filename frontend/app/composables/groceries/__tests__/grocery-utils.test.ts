@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { detectGroceryStore, mondayFor } from "../grocery-utils";
+import { detectGroceryStore, groceryError, mondayFor } from "../grocery-utils";
 
 describe("grocery product links", () => {
   it("recognizes retailer domains and subdomains", () => {
@@ -20,5 +20,14 @@ describe("calendar week selection", () => {
     expect(mondayFor("2026-10-12")).toBe("2026-10-12");
     expect(mondayFor("2026-10-18")).toBe("2026-10-12");
     expect(mondayFor("2027-01-01")).toBe("2026-12-28");
+  });
+});
+
+describe("request errors", () => {
+  it("shows the server's message, whatever shape it comes in", () => {
+    expect(groceryError({ response: { data: { detail: "Product not found" } } })).toBe("Product not found");
+    expect(groceryError({ response: { data: { detail: [{ msg: "Name what you're out of" }] } } })).toBe("Name what you're out of");
+    expect(groceryError({ response: { data: { detail: { message: "Set up an AI provider", error: true } } } })).toBe("Set up an AI provider");
+    expect(groceryError({ message: "Network Error" })).toBe("Network Error");
   });
 });

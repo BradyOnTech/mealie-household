@@ -75,12 +75,23 @@ export function useAppNavigation() {
       to: `/g/${groupSlug.value}/cookbooks`,
       restricted: true,
     },
+    // The assistant needs the group's AI provider
+    ...(group.value?.aiProviderSettings?.aiEnabled
+      ? [{
+          key: "ask",
+          title: i18n.t("assistant.nav"),
+          icon: $globals.icons.chatOutline,
+          to: "/household/assistant",
+          restricted: true,
+        }]
+      : []),
   ]));
 
   /** Which primary section the current page belongs to. */
   const activeSection = computed(() => {
     const path = route.path;
     if (path.startsWith("/household/week")) return "week";
+    if (path.startsWith("/household/assistant")) return "ask";
     if (path.startsWith("/household/groceries") || path.startsWith("/shopping-lists")) return "groceries";
     if (path.startsWith("/household/mealplan")) return "week";
     if (/^\/g\/[^/]+\/cookbooks/.test(path)) return "cookbooks";

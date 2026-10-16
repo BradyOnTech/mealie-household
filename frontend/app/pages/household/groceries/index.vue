@@ -26,6 +26,8 @@
       {{ error || catalogError }}
     </v-alert>
 
+    <GroceryRestockPanel compact />
+
     <section class="groceries-plan">
       <button type="button" class="groceries-plan__toggle" :aria-expanded="planOpen" @click="planOpen = !planOpen">
         <span class="groceries-plan__title">{{ $t('groceries.the-plan') }}</span>
@@ -240,6 +242,7 @@
             <div class="purchase__body">
               <div class="purchase__name">
                 {{ purchase.foodName }}
+                <span v-if="isRestock(purchase)" class="purchase__badge">{{ $t('restock.badge') }}</span>
                 <span v-if="isManualChoice(purchase)" class="purchase__badge">{{ $t('groceries.this-week') }}</span>
               </div>
               <div v-if="purchase.product" class="purchase__product">
@@ -259,8 +262,8 @@
               <div v-if="purchase.packageCount != null" class="purchase__buy">
                 {{ $t('groceries.buy') }} {{ purchase.packageCount }} × {{ purchase.product?.packageQuantity }} {{ unitTitle(purchase.product?.packageUnit) }}
               </div>
-              <div class="purchase__needs">
-                {{ purchase.items.map(item => item.display).join(' + ') }}
+              <div v-if="needsLine(purchase)" class="purchase__needs">
+                {{ needsLine(purchase) }}
               </div>
               <div v-if="purchase.quantityNote" class="purchase__warn">
                 {{ purchase.quantityNote }}
@@ -306,7 +309,7 @@
                 <v-list-item
                   v-if="manualIds(purchase).length"
                   :prepend-icon="$globals.icons.delete"
-                  :title="$t('groceries.delete-manual')"
+                  :title="$t(isRestockOnly(purchase) ? 'restock.remove' : 'groceries.delete-manual')"
                   :disabled="busy"
                   @click="deleteManual(purchase)"
                 />
@@ -392,8 +395,10 @@
 <script setup lang="ts">
 import { useIntervalFn } from "@vueuse/core";
 import { getISOWeek } from "date-fns";
+import GroceryRestockPanel from "~/components/Domain/Grocery/GroceryRestockPanel.vue";
 import { useGroceryWeek } from "~/composables/groceries/use-grocery-week";
 import { useGroceryCatalog } from "~/composables/groceries/use-grocery-catalog";
+import { useGroceryRestock } from "~/composables/groceries/use-grocery-restock";
 import { groceryError, groceryStores, groceryUnits, isoLocalDate, mondayFor, storeTitle, unitTitle } from "~/composables/groceries/grocery-utils";
 import type { GroceryPurchaseOut, GroceryStore, GrocerySuggestionOut, GroceryUnit, GroceryWeekGenerate } from "~/lib/api/types/grocery";
 
@@ -406,6 +411,9 @@ const weekStart = ref(mondayFor(initialDate));
 const dateInput = ref(weekStart.value);
 const { api, view, suggestions, busy, loading, error, load, loadSuggestions, mutate } = useGroceryWeek(weekStart);
 const { products, foods, error: catalogError, load: loadCatalog } = useGroceryCatalog();
+const { version: restockVersion, load: loadRestock } = useGroceryRestock();
+// Out of items go straight onto the newest list, so show them as they're added
+watch(restockVersion, () => { void load(); });
 const selectedStores = ref<GroceryStore[]>(groceryStores.map(store => store.value));
 const skipOnHand = ref(true);
 const mealScales = ref<Record<string, number | string>>({});
@@ -472,12 +480,23 @@ function recipeLink(slug?: string | null) { return `/g/${auth.user.value?.groupS
 function friendlyDay(value: string) { return new Date(`${value}T12:00:00`).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" }); }
 function storeColor(store?: string | null) { return groceryStores.find(item => item.value === store)?.color ?? "#8B8B8B"; }
 function storeCount(store: string | null) { return pendingPurchases.value.filter(purchase => purchase.store === store).length; }
-function isManualChoice(purchase: GroceryPurchaseOut) { return purchase.items.some(item => item.extras?.["shop.store_override"] || item.extras?.["shop.product_override"]); }
+function isRestockItem(item: GroceryPurchaseOut["items"][number]) { return item.extras?.["shop.source"] === "restock"; }
+function isRestock(purchase: GroceryPurchaseOut) { return purchase.items.some(isRestockItem); }
+function isRestockOnly(purchase: GroceryPurchaseOut) { return purchase.items.filter(item => item.extras?.["shop.source"] !== "week").every(isRestockItem); }
+// An Out of item's store is where it's usually bought, not a choice made for this trip
+function isManualChoice(purchase: GroceryPurchaseOut) { return purchase.items.some(item => !isRestockItem(item) && (item.extras?.["shop.store_override"] || item.extras?.["shop.product_override"])); }
 function manualIds(purchase: GroceryPurchaseOut) { return purchase.items.filter(item => item.extras?.["shop.source"] !== "week").map(item => item.id); }
+// Skip the amounts line when it would only repeat the name, as it does for things added without an amount
+function needsLine(purchase: GroceryPurchaseOut) {
+  const line = purchase.items.map(item => item.display).join(" + ");
+  return line.trim().toLowerCase() === purchase.foodName.trim().toLowerCase() ? "" : line;
+}
 async function refresh() { await Promise.all([load(), loadSuggestions(), loadCatalog()]); }
 async function generate() {
   if (!selectedStores.value.length) return;
-  await mutate(() => api.groceries.generate(weekStart.value, { stores: selectedStores.value as GroceryWeekGenerate["stores"], mealScales: effectiveScales.value, skipOnHand: skipOnHand.value, expectedRevision: revision.value }));
+  const ok = await mutate(() => api.groceries.generate(weekStart.value, { stores: selectedStores.value as GroceryWeekGenerate["stores"], mealScales: effectiveScales.value, skipOnHand: skipOnHand.value, expectedRevision: revision.value }));
+  // A new or updated list picks up what was waiting on the Out of list
+  if (ok) void loadRestock();
 }
 function itemIds(items: { id: string }[]): [string, ...string[]] {
   const [first, ...rest] = items;
@@ -485,7 +504,8 @@ function itemIds(items: { id: string }[]): [string, ...string[]] {
   return [first.id, ...rest.map(item => item.id)];
 }
 async function checkPurchase(purchase: GroceryPurchaseOut, checked: boolean) {
-  await mutate(() => api.groceries.check(weekStart.value, { itemIds: itemIds(purchase.items), checked, expectedRevision: revision.value }));
+  const ok = await mutate(() => api.groceries.check(weekStart.value, { itemIds: itemIds(purchase.items), checked, expectedRevision: revision.value }));
+  if (ok && isRestock(purchase)) void loadRestock();
 }
 function openAssignment(purchase: GroceryPurchaseOut) {
   assignment.value = purchase;
@@ -504,7 +524,8 @@ async function addManual() {
   if (ok) { manualDialog.value = false; Object.assign(manual, { foodId: null, note: "", quantity: 1, unit: "count", store: null }); }
 }
 async function deleteManual(purchase: GroceryPurchaseOut) {
-  await mutate(() => api.groceries.deleteItems(weekStart.value, { itemIds: itemIds(manualIds(purchase).map(id => ({ id }))), expectedRevision: revision.value }));
+  const ok = await mutate(() => api.groceries.deleteItems(weekStart.value, { itemIds: itemIds(manualIds(purchase).map(id => ({ id }))), expectedRevision: revision.value }));
+  if (ok && isRestock(purchase)) void loadRestock();
 }
 async function addSuggestion() {
   if (!plannedSuggestion.value) return;

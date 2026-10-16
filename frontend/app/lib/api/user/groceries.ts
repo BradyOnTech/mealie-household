@@ -2,6 +2,7 @@ import { BaseAPI } from "../base/base-clients";
 import type {
   GroceryFoodRuleCreate, GroceryFoodRuleOut, GroceryItemAssignment, GroceryItemCheck,
   GroceryItemDelete, GroceryManualItemCreate, GroceryProductCreate, GroceryProductOut,
+  GroceryRestockBought, GroceryRestockCreate, GroceryRestockList,
   GrocerySuggestionOut, GroceryWeekGenerate, GroceryWeekView,
 } from "~/lib/api/types/grocery";
 import type { IngredientFood } from "~/lib/api/types/recipe";
@@ -26,4 +27,9 @@ export class GroceriesAPI extends BaseAPI {
   addItem(week: string, data: GroceryManualItemCreate) { return this.requests.post<GroceryWeekView>(`${weekRoute(week)}/items`, data); }
   deleteItems(week: string, data: GroceryItemDelete) { return this.requests.post<GroceryWeekView>(`${weekRoute(week)}/items/delete`, data); }
   suggestions(date: string) { return this.requests.get<GrocerySuggestionOut[]>(`${base}/suggestions`, { plan_date: date }); }
+  restock() { return this.requests.get<GroceryRestockList>(`${base}/restock`); }
+  addRestock(data: GroceryRestockCreate) { return this.requests.post<GroceryRestockList>(`${base}/restock`, data); }
+  updateRestock(id: string, data: GroceryRestockCreate) { return this.requests.put<GroceryRestockList, GroceryRestockCreate>(`${base}/restock/${id}`, data); }
+  removeRestock(id: string) { return this.requests.delete<GroceryRestockList>(`${base}/restock/${id}`); }
+  setRestockBought(id: string, bought: boolean) { return this.requests.put<GroceryRestockList, GroceryRestockBought>(`${base}/restock/${id}/bought`, { bought }); }
 }
