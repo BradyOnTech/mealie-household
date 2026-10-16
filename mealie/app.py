@@ -66,6 +66,13 @@ async def lifespan_fn(_: FastAPI) -> AsyncGenerator[None]:
     init_db.main()
     logger.info("end: database initialization")
 
+    from mealie.services.recipe.pdf_import import close_interrupted_imports
+
+    try:
+        close_interrupted_imports()
+    except Exception:
+        logger.exception("Failed to close interrupted PDF imports")
+
     await start_scheduler()
 
     logger.info("-----SYSTEM STARTUP-----")

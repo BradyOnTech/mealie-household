@@ -79,6 +79,12 @@ const subpages = computed<MenuItem[]>(() => [
     hide: !group.value?.aiProviderSettings?.aiEnabled,
   },
   {
+    icon: $globals.icons.filePDF,
+    text: i18n.t("recipe.import-cookbook-pdf"),
+    value: "pdf",
+    hide: !group.value?.aiProviderSettings?.aiEnabled,
+  },
+  {
     icon: $globals.icons.edit,
     text: i18n.t("recipe.create-recipe"),
     value: "new",

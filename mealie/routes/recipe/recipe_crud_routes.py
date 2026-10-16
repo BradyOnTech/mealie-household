@@ -44,7 +44,7 @@ from mealie.schema.recipe.recipe import (
     RecipeSummary,
 )
 from mealie.schema.recipe.recipe_asset import RecipeAsset
-from mealie.schema.recipe.recipe_scraper import ScrapeRecipeAI, ScrapeRecipeTest
+from mealie.schema.recipe.recipe_scraper import ScrapeRecipeAI, ScrapeRecipePdfStarted, ScrapeRecipeTest
 from mealie.schema.recipe.recipe_suggestion import RecipeSuggestionQuery, RecipeSuggestionResponse
 from mealie.schema.recipe.request_helpers import (
     RecipeDuplicate,
@@ -70,6 +70,7 @@ from mealie.services.event_bus_service.event_types import (
 from mealie.services.openai import OpenAINotEnabledException
 from mealie.services.recipe.ai_recipe_service import AIProviderNotEnabledError, AIRecipeService
 from mealie.services.recipe.import_workflow.exceptions import NoRecipeDataError
+from mealie.services.recipe.pdf_import import PdfImportError, PdfImportInProgressError, PdfRecipeImportService
 from mealie.services.recipe.recipe_data_service import (
     InvalidDomainError,
     NotAnImageError,
@@ -463,6 +464,44 @@ class RecipeController(BaseRecipeController):
         )
 
         return {"reportId": report_id}
+
+    @router.post("/create/pdf", status_code=202, response_model=ScrapeRecipePdfStarted)
+    async def create_recipes_from_pdf(
+        self,
+        bg_tasks: BackgroundTasks,
+        file: Annotated[UploadFile, File()],
+        name: Annotated[str | None, Form()] = None,
+        add_cookbook: Annotated[bool, Form(alias="addCookbook")] = True,
+        add_organizers: Annotated[bool, Form(alias="addOrganizers")] = False,
+    ) -> ScrapeRecipePdfStarted:
+        """
+        Imports every recipe in a PDF cookbook using AI, tagging each with the cookbook's name. The import
+        runs in the background; the report this returns records each recipe as it's imported.
+        """
+
+        service = PdfRecipeImportService(self.repos, self.user, self.household, self.translator)
+        try:
+            job = await service.prepare(
+                file.file,
+                filename=file.filename,
+                cookbook_name=name,
+                add_cookbook=add_cookbook,
+                add_organizers=add_organizers,
+            )
+        except PdfImportInProgressError as e:
+            raise HTTPException(status.HTTP_409_CONFLICT, detail=ErrorResponse.respond(message=str(e))) from e
+        except PdfImportError as e:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=ErrorResponse.respond(message=str(e))) from e
+
+        bg_tasks.add_task(job.run)
+        self.publish_event(
+            event_type=EventTypes.recipe_created,
+            document_data=EventRecipeBulkReportData(operation=EventOperation.create, report_id=job.report_id),
+            group_id=self.group_id,
+            household_id=self.household_id,
+        )
+
+        return ScrapeRecipePdfStarted(report_id=job.report_id)
 
     # ==================================================================================================================
     # Other Create Operations

@@ -1,0 +1,17 @@
+You find the recipes in a cookbook.
+
+The user message contains consecutive pages from a PDF cookbook. Each page starts with a marker like "--- Page 12 ---", followed by the text extracted from it. Extracted text can come out of reading order, so a recipe's title can appear after its ingredients, and columns can be interleaved. If a page has no extracted text, an image of it is attached instead, in page order.
+
+List every recipe that starts on one of these pages, in page order, with:
+- name: the recipe's title as the book prints it. Cookbooks often print titles in capitals as a design choice; write the name in title case.
+- first_page: the page the recipe's title is on
+- last_page: the last page with any of the recipe's ingredients, instructions, or notes. Most recipes fit on one page, but some continue onto the following pages.
+
+Rules:
+- A recipe is a dish with its own ingredients and instructions. Leave out tables of contents, introductions, section and chapter title pages, guides to ingredients or equipment, meal plans, indexes, and anything else that isn't a recipe.
+- List a recipe only where it's printed in full. A table of contents, an index, or another recipe that mentions it doesn't count.
+- A page can hold more than one recipe; list each one. Don't list part of a recipe, such as its sauce or marinade, as a recipe of its own.
+- If the first page continues a recipe that started on an earlier page, leave that recipe out. It has already been listed.
+- If a recipe continues past the last page you were given, set last_page to the last page you were given.
+- Use the page numbers from the page markers, never the page numbers printed in the book.
+- If none of the pages has a recipe, return an empty list.

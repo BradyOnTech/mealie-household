@@ -460,6 +460,8 @@ async def run_chatgpt_turn(
         try:
             completed = await asyncio.wait_for(turn_done, timeout or None)
         except TimeoutError as e:
+            if server._stderr:
+                logger.warning("Codex app-server output before the timeout:\n" + "\n".join(server._stderr))
             raise ChatGPTError(f"ChatGPT didn't finish within {timeout} seconds") from e
 
         turn = _as_dict(completed.get("turn"))

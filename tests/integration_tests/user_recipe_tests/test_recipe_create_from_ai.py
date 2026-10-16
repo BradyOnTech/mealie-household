@@ -215,6 +215,9 @@ def test_create_from_images(
     )
     assert r.status_code == 200
 
+    # the frontend only requests a recipe's image when it has an image key
+    assert recipe["image"]
+
 
 def test_create_from_content_and_images(
     api_client: TestClient,

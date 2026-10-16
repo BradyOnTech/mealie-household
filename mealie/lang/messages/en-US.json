@@ -31,6 +31,24 @@
             "unreadable-source": "Unable to read any content from the provided source",
             "video-download-failed": "Unable to download the video. It may be private, removed, or from an unsupported site"
         },
+        "pdf-import": {
+            "already-importing": "This PDF is already being imported",
+            "failed": "Couldn't import {name} (page {page})",
+            "found-recipes": "Recipes found in the PDF: {count}, across {pages} pages",
+            "imported": "Imported {name} (page {page})",
+            "interrupted": "Mealie restarted before this import finished. Import the PDF again to pick up where it left off",
+            "needs-image-provider": "This PDF has no text in it, so reading it needs an AI image provider",
+            "no-recipes-found": "No recipes were found in the PDF",
+            "skipped-imported": "Already imported from this PDF, so skipped: {count}",
+            "source-note": "{name}, page {page}",
+            "source-note-title": "Source",
+            "stopped-provider-error": "Stopped because the AI provider can't be used. Check its settings, then import the PDF again to pick up where this left off",
+            "stopped-repeated-failures": "Stopped after {count} recipes in a row couldn't be imported. Import the PDF again to retry the rest",
+            "stopped-usage-limit": "Stopped because the AI provider's usage limit was reached. Import the PDF again once it resets to pick up where this left off",
+            "unexpected-error": "The import stopped because of an unexpected error",
+            "unreadable": "That file isn't a PDF Mealie can read. It may be damaged or protected by a password",
+            "unreadable-pages": "Couldn't look for recipes on pages {first} to {last}"
+        },
         "create-progress": {
             "creating-recipe": "Creating recipe...",
             "creating-recipe-from-transcript-with-ai": "Creating recipe from transcript with AI...",

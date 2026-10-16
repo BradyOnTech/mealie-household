@@ -573,6 +573,9 @@ export interface ScrapeRecipeData {
   data: string;
   url?: string | null;
 }
+export interface ScrapeRecipePdfStarted {
+  reportId: string;
+}
 export interface ScrapeRecipeTest {
   url: string;
   useOpenAI?: boolean;

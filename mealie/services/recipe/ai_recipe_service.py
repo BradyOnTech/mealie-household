@@ -61,6 +61,8 @@ class AIRecipeService(RecipeService):
             if local_images:
                 with open(local_images[0], "rb") as f:
                     RecipeDataService(recipe.id).write_image(f.read(), "webp")
+                # the image key is what tells the frontend there's an image to load
+                recipe.image = self.group_recipes.update_image(recipe.slug)
 
             return recipe
 

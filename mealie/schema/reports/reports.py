@@ -16,6 +16,7 @@ class ReportCategory(enum.StrEnum):
     restore = "restore"
     migration = "migration"
     bulk_import = "bulk_import"
+    pdf_import = "pdf_import"
 
 
 class ReportSummaryStatus(enum.StrEnum):

@@ -41,6 +41,7 @@ A few things to know:
 - The OpenAI Ingredient Parser can be used as an alternative to the NLP and Brute Force parsers. Simply choose the OpenAI parser while parsing ingredients (:octicons-tag-24: v1.7.0)
 - When importing a recipe via URL, if the default recipe scraper is unable to read the recipe data from a webpage, the webpage contents will be parsed by AI (:octicons-tag-24: v1.9.0)
 - The **Import with AI** page creates a recipe out of just about anything: pasted text, HTML, or JSON, photos of a recipe, a link, or any combination of them (:octicons-tag-24: v3.23.0)
+- The **Import a Cookbook (PDF)** page imports every recipe in a cookbook PDF, with their photos
 - The **Ask** page is a chat with a kitchen assistant that can keep your household's Out of list and answer questions about its groceries, meal plan, and recipes
 
 ## Ask
@@ -76,3 +77,23 @@ Mealie only assigns an organizer that the recipe itself refers to. It won't gues
 Reading the source material is the only step that needs to understand images or audio, so that's the only step that uses your image or audio provider. Turning what it read into a recipe, and working out its organizers, always use your default provider.
 
 This means an import with photos attached is read by your image provider even if you also pasted text alongside them.
+
+## Import a Cookbook (PDF)
+
+The **Import a Cookbook (PDF)** page, under *Create ➞ Import a Cookbook (PDF)*, imports every recipe in a cookbook PDF at once. Give it the PDF and a name for the cookbook, and it runs in the background, listing each recipe as it's imported. You can leave the page while it works and come back to it.
+
+The import happens in two passes:
+
+1. **Finding the recipes.** The text of the PDF's pages goes to your default provider a couple of dozen pages at a time, and it lists each recipe and the pages it's on. Tables of contents, introductions, and section pages are skipped.
+2. **Importing them.** Each recipe is read from the text of its pages, along with an image of each page if you've configured an image provider. Designed cookbooks often store their text out of reading order, so the page images let the AI see which heading, ingredient, and step goes where. Without an image provider, only the text is read.
+
+Each recipe's photo is cut straight out of the PDF, cropped the way the page shows it, so photos are imported even without an image provider. Every recipe is tagged with the cookbook's name and gets a note saying which page it came from. Unless you turn it off, the cookbook is also added to the sidebar, showing the recipes with its tag. You can optionally have tags, categories, and tools added to each recipe too, which takes one more AI request per recipe.
+
+A PDF with no text in it, such as a scanned book, can still be imported if you have an image provider, since every page is then read from an image of it. That's slower, and takes more of your provider's usage.
+
+### Large cookbooks and usage limits
+
+Importing a cookbook takes one AI request per recipe, plus a few to find them, so a 100-recipe book is a little over 100 requests. A request that fails for a passing reason, like a dropped connection, is tried again once the rest are done. If your provider runs out partway through, for example because a [ChatGPT subscription](#using-a-chatgpt-subscription) reached its plan's usage limit, the import stops and says so.
+
+Each imported recipe remembers which PDF and page it came from, so you can import the same PDF again to pick up where it left off: recipes that are already imported are skipped. The same goes for an import interrupted by Mealie restarting. If you delete an imported recipe, importing the PDF again brings it back.
+

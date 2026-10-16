@@ -2,6 +2,7 @@
 from .compiled_source import OpenAICompiledSource
 from .general import OpenAIText
 from .organizers import OpenAIOrganizers
+from .pdf_recipes import OpenAIPdfRecipeLocation, OpenAIPdfRecipeLocations
 from .recipe import (
     OpenAIRecipe,
     OpenAIRecipeIngredient,
@@ -14,6 +15,8 @@ from .recipe_ingredient import OpenAIIngredient, OpenAIIngredients
 __all__ = [
     "OpenAIOrganizers",
     "OpenAICompiledSource",
+    "OpenAIPdfRecipeLocation",
+    "OpenAIPdfRecipeLocations",
     "OpenAIIngredient",
     "OpenAIIngredients",
     "OpenAIRecipe",

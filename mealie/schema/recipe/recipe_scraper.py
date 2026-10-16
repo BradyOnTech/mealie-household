@@ -1,4 +1,4 @@
-from pydantic import ConfigDict, Field
+from pydantic import UUID4, ConfigDict, Field
 
 from mealie.schema._mealie.mealie_model import MealieModel
 
@@ -59,3 +59,10 @@ class ScrapeRecipeAI(MealieModel):
             },
         }
     )
+
+
+class ScrapeRecipePdfStarted(MealieModel):
+    """A PDF cookbook import that's running in the background"""
+
+    report_id: UUID4
+    """The report that records each recipe as it's imported"""
