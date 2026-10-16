@@ -9,6 +9,7 @@ from pydantic import UUID4
 from sqlalchemy.exc import IntegrityError
 
 from mealie.db.models.household import Household, HouseholdToRecipe
+from mealie.db.models.recipe.api_extras import ApiExtras
 from mealie.db.models.recipe.category import Category
 from mealie.db.models.recipe.ingredient import RecipeIngredientModel, RecipeIngredientSubstitutionModel
 from mealie.db.models.recipe.recipe import RecipeModel
@@ -370,3 +371,20 @@ class RepositoryRecipes(RecipeSuggestionMixin, HouseholdRepositoryGeneric[Recipe
     def all_ids(self, group_id: UUID4) -> Sequence[UUID4]:
         stmt = sa.select(RecipeModel.id).filter(RecipeModel.group_id == group_id)
         return self.session.execute(stmt).scalars().all()
+
+    def get_extras_values(self, key: str, value_prefix: str = "") -> list[str]:
+        """Returns the values of an API extra across this repo's recipes, optionally just those with a prefix"""
+
+        stmt = (
+            sa.select(ApiExtras.value)
+            .join(RecipeModel, RecipeModel.id == ApiExtras.recipee_id)
+            .filter(ApiExtras.key_name == key)
+        )
+        if value_prefix:
+            stmt = stmt.filter(ApiExtras.value.startswith(value_prefix, autoescape=True))
+        if self.group_id:
+            stmt = stmt.filter(RecipeModel.group_id == self.group_id)
+        if self.household_id:
+            stmt = stmt.filter(RecipeModel.household_id == self.household_id)
+
+        return [value for value in self.session.execute(stmt).scalars().all() if value is not None]

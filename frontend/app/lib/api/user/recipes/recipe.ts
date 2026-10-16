@@ -17,6 +17,7 @@ import type {
   RecipeTimelineEventIn,
   RecipeTimelineEventOut,
   RecipeTimelineEventUpdate,
+  ScrapeRecipePdfStarted,
 } from "~/lib/api/types/recipe";
 import type { SSEDataEventDone, SSEDataEventMessage } from "~/lib/api/types/response";
 import type { ApiRequestInstance, PaginationData, RequestResponse } from "~/lib/api/types/non-generated";
@@ -40,6 +41,7 @@ const routes = {
   recipesTestScrapeUrl: `${prefix}/recipes/test-scrape-url`,
   recipesCreateUrl: `${prefix}/recipes/create/url/stream`,
   recipesCreateUrlBulk: `${prefix}/recipes/create/url/bulk`,
+  recipesCreateFromPdf: `${prefix}/recipes/create/pdf`,
   recipesCreateFromZip: `${prefix}/recipes/create/zip`,
   recipesCreateWithAI: `${prefix}/recipes/create/ai/stream`,
   recipesCreateFromHtmlOrJson: `${prefix}/recipes/create/html-or-json/stream`,
@@ -242,6 +244,16 @@ export class RecipeAPI extends BaseCRUDAPI<CreateRecipe, Recipe, Recipe> {
 
   async createManyByUrl(payload: CreateRecipeByUrlBulk) {
     return await this.requests.post<string>(routes.recipesCreateUrlBulk, payload);
+  }
+
+  async createManyFromPdf(payload: { file: File; name: string; addCookbook: boolean; addOrganizers: boolean }) {
+    const formData = new FormData();
+    formData.append("file", payload.file);
+    formData.append("name", payload.name);
+    formData.append("addCookbook", String(payload.addCookbook));
+    formData.append("addOrganizers", String(payload.addOrganizers));
+
+    return await this.requests.post<ScrapeRecipePdfStarted>(routes.recipesCreateFromPdf, formData);
   }
 
   async createOneWithAI(

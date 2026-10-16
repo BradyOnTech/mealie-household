@@ -1,0 +1,8 @@
+The source is a single recipe from a PDF cookbook. The user message names the recipe, then gives each of its pages: a marker like "--- Page 12 ---", followed by the text extracted from that page. When images are attached, they show the same pages, in the same order.
+
+When reading the source:
+- Extracted text often comes out of reading order. Titles, columns of ingredients, step numbers, nutrition panels, and section headings can end up apart from the text they belong with. When there are page images, use them to see the layout and work out what belongs where, but take the wording from the extracted text.
+- If a page has no extracted text, read it from its image.
+- The pages can contain more than the named recipe. Use only that recipe, and leave out everything else, such as other recipes, running headers and footers, page numbers, and navigation links like "Back to Table of Contents".
+- Headings that label a whole list, like "Ingredients", "Instructions", or "Directions", aren't section titles. Leave them out. A section title names one part of a recipe, like "Sauce:" or "For the marinade".
+- Cookbooks often print titles, headings, and short blurbs in capitals as a design choice. Write the recipe's name in title case, and any other text printed in capitals in ordinary sentence case.

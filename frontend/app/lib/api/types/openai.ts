@@ -26,6 +26,14 @@ export interface OpenAIOrganizers {
   categories?: string[];
   tools?: string[];
 }
+export interface OpenAIPdfRecipeLocation {
+  name: string;
+  first_page: number;
+  last_page: number;
+}
+export interface OpenAIPdfRecipeLocations {
+  recipes?: OpenAIPdfRecipeLocation[];
+}
 export interface OpenAIRecipe {
   name: string;
   description?: string | null;
