@@ -1,13 +1,15 @@
 from collections import defaultdict
 from collections.abc import Sequence
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from math import ceil, isfinite
 from uuid import UUID
 
+from dateutil.tz import tzlocal
 from fastapi import HTTPException
 from sqlalchemy.exc import IntegrityError
 
-from mealie.db.models.household.grocery import GroceryWeek
+from mealie.db.models._model_utils.datetime import get_utc_now
+from mealie.db.models.household.grocery import GroceryRestockItem, GroceryWeek
 from mealie.db.models.household.shopping_list import ShoppingListItem
 from mealie.repos.all_repositories import AllRepositories, get_repositories
 from mealie.schema.grocery.grocery import (
@@ -22,6 +24,10 @@ from mealie.schema.grocery.grocery import (
     GroceryProductOut,
     GroceryProductSave,
     GroceryPurchaseOut,
+    GroceryRestockCreate,
+    GroceryRestockList,
+    GroceryRestockOut,
+    GroceryRestockStatus,
     GroceryRuleKind,
     GrocerySuggestionOut,
     GroceryUnit,
@@ -49,11 +55,26 @@ STORE_OVERRIDE = "shop.store_override"
 PRODUCT_OVERRIDE = "shop.product_override"
 PURCHASED_AMOUNT = "shop.purchased_amount"
 PURCHASED_UNIT = "shop.purchased_unit"
+RESTOCK_ID = "shop.restock_id"
 EPSILON = 1e-8
+RESTOCK_RECENT = timedelta(days=14)
+"""How long a bought item stays under "recently bought" on the Out of list"""
+RESTOCK_KEEP = timedelta(days=90)
+"""How long bought items are kept at all"""
 
 
 def monday(value: date) -> date:
     return value - timedelta(days=value.weekday())
+
+
+def household_today() -> date:
+    """Today by the server's clock, which the Docker setup puts in the household's time zone"""
+    return datetime.now(tz=tzlocal()).date()
+
+
+def is_usual_amount(item: ShoppingListItemBase) -> bool:
+    """An Out of item with no amount given, meaning one of whatever the household normally buys"""
+    return (item.extras or {}).get(SOURCE) == "restock" and not item.quantity
 
 
 def choose_product(
@@ -207,7 +228,12 @@ class GroceryService(BaseService):
             if not product or not product.package_quantity or not product.package_unit:
                 continue
             total = 0.0
+            # Running out of something without saying how much means buying at least one package
+            at_least_one = False
             for item in purchase.items:
+                if is_usual_amount(item):
+                    at_least_one = True
+                    continue
                 amount = item_standard_amount(item, units)
                 converted = convert_amount(*amount, product.package_unit) if amount else None
                 if converted is None:
@@ -217,8 +243,9 @@ class GroceryService(BaseService):
                     break
                 total += converted
             else:
-                purchase.package_quantity_needed = round(total, 6)
-                purchase.package_count = max(0, ceil(total / product.package_quantity - EPSILON))
+                minimum = 1 if at_least_one else 0
+                purchase.package_quantity_needed = round(total, 6) or minimum * product.package_quantity
+                purchase.package_count = max(minimum, ceil(total / product.package_quantity - EPSILON))
         result.purchases = sorted(
             grouped.values(),
             key=lambda purchase: (purchase.items[0].checked, purchase.store or "zz", purchase.food_name.lower()),
@@ -446,6 +473,7 @@ class GroceryService(BaseService):
             week.meal_scales = dict(data.meal_scales)
             week.skip_on_hand = data.skip_on_hand
             week.warnings = list(dict.fromkeys(warnings))
+            self._sync_restock(reserved=week)
             self.weeks.commit()
         except Exception:
             self.repos.session.rollback()
@@ -494,6 +522,7 @@ class GroceryService(BaseService):
                     extras[PURCHASED_AMOUNT] = str(amount)
                     extras[PURCHASED_UNIT] = unit
                 item.update(session=self.repos.session, extras=extras)
+            self._sync_restock(reserved=week)
             self.weeks.commit()
         except Exception:
             self.repos.session.rollback()
@@ -567,11 +596,263 @@ class GroceryService(BaseService):
                 raise HTTPException(400, "Change the meal plan or pantry to remove generated ingredients")
             for item in items:
                 self.repos.session.delete(item)
+            # Out of items deleted here are off the Out of list too
+            self._sync_restock(reserved=week)
             self.weeks.commit()
         except Exception:
             self.repos.session.rollback()
             raise
         return self.view(value)
+
+    # ------------------------------------------------------------------
+    # The Out of list: things the household has run out of, recipe or no recipe. Each one rides on
+    # the newest grocery list for this week or later until someone checks it off. With no such list
+    # yet, it waits and joins the next one that's made.
+
+    def restock_list(self) -> GroceryRestockList:
+        try:
+            if self._sync_restock():
+                self.weeks.commit()
+        except Exception:
+            self.repos.session.rollback()
+            raise
+        current = monday(household_today())
+        target = self.weeks.newest_from(current)
+        restock = self.repos.grocery_restock_items
+        return GroceryRestockList(
+            items=[self.restock_out(item, current) for item in restock.open_models()],
+            recently_bought=[
+                self.restock_out(item, current) for item in restock.bought_models(get_utc_now() - RESTOCK_RECENT)
+            ],
+            next_list_week=target.week_start if target else None,
+        )
+
+    def restock_out(self, item: GroceryRestockItem, current: date | None = None) -> GroceryRestockOut:
+        result = GroceryRestockOut.model_validate(item)
+        current = current or monday(household_today())
+        if result.bought_at:
+            result.status = GroceryRestockStatus.bought
+        elif result.shopping_list_item_id and result.week_start and result.week_start >= current:
+            result.status = GroceryRestockStatus.listed
+        return result
+
+    def add_restock(self, data: GroceryRestockCreate, added_by: str = "") -> tuple[GroceryRestockOut, bool]:
+        """
+        Put something on the Out of list. Running out of something that's already listed fills in
+        whatever new details were given instead of listing it twice. Returns the item, and whether
+        it's new.
+        """
+        try:
+            food_id = self._restock_food_id(data)
+            item = self._open_restock(data.name, food_id)
+            created = item is None
+            if item is None:
+                item = GroceryRestockItem(
+                    session=self.repos.session,
+                    group_id=self.repos.group_id,
+                    household_id=self.repos.household_id,
+                    name=data.name,
+                    food_id=food_id,
+                    quantity=data.quantity,
+                    unit=data.unit.value if data.unit else None,
+                    store=data.store.value if data.store else None,
+                    note=data.note,
+                    added_by=added_by,
+                )
+                self.repos.session.add(item)
+            else:
+                if data.quantity is not None:
+                    item.quantity = data.quantity
+                    item.unit = data.unit.value if data.unit else None
+                if data.store:
+                    item.store = data.store.value
+                if data.note:
+                    item.note = data.note
+                if food_id and not item.food_id:
+                    item.food_id = food_id
+                self._refresh_restock_row(item)
+            self._sync_restock()
+            self.weeks.commit()
+        except Exception:
+            self.repos.session.rollback()
+            raise
+        return self.restock_out(item), created
+
+    def update_restock(self, item_id: UUID, data: GroceryRestockCreate) -> GroceryRestockOut:
+        try:
+            item = self.repos.grocery_restock_items.item_model(item_id)
+            item.name = data.name
+            item.food_id = self._restock_food_id(data)
+            item.quantity = data.quantity
+            item.unit = data.unit.value if data.unit else None
+            item.store = data.store.value if data.store else None
+            item.note = data.note
+            if item.bought_at is None:
+                self._refresh_restock_row(item)
+            self._sync_restock()
+            self.weeks.commit()
+        except Exception:
+            self.repos.session.rollback()
+            raise
+        return self.restock_out(item)
+
+    def remove_restock(self, item_id: UUID) -> GroceryRestockOut:
+        """Take something off the Out of list, and off the grocery list too unless it was bought there"""
+        try:
+            item = self.repos.grocery_restock_items.item_model(item_id)
+            removed = self.restock_out(item)
+            row, week = self._restock_row_of(item)
+            if row is not None and week is not None and not row.checked:
+                self.repos.session.delete(row)
+                self.weeks.bump({week.id})
+            self.repos.session.delete(item)
+            self._sync_restock()
+            self.weeks.commit()
+        except Exception:
+            self.repos.session.rollback()
+            raise
+        return removed
+
+    def set_restock_bought(self, item_id: UUID, bought: bool) -> GroceryRestockOut:
+        """Check an item off (or back on), along with its row on the grocery list"""
+        try:
+            item = self.repos.grocery_restock_items.item_model(item_id)
+            row, week = self._restock_row_of(item)
+            if row is not None and week is not None and bool(row.checked) != bought:
+                row.checked = bought
+                self.weeks.bump({week.id})
+            if bought and item.bought_at is None:
+                item.bought_at = get_utc_now()
+            elif not bought:
+                item.bought_at = None
+            self._sync_restock()
+            self.weeks.commit()
+        except Exception:
+            self.repos.session.rollback()
+            raise
+        return self.restock_out(item)
+
+    def _restock_food_id(self, data: GroceryRestockCreate) -> UUID | None:
+        if data.food_id:
+            return self.validate_food(data.food_id).id
+        food = self.repos.grocery_restock_items.food_named(data.name)
+        return food.id if food else None
+
+    def _open_restock(self, name: str, food_id: UUID | None) -> GroceryRestockItem | None:
+        normalized = GroceryRestockItem.normalize(name)
+        for item in self.repos.grocery_restock_items.open_models():
+            if (food_id and item.food_id == food_id) or GroceryRestockItem.normalize(item.name) == normalized:
+                return item
+        return None
+
+    def _restock_row_of(self, item: GroceryRestockItem) -> tuple[ShoppingListItem | None, GroceryWeek | None]:
+        if not item.shopping_list_item_id:
+            return None, None
+        return self.weeks.list_items({item.shopping_list_item_id}).get(item.shopping_list_item_id, (None, None))
+
+    def _restock_row_fields(self, item: GroceryRestockItem) -> dict:
+        """What an Out of item looks like as a row on the grocery list"""
+        food = self.repos.ingredient_foods.get_one(item.food_id) if item.food_id else None
+        unit = self.weeks.standard_unit(item.unit) if item.quantity and item.unit else None
+        extras = {SOURCE: "restock", RESTOCK_ID: str(item.id)}
+        if item.store:
+            extras[STORE_OVERRIDE] = item.store
+        if food:
+            note = item.note
+        else:
+            note = f"{item.name} ({item.note})" if item.note else item.name
+        return {
+            "food_id": food.id if food else None,
+            "label_id": food.label_id if food else None,
+            "note": note,
+            "quantity": item.quantity or 0,
+            "unit_id": unit.id if unit else None,
+            "extras": extras,
+        }
+
+    def _refresh_restock_row(self, item: GroceryRestockItem) -> None:
+        """Carry edited details over to the item's row, if it hasn't been checked off yet"""
+        row, week = self._restock_row_of(item)
+        if row is not None and week is not None and not row.checked:
+            row.update(session=self.repos.session, **self._restock_row_fields(item))
+            self.weeks.bump({week.id})
+
+    def _sync_restock(self, reserved: GroceryWeek | None = None) -> bool:
+        """
+        Bring the Out of list and the grocery lists in step, without committing. Returns whether
+        anything changed. `reserved` is a week whose revision the caller has already claimed.
+
+        A row checked off on a list marks its item bought, and unchecking the row reopens it. A row
+        deleted from a list that still exists takes its item off the Out of list; if the whole list
+        is gone, the item waits for the next one. Everything still needed goes on the newest list
+        for this week or later, moving off any older list where it wasn't bought.
+        """
+        session = self.repos.session
+        restock = self.repos.grocery_restock_items
+        session.flush()
+        now = get_utc_now()
+        changed = restock.prune_bought(now - RESTOCK_KEEP)
+        touched: set[UUID] = set()
+
+        linked = restock.linked_models()
+        rows = self.weeks.list_items({item.shopping_list_item_id for item in linked if item.shopping_list_item_id})
+        weeks = self.weeks.week_models({item.week_start for item in linked if item.week_start})
+        for item in linked:
+            found = rows.get(item.shopping_list_item_id) if item.shopping_list_item_id else None
+            if found is None:
+                if item.bought_at is None and item.week_start in weeks:
+                    session.delete(item)
+                else:
+                    item.shopping_list_item_id = None
+                    if item.bought_at is None:
+                        item.week_start = None
+                changed = True
+                continue
+            row, week = found
+            if item.week_start != week.week_start:
+                item.week_start = week.week_start
+                changed = True
+            if row.checked and item.bought_at is None:
+                item.bought_at = now
+                changed = True
+            elif not row.checked and item.bought_at is not None:
+                item.bought_at = None
+                changed = True
+        session.flush()
+
+        target = self.weeks.newest_from(monday(household_today()))
+        if target is not None:
+            position = self.weeks.next_position(target)
+            for item in restock.open_models():
+                found = rows.get(item.shopping_list_item_id) if item.shopping_list_item_id else None
+                if found is not None:
+                    row, week = found
+                    if week.id == target.id:
+                        continue
+                    row.shopping_list_id = target.shopping_list_id
+                    row.position = position
+                    touched |= {week.id, target.id}
+                else:
+                    row = ShoppingListItem(
+                        session=session,
+                        shopping_list_id=target.shopping_list_id,
+                        checked=False,
+                        position=position,
+                        **self._restock_row_fields(item),
+                    )
+                    session.add(row)
+                    session.flush()
+                    item.shopping_list_item_id = row.id
+                    touched.add(target.id)
+                position += 1
+                item.week_start = target.week_start
+                changed = True
+
+        if reserved is not None:
+            touched.discard(reserved.id)
+        self.weeks.bump(touched)
+        session.flush()
+        return changed or bool(touched)
 
     def suggestions(self, plan_date: date, limit: int = 5) -> list[GrocerySuggestionOut]:
         rules = self.repos.group_meal_plan_rules.get_rules(PlanRulesDay.from_date(plan_date), PlanRulesType.dinner)

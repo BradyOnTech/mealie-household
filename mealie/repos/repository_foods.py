@@ -101,6 +101,7 @@ class RepositoryFood(GroupRepositoryGeneric[IngredientFood, IngredientFoodModel]
         to_model.ingredients += from_model.ingredients
         # Product links follow the normalized ingredient when duplicate foods are merged.
         to_model.grocery_products += from_model.grocery_products
+        to_model.grocery_restock_items += from_model.grocery_restock_items
         existing_rules = {(rule.household_id, rule.kind) for rule in to_model.grocery_food_rules}
         for rule in list(from_model.grocery_food_rules):
             key = (rule.household_id, rule.kind)

@@ -10,6 +10,7 @@ export type GroceryUnit =
   "count" | "gram" | "kilogram" | "ounce" | "pound" | "milliliter" | "liter" | "fluid_ounce" | "cup";
 export type GroceryRecurringMode = "minimum" | "extra";
 export type GroceryStore = "walmart" | "cub" | "aldi" | "whole_foods";
+export type GroceryRestockStatus = "waiting" | "listed" | "bought";
 export type PlanEntryType = "breakfast" | "lunch" | "dinner" | "side" | "snack" | "drink" | "dessert";
 
 export interface GroceryFoodRuleCreate {
@@ -378,6 +379,41 @@ export interface ShoppingListItemRecipeRefOut {
   recipeNote?: string | null;
   id: string;
   shoppingListItemId: string;
+}
+export interface GroceryRestockBought {
+  bought?: boolean;
+}
+export interface GroceryRestockCreate {
+  name: string;
+  foodId?: string | null;
+  quantity?: number | null;
+  unit?: GroceryUnit | null;
+  store?: GroceryStore | null;
+  note?: string;
+}
+export interface GroceryRestockList {
+  items?: GroceryRestockOut[];
+  recentlyBought?: GroceryRestockOut[];
+  nextListWeek?: string | null;
+}
+export interface GroceryRestockOut {
+  name: string;
+  foodId?: string | null;
+  quantity?: number | null;
+  unit?: GroceryUnit | null;
+  store?: GroceryStore | null;
+  note?: string;
+  id: string;
+  groupId: string;
+  householdId: string;
+  food?: IngredientFoodSummary | null;
+  addedBy?: string;
+  shoppingListItemId?: string | null;
+  weekStart?: string | null;
+  boughtAt?: string | null;
+  status?: GroceryRestockStatus;
+  createdAt?: string | null;
+  updatedAt?: string | null;
 }
 export interface GrocerySuggestionOut {
   recipe: RecipeSummary;

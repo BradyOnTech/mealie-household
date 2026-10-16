@@ -17,7 +17,7 @@ from .._model_utils.guid import GUID
 if TYPE_CHECKING:
     from ..group import Group
     from ..household import Household
-    from ..household.grocery import GroceryFoodRule, GroceryProduct
+    from ..household.grocery import GroceryFoodRule, GroceryProduct, GroceryRestockItem
     from .recipe import RecipeModel
 
 households_to_ingredient_foods = sa.Table(
@@ -218,6 +218,10 @@ class IngredientFoodModel(SqlAlchemyBase, BaseMixins):
     )
     grocery_food_rules: Mapped[list[GroceryFoodRule]] = orm.relationship(
         "GroceryFoodRule", back_populates="food", cascade="all, delete-orphan"
+    )
+    # Running out of something outlives the food record: deleting the food only unlinks the item.
+    grocery_restock_items: Mapped[list[GroceryRestockItem]] = orm.relationship(
+        "GroceryRestockItem", back_populates="food"
     )
 
     # ID Relationships

@@ -54,5 +54,8 @@ export function groceryError(error: unknown): string {
   if (Array.isArray(detail)) {
     return detail.map((item: { msg?: string }) => item.msg ?? "Check the entered fields").join(". ");
   }
+  if (detail && typeof detail === "object" && typeof (detail as { message?: unknown }).message === "string") {
+    return (detail as { message: string }).message;
+  }
   return value?.message ?? "The request could not be completed. Please try again.";
 }

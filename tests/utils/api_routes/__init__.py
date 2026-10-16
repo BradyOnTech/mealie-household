@@ -87,12 +87,16 @@ groups_self = "/api/groups/self"
 """`/api/groups/self`"""
 groups_storage = "/api/groups/storage"
 """`/api/groups/storage`"""
+households_assistant_chat = "/api/households/assistant/chat"
+"""`/api/households/assistant/chat`"""
 households_cookbooks = "/api/households/cookbooks"
 """`/api/households/cookbooks`"""
 households_events_notifications = "/api/households/events/notifications"
 """`/api/households/events/notifications`"""
 households_groceries_products = "/api/households/groceries/products"
 """`/api/households/groceries/products`"""
+households_groceries_restock = "/api/households/groceries/restock"
+"""`/api/households/groceries/restock`"""
 households_groceries_rules = "/api/households/groceries/rules"
 """`/api/households/groceries/rules`"""
 households_groceries_source = "/api/households/groceries/source"
@@ -395,6 +399,16 @@ def households_events_notifications_item_id_test(item_id):
 def households_groceries_products_product_id(product_id):
     """`/api/households/groceries/products/{product_id}`"""
     return f"{prefix}/households/groceries/products/{product_id}"
+
+
+def households_groceries_restock_item_id(item_id):
+    """`/api/households/groceries/restock/{item_id}`"""
+    return f"{prefix}/households/groceries/restock/{item_id}"
+
+
+def households_groceries_restock_item_id_bought(item_id):
+    """`/api/households/groceries/restock/{item_id}/bought`"""
+    return f"{prefix}/households/groceries/restock/{item_id}/bought"
 
 
 def households_groceries_rules_rule_id(rule_id):

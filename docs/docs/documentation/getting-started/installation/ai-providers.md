@@ -41,6 +41,15 @@ A few things to know:
 - The OpenAI Ingredient Parser can be used as an alternative to the NLP and Brute Force parsers. Simply choose the OpenAI parser while parsing ingredients (:octicons-tag-24: v1.7.0)
 - When importing a recipe via URL, if the default recipe scraper is unable to read the recipe data from a webpage, the webpage contents will be parsed by AI (:octicons-tag-24: v1.9.0)
 - The **Import with AI** page creates a recipe out of just about anything: pasted text, HTML, or JSON, photos of a recipe, a link, or any combination of them (:octicons-tag-24: v3.23.0)
+- The **Ask** page is a chat with a kitchen assistant that can keep your household's Out of list and answer questions about its groceries, meal plan, and recipes
+
+## Ask
+
+The **Ask** page, in the main navigation once a default provider is set, is a chat for your household. Tell it what you've run out of ("we're out of rice and paper towels") and it adds those to the household's Out of list, which goes on the newest grocery list. You can also ask what's left on the grocery list, what's planned this week, or what's in a recipe, have it suggest or plan a dinner, and have it change, remove, or check off things on the Out of list.
+
+The assistant works through tools that use the same permissions as the rest of the app, so it only sees and changes your own household's lists and plans, and the group's recipes you can see. It uses your default provider, through tool calling: any OpenAI-compatible API that supports tools works, and so does a ChatGPT subscription provider. The conversation is kept on your device, and each message sends the recent conversation along with it.
+
+Its instructions are the `household.assistant` prompt, which you can override like any other prompt.
 
 ## Import with AI
 

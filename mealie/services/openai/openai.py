@@ -6,9 +6,11 @@ import json
 import os
 import shutil
 from abc import ABC, abstractmethod
+from collections.abc import Awaitable, Callable, Sequence
+from dataclasses import dataclass
 from pathlib import Path
 from textwrap import dedent
-from typing import TYPE_CHECKING, TypeVar
+from typing import TYPE_CHECKING, Any, Literal, TypeVar
 
 if TYPE_CHECKING:
     from openai import AsyncOpenAI
@@ -28,6 +30,9 @@ from . import chatgpt
 
 T = TypeVar("T", bound=OpenAIBase)
 logger = root_logger.get_logger(__name__)
+
+MAX_TOOL_ROUNDS = 8
+"""How many times the model can go back to its tools before it has to answer (API-key providers)"""
 
 
 class OpenAINotEnabledException(Exception):
@@ -60,6 +65,45 @@ class OpenAIDataInjection(BaseModel):
             return json.dumps(value, separators=(",", ":"))
         except TypeError:
             return value
+
+
+class OpenAIToolError(Exception):
+    """A tool couldn't do what the model asked. The message is handed back to the model."""
+
+
+@dataclass
+class OpenAITool:
+    """A function the model may call during `OpenAIService.chat`"""
+
+    name: str
+    description: str
+    parameters: dict[str, Any]
+    """JSON schema for the arguments object"""
+    run: Callable[[Any], Awaitable[str]]
+    """Takes the arguments the model sent and returns the text to hand back to it"""
+
+
+@dataclass
+class OpenAIChatMessage:
+    role: Literal["user", "assistant"]
+    content: str
+
+
+def tool_parameters(model: type[BaseModel]) -> dict[str, Any]:
+    """A model's JSON schema with its references inlined and titles dropped, the plainest shape for tools"""
+    schema = model.model_json_schema()
+    definitions = schema.pop("$defs", {})
+
+    def resolve(node: Any) -> Any:
+        if isinstance(node, dict):
+            if ref := node.get("$ref"):
+                return resolve({**definitions[ref.split("/")[-1]], **{k: v for k, v in node.items() if k != "$ref"}})
+            return {key: resolve(value) for key, value in node.items() if key != "title"}
+        if isinstance(node, list):
+            return [resolve(value) for value in node]
+        return node
+
+    return resolve(schema)
 
 
 class OpenAIAttachment(BaseModel, ABC):
@@ -450,6 +494,115 @@ class OpenAIService(BaseService):
             raise exceptions.RateLimitError(str(e)) from e
         except Exception as e:
             raise Exception(f"OpenAI Request Failed. {e.__class__.__name__}: {e}") from e
+
+    async def chat(
+        self,
+        instructions: str,
+        messages: Sequence[OpenAIChatMessage],
+        tools: Sequence[OpenAITool],
+        *,
+        provider: AIProviderOut | None = None,
+    ) -> str:
+        """
+        Reply to the last of `messages`, a user's, with the rest as the conversation so far. The
+        model can call any of `tools`, as often as it needs to, before it answers.
+        """
+        import openai
+
+        if not messages or messages[-1].role != "user":
+            raise ValueError("A chat has to end with the user's message")
+
+        provider = provider or self._get_provider()
+        by_name = {tool.name: tool for tool in tools}
+
+        async def call_tool(name: str, arguments: Any) -> tuple[bool, str]:
+            tool = by_name.get(name)
+            if tool is None:
+                return False, f"There's no tool called {name}."
+            try:
+                return True, await tool.run(arguments)
+            except OpenAIToolError as e:
+                return False, str(e)
+            except Exception:
+                self.logger.exception(f"AI tool {name} failed")
+                return False, "That didn't work because of an error in Mealie."
+
+        try:
+            if provider.provider_type == AIProviderType.chatgpt:
+                return await self._chat_with_chatgpt(instructions, messages, tools, call_tool, provider)
+            return await self._chat_with_completions(instructions, messages, tools, call_tool, provider)
+        except (openai.RateLimitError, chatgpt.ChatGPTUsageLimitError) as e:
+            raise exceptions.RateLimitError(str(e)) from e
+
+    async def _chat_with_completions(
+        self,
+        instructions: str,
+        messages: Sequence[OpenAIChatMessage],
+        tools: Sequence[OpenAITool],
+        call_tool: chatgpt.ToolHandler,
+        provider: AIProviderOut,
+    ) -> str:
+        client = self.get_client(provider)
+        conversation: list[Any] = [{"role": "system", "content": instructions}]
+        conversation += [{"role": message.role, "content": message.content} for message in messages]
+        specs: list[Any] = [
+            {
+                "type": "function",
+                "function": {"name": tool.name, "description": tool.description, "parameters": tool.parameters},
+            }
+            for tool in tools
+        ]
+
+        for _ in range(MAX_TOOL_ROUNDS):
+            completion = await client.chat.completions.create(model=provider.model, messages=conversation, tools=specs)
+            if not completion.choices:
+                raise exceptions.OpenAIServiceError("The AI provider didn't reply")
+
+            reply = completion.choices[0].message
+            calls = [call for call in reply.tool_calls or [] if call.type == "function"]
+            if not calls:
+                return (reply.content or "").strip()
+
+            conversation.append(
+                {"role": "assistant", "content": reply.content, "tool_calls": [call.model_dump() for call in calls]}
+            )
+            for call in calls:
+                try:
+                    arguments = json.loads(call.function.arguments or "{}")
+                except ValueError:
+                    success, text = False, "The arguments weren't valid JSON."
+                else:
+                    success, text = await call_tool(call.function.name, arguments)
+                conversation.append({"role": "tool", "tool_call_id": call.id, "content": text})
+
+        raise exceptions.OpenAIServiceError("The AI provider kept calling tools without answering")
+
+    async def _chat_with_chatgpt(
+        self,
+        instructions: str,
+        messages: Sequence[OpenAIChatMessage],
+        tools: Sequence[OpenAITool],
+        call_tool: chatgpt.ToolHandler,
+        provider: AIProviderOut,
+    ) -> str:
+        *earlier, latest = messages
+        specs = [
+            {"type": "function", "name": tool.name, "description": tool.description, "inputSchema": tool.parameters}
+            for tool in tools
+        ]
+        async with chatgpt.credential_lock(provider.id):
+            return await chatgpt.run_chatgpt_turn(
+                self._load_chatgpt_credential(provider),
+                instructions=instructions,
+                inputs=[{"type": "text", "text": latest.content}],
+                output_schema=None,
+                model=provider.model or None,
+                timeout=provider.timeout,
+                save_credential=lambda credential: self._save_chatgpt_credential(provider, credential),
+                tools=specs,
+                call_tool=call_tool,
+                history=[chatgpt.to_codex_history(message.role, message.content) for message in earlier],
+            )
 
     async def transcribe_audio(self, audio_file_path: Path) -> str | None:
         import openai

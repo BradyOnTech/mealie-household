@@ -1,23 +1,41 @@
-from datetime import date
+from datetime import date, datetime
 from uuid import UUID
 
 from fastapi import HTTPException
-from sqlalchemy import select, update
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import selectinload
 
-from mealie.db.models.household.grocery import GroceryWeek
+from mealie.db.models.household.grocery import GroceryRestockItem, GroceryWeek
 from mealie.db.models.household.shopping_list import (
     ShoppingList,
     ShoppingListItem,
     ShoppingListMultiPurposeLabel,
     ShoppingListRecipeReference,
 )
-from mealie.db.models.recipe.ingredient import IngredientUnitModel, RecipeIngredientModel
-from mealie.schema.grocery.grocery import GroceryWeekOut
+from mealie.db.models.recipe.ingredient import (
+    IngredientFoodAliasModel,
+    IngredientFoodModel,
+    IngredientUnitModel,
+    RecipeIngredientModel,
+)
+from mealie.schema.grocery.grocery import GroceryRestockOut, GroceryWeekOut
 from mealie.schema.household.group_shopping_list import ShoppingListItemCreate, ShoppingListItemUpdateBulk
 from mealie.schema.recipe.recipe_ingredient import IngredientUnit
 
 from .repository_generic import HouseholdRepositoryGeneric
+
+GROCERY_UNIT_ABBREVIATIONS = {
+    "gram": ("g", "g"),
+    "kilogram": ("kg", "kg"),
+    "ounce": ("oz", "oz"),
+    "pound": ("lb", "lb"),
+    "milliliter": ("ml", "ml"),
+    "liter": ("l", "l"),
+    "fluid_ounce": ("fl oz", "fl oz"),
+    "cup": ("cup", "cups"),
+}
+"""How a unit the grocery list had to create reads on the list, singular and plural"""
 
 
 class RepositoryGroceryWeek(HouseholdRepositoryGeneric[GroceryWeekOut, GroceryWeek]):
@@ -50,10 +68,14 @@ class RepositoryGroceryWeek(HouseholdRepositoryGeneric[GroceryWeekOut, GroceryWe
             .first()
         )
         if unit is None:
+            abbreviation, plural_abbreviation = GROCERY_UNIT_ABBREVIATIONS.get(name, (name, name))
             unit = IngredientUnitModel(
                 session=self.session,
                 group_id=self.group_id,
                 name=f"Grocery: {name}",
+                abbreviation=abbreviation,
+                plural_abbreviation=plural_abbreviation,
+                use_abbreviation=True,
                 standard_quantity=1,
                 standard_unit=name,
                 fraction=False,
@@ -156,9 +178,124 @@ class RepositoryGroceryWeek(HouseholdRepositoryGeneric[GroceryWeekOut, GroceryWe
             raise HTTPException(404, "A grocery item was not found in this household's list")
         return [by_id[item_id] for item_id in dict.fromkeys(item_ids)]
 
+    def newest_from(self, week_start: date) -> GroceryWeek | None:
+        """The household's list for the latest week on or after `week_start`"""
+        query = (
+            select(GroceryWeek)
+            .filter_by(**self._filter_builder())
+            .where(GroceryWeek.week_start >= week_start)
+            .order_by(GroceryWeek.week_start.desc())
+            .limit(1)
+        )
+        return self.session.execute(query).scalars().first()
+
+    def week_models(self, week_starts: set[date]) -> dict[date, GroceryWeek]:
+        if not week_starts:
+            return {}
+        query = select(GroceryWeek).filter_by(**self._filter_builder()).where(GroceryWeek.week_start.in_(week_starts))
+        return {week.week_start: week for week in self.session.execute(query).scalars()}
+
+    def list_items(self, item_ids: set[UUID]) -> dict[UUID, tuple[ShoppingListItem, GroceryWeek]]:
+        """Rows on any of this household's weekly grocery lists, with the week each one is on"""
+        if not item_ids:
+            return {}
+        query = (
+            select(ShoppingListItem, GroceryWeek)
+            .join(GroceryWeek, GroceryWeek.shopping_list_id == ShoppingListItem.shopping_list_id)
+            .where(
+                ShoppingListItem.id.in_(item_ids),
+                GroceryWeek.group_id == self.group_id,
+                GroceryWeek.household_id == self.household_id,
+            )
+        )
+        return {item.id: (item, week) for item, week in self.session.execute(query).tuples()}
+
+    def next_position(self, week: GroceryWeek) -> int:
+        query = select(func.coalesce(func.max(ShoppingListItem.position), -1) + 1).where(
+            ShoppingListItem.shopping_list_id == week.shopping_list_id
+        )
+        return int(self.session.execute(query).scalar_one())
+
+    def bump(self, week_ids: set[UUID]) -> None:
+        """Mark lists as changed, so a page still holding an older revision refreshes before it edits them"""
+        if week_ids:
+            self.session.execute(
+                update(GroceryWeek).where(GroceryWeek.id.in_(week_ids)).values(revision=GroceryWeek.revision + 1)
+            )
+
     def commit(self) -> None:
         try:
             self.session.commit()
         except Exception:
             self.session.rollback()
             raise
+
+
+class RepositoryGroceryRestock(HouseholdRepositoryGeneric[GroceryRestockOut, GroceryRestockItem]):
+    def open_models(self) -> list[GroceryRestockItem]:
+        query = (
+            select(GroceryRestockItem)
+            .filter_by(**self._filter_builder())
+            .where(GroceryRestockItem.bought_at.is_(None))
+            .order_by(GroceryRestockItem.created_at, GroceryRestockItem.name)
+            .options(selectinload(GroceryRestockItem.food))
+        )
+        return list(self.session.execute(query).scalars())
+
+    def bought_models(self, since: datetime, limit: int = 20) -> list[GroceryRestockItem]:
+        query = (
+            select(GroceryRestockItem)
+            .filter_by(**self._filter_builder())
+            .where(GroceryRestockItem.bought_at >= since)
+            .order_by(GroceryRestockItem.bought_at.desc())
+            .limit(limit)
+            .options(selectinload(GroceryRestockItem.food))
+        )
+        return list(self.session.execute(query).scalars())
+
+    def prune_bought(self, before: datetime) -> bool:
+        """Forget items bought before `before`. Checks first, so a quiet read never takes a write lock."""
+        scope = (
+            GroceryRestockItem.group_id == self.group_id,
+            GroceryRestockItem.household_id == self.household_id,
+            GroceryRestockItem.bought_at < before,
+        )
+        if self.session.execute(select(GroceryRestockItem.id).where(*scope).limit(1)).first() is None:
+            return False
+        self.session.execute(delete(GroceryRestockItem).where(*scope))
+        return True
+
+    def linked_models(self) -> list[GroceryRestockItem]:
+        """Everything standing in for a row on a grocery list, bought or not"""
+        query = (
+            select(GroceryRestockItem)
+            .filter_by(**self._filter_builder())
+            .where(GroceryRestockItem.shopping_list_item_id.is_not(None))
+        )
+        return list(self.session.execute(query).scalars())
+
+    def item_model(self, item_id: UUID) -> GroceryRestockItem:
+        query = select(GroceryRestockItem).filter_by(**self._filter_builder(id=item_id))
+        item = self.session.execute(query).scalar_one_or_none()
+        if item is None:
+            raise HTTPException(404, "That item isn't on your Out of list")
+        return item
+
+    def food_named(self, name: str) -> IngredientFoodModel | None:
+        """The group's food with exactly this name, plural, or alias, ignoring case and punctuation"""
+        normalized = GroceryRestockItem.normalize(name)
+        if not normalized:
+            return None
+        query = (
+            select(IngredientFoodModel)
+            .outerjoin(IngredientFoodAliasModel, IngredientFoodAliasModel.food_id == IngredientFoodModel.id)
+            .where(IngredientFoodModel.group_id == self.group_id)
+            .where(
+                (IngredientFoodModel.name_normalized == normalized)
+                | (IngredientFoodModel.plural_name_normalized == normalized)
+                | (IngredientFoodAliasModel.name_normalized == normalized)
+            )
+            .order_by(IngredientFoodModel.name_normalized != normalized, IngredientFoodModel.created_at)
+            .limit(1)
+        )
+        return self.session.execute(query).scalars().first()
