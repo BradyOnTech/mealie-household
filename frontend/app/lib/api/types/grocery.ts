@@ -5,14 +5,47 @@
 /* Do not modify it by hand - just update the pydantic models and then re-run the script
 */
 
-export type GroceryRuleKind = "pantry" | "recurring";
+export type GroceryStore = "walmart" | "cub" | "aldi" | "whole_foods";
 export type GroceryUnit =
   "count" | "gram" | "kilogram" | "ounce" | "pound" | "milliliter" | "liter" | "fluid_ounce" | "cup";
+export type GroceryRuleKind = "pantry" | "recurring";
 export type GroceryRecurringMode = "minimum" | "extra";
-export type GroceryStore = "walmart" | "cub" | "aldi" | "whole_foods";
 export type GroceryRestockStatus = "waiting" | "listed" | "bought";
 export type PlanEntryType = "breakfast" | "lunch" | "dinner" | "side" | "snack" | "drink" | "dessert";
 
+export interface GroceryCommonItemList {
+  items?: GroceryCommonItemOut[];
+  nextListWeek?: string | null;
+  stores?: GroceryStore[];
+}
+export interface GroceryCommonItemOut {
+  food: IngredientFoodSummary;
+  aisle?: string | null;
+  products: GroceryProductOut[];
+  listed?: boolean;
+}
+export interface IngredientFoodSummary {
+  id: string;
+  name: string;
+  pluralName?: string | null;
+}
+export interface GroceryProductOut {
+  foodId: string;
+  name: string;
+  store: GroceryStore;
+  url?: string | null;
+  priority?: number;
+  enabled?: boolean;
+  packageQuantity?: number | null;
+  packageUnit?: GroceryUnit | null;
+  notes?: string;
+  groupId: string;
+  householdId: string;
+  id: string;
+  food: IngredientFoodSummary;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+}
 export interface GroceryFoodRuleCreate {
   foodId: string;
   kind: GroceryRuleKind;
@@ -32,11 +65,6 @@ export interface GroceryFoodRuleOut {
   householdId: string;
   id: string;
   food: IngredientFoodSummary;
-}
-export interface IngredientFoodSummary {
-  id: string;
-  name: string;
-  pluralName?: string | null;
 }
 export interface GroceryFoodRuleSave {
   foodId: string;
@@ -81,23 +109,6 @@ export interface GroceryProductCreate {
   packageQuantity?: number | null;
   packageUnit?: GroceryUnit | null;
   notes?: string;
-}
-export interface GroceryProductOut {
-  foodId: string;
-  name: string;
-  store: GroceryStore;
-  url?: string | null;
-  priority?: number;
-  enabled?: boolean;
-  packageQuantity?: number | null;
-  packageUnit?: GroceryUnit | null;
-  notes?: string;
-  groupId: string;
-  householdId: string;
-  id: string;
-  food: IngredientFoodSummary;
-  createdAt?: string | null;
-  updatedAt?: string | null;
 }
 export interface GroceryProductSave {
   foodId: string;

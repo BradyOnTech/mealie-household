@@ -103,7 +103,8 @@ when updating, and do not use `docker compose down -v`, which deletes its data v
 7. Generate the list. Use store filters, open product links, and check off purchases.
 
 Products with no saved URL work for in-store shopping. Ingredients without a matching product stay visible
-under Unassigned. Saved preferences do not automatically add every catalog product to your shopping list.
+under Unassigned. Saved preferences don't put every catalog product on your shopping list; pick the ones you
+need from **Common items**.
 
 ## Behavior
 
@@ -155,6 +156,23 @@ amount it means one of whatever you usually buy, so a product with a package siz
 package. Checking the row off on any list, including Mealie's standard shopping list, marks the item bought;
 deleting the row from a list removes it from the Out of list. Bought items stay under **Bought lately** for
 two weeks, where one tap adds them again.
+
+### Common items
+
+**Common items**, next to **We're out of…**, opens a list of every ingredient with an enabled preferred
+product, grouped by aisle (the ingredient's label). Tap a row to put it on the list, and tap it again to take it
+back off. Rows go on the Out of list, so they follow its rules: they go on the newest list for this week or
+later, or wait for the next one, and they're never listed twice. Each row shows the product the list would
+buy, and **Already on the list** when a recipe, staple, or addition has put it there already.
+
+Choosing a store shows only what that store sells, with that store's product, and adding from it buys the item
+there. Otherwise the list chooses the store, as it does for recipes. The one exception is an item whose stores
+aren't on this week's trip. It goes on at the store its row shows rather than under Unassigned. When the search
+finds nothing, you can add what you typed as a one-off.
+
+To add or remove common items, save or turn off products in Preferred products. Things that aren't food, like
+paper towels, need an ingredient for their product. Members with Organize permission can create one from the
+product form.
 
 ### Ask (the kitchen assistant)
 
@@ -219,7 +237,8 @@ it requires a signed-in household user and contains source/build instructions wi
   `mealie/services/openai/openai.py` (`OpenAIService.chat`) runs the tool-calling conversation for either provider type.
 - `frontend/app/pages/household/groceries/`: shopping and catalog pages.
 - `frontend/app/pages/household/assistant.vue`: the Ask page.
-- `frontend/app/components/Domain/Grocery/`: product and pantry/staple editors, and the Out of panel.
+- `frontend/app/components/Domain/Grocery/`: product and pantry/staple editors, the Out of panel, and the
+  Common items picker (`GroceryCommonItemsDialog.vue`, fed by `GroceryService.common_items`).
 
 One Alembic migration adds the three grocery tables, and a second adds the Out of list. When merging a later upstream release with new migrations,
 check for multiple Alembic heads and create/test an Alembic merge revision when required.
