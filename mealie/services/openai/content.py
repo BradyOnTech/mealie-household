@@ -1,3 +1,6 @@
+import json
+from typing import Any
+
 import bs4
 
 MAX_SOURCE_CONTENT_LENGTH = 100_000
@@ -51,6 +54,49 @@ def extract_json_ld_data_from_html(soup: bs4.BeautifulSoup) -> str:
             pass
 
     return "\n\n".join(data_parts)
+
+
+def find_json_ld_recipes(html: str) -> list[dict[str, Any]]:
+    """
+    Every schema.org Recipe in a page's ld+json data, wherever it's nested: at the top level,
+    in a list, in an `@graph`, or as a page's `mainEntity`.
+    """
+
+    recipes: list[dict[str, Any]] = []
+    for script in bs4.BeautifulSoup(html, "lxml").find_all("script", type="application/ld+json"):
+        try:
+            data = json.loads(script.string or "")
+        except ValueError:
+            continue
+
+        recipes.extend(_json_ld_recipes(data))
+
+    return recipes
+
+
+def _json_ld_recipes(data: Any) -> list[dict[str, Any]]:
+    if isinstance(data, list):
+        return [recipe for item in data for recipe in _json_ld_recipes(item)]
+    if not isinstance(data, dict):
+        return []
+
+    types = data.get("@type")
+    for type_name in types if isinstance(types, list) else [types]:
+        # types can be written out in full, e.g. "http://schema.org/Recipe" or "schema:Recipe"
+        if isinstance(type_name, str) and type_name.rsplit("/", 1)[-1].rsplit(":", 1)[-1] == "Recipe":
+            return [data]
+
+    return _json_ld_recipes(data.get("@graph")) + _json_ld_recipes(data.get("mainEntity"))
+
+
+def has_recipe_data(html: str) -> bool:
+    """
+    Whether a page publishes a recipe as schema.org structured data. Other structured data, like
+    the VideoObject on a video's page, doesn't count.
+    """
+
+    # most pages that don't can be ruled out without parsing them
+    return "recipe" in html.lower() and bool(find_json_ld_recipes(html))
 
 
 def find_image(soup: bs4.BeautifulSoup) -> str | None:

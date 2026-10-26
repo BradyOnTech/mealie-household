@@ -1,9 +1,11 @@
 from dataclasses import dataclass
 
+from mealie.core import exceptions
 from mealie.core.root_logger import get_logger
 from mealie.pkgs.safehttp import resilient_fetch
 from mealie.schema.openai.compiled_source import OpenAICompiledSource
-from mealie.services.openai.content import truncate_source_parts
+from mealie.services.openai import transcription
+from mealie.services.openai.content import has_recipe_data, truncate_source_parts
 
 from ..base import WorkflowStep
 from ..compilers import DEFAULT_SOURCE_COMPILERS, SourceCompiler, SourceType
@@ -49,8 +51,14 @@ class CompileSourceStep(WorkflowStep):
         self.logger = get_logger()
 
     async def _compile(
-        self, ctx: WorkflowContext, source_type: SourceType, content: str | None = None
+        self, ctx: WorkflowContext, source_type: SourceType, content: str | None = None, *, final: bool = False
     ) -> OpenAICompiledSource | None:
+        """
+        Compiles a source with the first compiler that can. A compiler that fails hands the source
+        on to the next one, unless the result is `final`: then there's nowhere better to read the
+        source from, and its error says more about what went wrong than any fallback's would.
+        """
+
         for CompilerClass in self.compilers:
             if CompilerClass.source_type is not source_type:
                 continue
@@ -64,7 +72,13 @@ class CompileSourceStep(WorkflowStep):
 
             try:
                 compiled = await compiler.compile()
+            except exceptions.RateLimitError:
+                # every other compiler would run into the same limit
+                raise
             except Exception:
+                if final:
+                    raise
+
                 # `can_compile` judges the shape of the source, not whether it can actually be read.
                 # yt-dlp recognises every cooking.nytimes.com/recipes/<id> URL, for instance, but
                 # most of those pages carry no video at all. Hand the source to the next compiler —
@@ -90,26 +104,47 @@ class CompileSourceStep(WorkflowStep):
         return await self._compile(ctx, SourceType.CONTENT, content)
 
     async def _compile_page(self, ctx: WorkflowContext) -> OpenAICompiledSource | None:
-        # compilers that read the URL themselves go first, so that a video is downloaded rather
-        # than fetched and read as a webpage
-        if ctx.input.url and (compiled := await self._compile(ctx, SourceType.URL)):
-            return compiled
+        url = ctx.input.url
+        if not url:
+            return await self._compile_content(ctx, ctx.input.page_content)
+
+        # On the big video sites the video is the whole post, and its page carries little more than
+        # a title, so compilers that read the URL themselves go first and the page is never fetched
+        read_urls: set[str] = set()
+        if transcription.is_video_site(url):
+            read_urls.add(url)
+            if compiled := await self._compile(ctx, SourceType.URL, final=True):
+                return compiled
 
         page_content = ctx.input.page_content
-        if not page_content and ctx.input.url:
+        if not page_content:
             await ctx.report_progress("recipe.create-progress.fetching-webpage")
-            result = await resilient_fetch(ctx.input.url)
+            result = await resilient_fetch(url)
             if result:
                 page_content = result.text
                 ctx.resolved_url = result.url
 
-        # share/short links aren't recognized as videos until after redirects; give URL
-        # compilers a second chance with the landing URL before reading the page as HTML
-        if ctx.resolved_url and ctx.resolved_url != ctx.input.url:
-            if compiled := await self._compile(ctx, SourceType.URL):
+        # Anywhere else, a page that publishes its recipe as structured data is the best source
+        # there is. yt-dlp knows a few recipe sites (NYT Cooking and BBC Food among them), but their
+        # videos only demonstrate the written recipe. Share links, meanwhile, aren't recognized as
+        # videos until after their redirect, so they're read with the landing URL.
+        landing_url = ctx.resolved_url or url
+        if (
+            landing_url not in read_urls
+            and self._can_compile_url(ctx)
+            and not (page_content and has_recipe_data(page_content))
+        ):
+            final = transcription.is_video_site(landing_url)
+            if compiled := await self._compile(ctx, SourceType.URL, final=final):
                 return compiled
 
         return await self._compile_content(ctx, page_content)
+
+    def _can_compile_url(self, ctx: WorkflowContext) -> bool:
+        return any(
+            CompilerClass.source_type is SourceType.URL and CompilerClass(ctx).can_compile()
+            for CompilerClass in self.compilers
+        )
 
     def _merge(self, ctx: WorkflowContext, documents: list[CompiledDocument]) -> OpenAICompiledSource:
         usable = [document for document in documents if document.is_usable]

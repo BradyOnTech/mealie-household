@@ -159,6 +159,26 @@ RUN if [ -n "$CODEX_VERSION" ]; then \
         && rm -f /tmp/codex.tar.gz "/tmp/codex-${arch}-unknown-linux-musl"; \
     fi
 
+# Deno, which yt-dlp runs YouTube's player code in to read its videos. Without a JavaScript
+# runtime, yt-dlp's YouTube support is deprecated and degrading.
+# Build with --build-arg DENO_VERSION= to leave it out.
+ARG DENO_VERSION=2.9.8
+ARG DENO_SHA256_AMD64=e890975bc2549807bbcc0b584ffafda72cc7c93349dd99c80483dd784f6c4609
+ARG DENO_SHA256_ARM64=d49596c20b9788cf8f5d8ddf644103d4bde56ed239753f0bdb92ba9361d51905
+RUN if [ -n "$DENO_VERSION" ]; then \
+        case "$TARGETARCH" in \
+            amd64) arch=x86_64; sha256=$DENO_SHA256_AMD64 ;; \
+            arm64) arch=aarch64; sha256=$DENO_SHA256_ARM64 ;; \
+            *) echo "No Deno build for $TARGETARCH" >&2; exit 1 ;; \
+        esac \
+        && curl -fsSL -o /tmp/deno.zip \
+            "https://github.com/denoland/deno/releases/download/v${DENO_VERSION}/deno-${arch}-unknown-linux-gnu.zip" \
+        && echo "$sha256  /tmp/deno.zip" | sha256sum -c - \
+        && unzip -q /tmp/deno.zip -d /tmp/deno \
+        && install -m 0755 /tmp/deno/deno /usr/local/bin/deno \
+        && rm -rf /tmp/deno.zip /tmp/deno; \
+    fi
+
 # create directory used for Docker Secrets
 RUN mkdir -p /run/secrets
 

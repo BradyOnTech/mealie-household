@@ -12,7 +12,7 @@ To set up AI providers, visit your group settings.
 
 - To enable AI features at all, you *must* set a default provider (e.g. `gpt-5`)
 - To enable image recognition features, such as creating a recipe from an image, configure a provider capable of image recognition (e.g. `gpt-5`)
-- To enable audio transcription features, such as importing a recipe from a video, configure a provider capable of audio transcriptions (e.g. `whisper-1`)
+- To transcribe videos that have no captions when importing them, configure a provider capable of audio transcriptions (e.g. `whisper-1`). Videos with captions don't need one
 
 For most users, choosing an OpenAI model (such as `gpt-5`) and supplying the OpenAI API key is all you need to do. Note that while OpenAI has a free tier, it's not sufficiently capable for Mealie (or most other production use cases). For more information, check out [OpenAI's rate limits](https://platform.openai.com/docs/guides/rate-limits). If you deposit $5 into your OpenAI account, you will be permanently bumped up to Tier 1, which is sufficient for Mealie. Cost per-request is dependant on many factors, but Mealie tries to keep token counts conservative.
 
@@ -31,7 +31,7 @@ If OpenAI won't accept the code, turn on device code sign-in for Codex in your C
 A few things to know:
 
 - Requests go through the [Codex CLI](https://github.com/openai/codex), which the Docker image includes. Outside Docker, install it and, if it isn't on your `PATH`, set [`CODEX_BIN`](./backend-config.md#openai). Each request starts its own short-lived Codex process, which adds a second or so.
-- It can read text and images, so it can be your default and image provider, but it can't transcribe audio. Use an API-key provider as your audio provider.
+- It can read text and images, so it can be your default and image provider, and it can import videos from their captions. It can't transcribe audio, so to import videos that have no captions, use an API-key provider as your audio provider.
 - Leave the model blank to use your plan's default model.
 - Everyone in your group shares the one ChatGPT account and its usage limits. When those run out, AI features fail until the limit resets.
 - The sign-in is stored in Mealie's database, the same way an API key is, and Codex refreshes it as needed. To switch accounts, edit the provider and sign in again.
@@ -39,7 +39,7 @@ A few things to know:
 
 ## AI Features
 - The OpenAI Ingredient Parser can be used as an alternative to the NLP and Brute Force parsers. Simply choose the OpenAI parser while parsing ingredients (:octicons-tag-24: v1.7.0)
-- When importing a recipe via URL, if the default recipe scraper is unable to read the recipe data from a webpage, the webpage contents will be parsed by AI (:octicons-tag-24: v1.9.0)
+- When importing a recipe via URL, if the default recipe scraper is unable to read the recipe data from a webpage, the webpage contents will be parsed by AI (:octicons-tag-24: v1.9.0). A link to a video is read from the video instead (see [Videos](#videos))
 - The **Import with AI** page creates a recipe out of just about anything: pasted text, HTML, or JSON, photos of a recipe, a link, or any combination of them (:octicons-tag-24: v3.23.0)
 - The **Import a Cookbook (PDF)** page imports every recipe in a cookbook PDF, with their photos
 - The **Ask** page is a chat with a kitchen assistant that can keep your household's Out of list and answer questions about its groceries, meal plan, and recipes
@@ -56,13 +56,24 @@ Its instructions are the `household.assistant` prompt, which you can override li
 
 The **Import with AI** page, found under *Create ➞ Import with AI*, creates a recipe from any combination of:
 
-- **A URL.** Mealie fetches the page and reads the recipe from it. Give it a link to a video (e.g. YouTube or Instagram) and the video is transcribed instead, provided you've configured an audio provider. The URL is always saved as the recipe's source.
+- **A URL.** Mealie fetches the page and reads the recipe from it. Give it a link to a video (e.g. YouTube or Instagram) and the recipe is read from the video instead (see [Videos](#videos)). The URL is always saved as the recipe's source.
 - **Content.** Paste a recipe as plain text, or paste raw HTML or a [schema.org Recipe](https://schema.org/Recipe) JSON object. This is useful when a site blocks Mealie from reading it directly. It's also where you write notes about a recipe you're importing from somewhere else.
 - **Images.** Upload one or more photos of a recipe, hand-written or typed. Multiple photos are treated as pages of a single recipe, and the first one becomes the recipe's image. This requires an image provider.
 
 Every source you provide is read, and the results are combined into one description of the recipe. Content you paste alongside a URL, a video, or photos adds to them rather than replacing them, so a page that only partly loaded can be topped up by hand. Where your own content disagrees with the other sources it wins, so it doubles as a place for notes: what to name the recipe, a correction to an ingredient, a step the video skipped over. If content is the only thing you provide, it's simply the recipe's source material.
 
 You can also optionally have the recipe translated into your own language.
+
+### Videos
+
+A video, whether you import it here or with *Import with URL*, is read from what it publishes about itself: its title, its description, and its captions. The video itself isn't downloaded, and no audio provider is needed, so a group whose only provider is a [ChatGPT subscription](#using-a-chatgpt-subscription) can import videos too.
+
+- **Captions.** The creator's own captions are used if the video has them in the language it's spoken in, and otherwise the captions recognized from its speech, which YouTube has for most videos. Machine-translated captions are never used; to get a recipe in another language, have it translated instead.
+- **Chapters.** A video split into chapters keeps them as headings in its transcript, which helps the recipe come out in sections.
+- **The written recipe.** Cooking channels often link to a written version of the recipe from the description. When a link the description introduces as the recipe ("Full recipe: …") leads to a recipe whose name matches the video's title, that recipe is read too. Its ingredients come with exact amounts, where a video might only say "a splash", and its photo is used instead of the video's thumbnail.
+- **No captions.** A video without captions has its audio transcribed by your audio provider, if you've configured one (videos over 90 minutes are skipped). Otherwise the recipe is read from the description, which works for the many short videos that write their recipe there.
+
+Recipe sites that also publish videos, like NYT Cooking, are read from the recipe on their page rather than from the video.
 
 ### Organizers
 
@@ -96,4 +107,3 @@ A PDF with no text in it, such as a scanned book, can still be imported if you h
 Importing a cookbook takes one AI request per recipe, plus a few to find them, so a 100-recipe book is a little over 100 requests. A request that fails for a passing reason, like a dropped connection, is tried again once the rest are done. If your provider runs out partway through, for example because a [ChatGPT subscription](#using-a-chatgpt-subscription) reached its plan's usage limit, the import stops and says so.
 
 Each imported recipe remembers which PDF and page it came from, so you can import the same PDF again to pick up where it left off: recipes that are already imported are skipped. The same goes for an import interrupted by Mealie restarting. If you delete an imported recipe, importing the PDF again brings it back.
-

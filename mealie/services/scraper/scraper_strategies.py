@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 from abc import ABC, abstractmethod
 from collections.abc import Awaitable, Callable
 from typing import TYPE_CHECKING, Any
@@ -10,16 +9,12 @@ from fastapi import HTTPException, status
 if TYPE_CHECKING:
     from recipe_scrapers import SchemaScraperFactory
 
-from mealie.core import exceptions
-from mealie.core.dependencies.dependencies import get_temporary_path
 from mealie.core.root_logger import get_logger
 from mealie.lang.providers import Translator
 from mealie.repos.repository_factory import AllRepositories
-from mealie.schema.openai.recipe import OpenAIRecipe
 from mealie.schema.recipe.recipe import Recipe, RecipeStep
-from mealie.schema.recipe.recipe_ingredient import RecipeIngredient
 from mealie.schema.recipe.recipe_notes import RecipeNote
-from mealie.services.openai import OpenAIService, transcription
+from mealie.services.openai import OpenAIService
 from mealie.services.recipe.import_workflow import (
     RecipeImportWorkflow,
     WorkflowContext,
@@ -374,94 +369,6 @@ class RecipeScraperOpenAI(ABCScraperStrategy):
             extras.set_categories(cleaner.clean_categories(ctx.organizer_names.categories))
 
         return result.recipe, extras
-
-
-class RecipeScraperOpenAITranscription(ABCScraperStrategy):
-    def can_scrape(self) -> bool:
-        if not self.url:
-            return False
-
-        settings = self.repos.group_ai_provider_settings.get_one(self.repos.group_id)
-        if not (settings and settings.audio_provider_enabled):
-            return False
-
-        # Check if we can actually download something to transcribe
-        return transcription.is_video_url(self.url)
-
-    async def get_html(self, url: str) -> str:
-        return self.raw_html or ""  # we don't use HTML with this scraper since we use ytdlp
-
-    async def parse(
-        self,
-        on_progress: Callable[[str], Awaitable[None]] | None = None,
-    ) -> tuple[Recipe, ScrapedExtras] | tuple[None, None]:
-        openai_service = OpenAIService(self.repos)
-
-        with get_temporary_path() as temp_path:
-            if on_progress:
-                await on_progress(self.translator.t("recipe.create-progress.downloading-video"))
-
-            video_data = await asyncio.to_thread(transcription.download_video, self.url, temp_path)
-
-            async def report_transcribing() -> None:
-                if on_progress:
-                    await on_progress(self.translator.t("recipe.create-progress.transcribing-audio-with-ai"))
-
-            video_data["transcription"] = await transcription.resolve_transcription(
-                video_data, openai_service, before_transcribe=report_transcribing
-            )
-
-        if not video_data["transcription"]:
-            self.logger.error("Could not extract a transcript (no data)")
-            return None, None
-
-        self.logger.debug(f"Transcription: {video_data['transcription'][:200]}...")
-        prompt = openai_service.get_prompt("recipes.parse-recipe-video")
-
-        message_parts = [
-            f"Title: {video_data['title']}",
-            f"Description: {video_data['description']}",
-            f"Transcription: {video_data['transcription']}",
-        ]
-
-        if on_progress:
-            await on_progress(self.translator.t("recipe.create-progress.creating-recipe-from-transcript-with-ai"))
-
-        try:
-            response = await openai_service.get_response(prompt, "\n".join(message_parts), response_schema=OpenAIRecipe)
-        except exceptions.RateLimitError:
-            raise
-        except Exception as e:
-            raise exceptions.OpenAIServiceError(f"Failed to extract recipe from video: {e}") from e
-
-        if not response:
-            raise exceptions.OpenAIServiceError("OpenAI returned an empty response when extracting recipe")
-
-        recipe = Recipe(
-            name=response.name,
-            slug="",
-            description=response.description,
-            recipe_yield=response.recipe_yield,
-            total_time=response.total_time,
-            prep_time=response.prep_time,
-            perform_time=response.perform_time,
-            recipe_ingredient=[
-                RecipeIngredient(title=ingredient.title, note=ingredient.text)
-                for ingredient in response.ingredients
-                if ingredient.text
-            ],
-            recipe_instructions=[
-                RecipeStep(title=instruction.title, text=instruction.text)
-                for instruction in response.instructions
-                if instruction.text
-            ],
-            notes=[RecipeNote(title=note.title or "", text=note.text) for note in response.notes if note.text],
-            image=video_data["thumbnail_url"] or None,
-            org_url=self.url,
-        )
-
-        self.logger.info(f"Successfully extracted recipe from video: {video_data['title']}")
-        return recipe, ScrapedExtras()
 
 
 class RecipeScraperOpenGraph(ABCScraperStrategy):

@@ -10,7 +10,6 @@ from mealie.services.scraper.scraped_extras import ScrapedExtras
 from .scraper_strategies import (
     ABCScraperStrategy,
     RecipeScraperOpenAI,
-    RecipeScraperOpenAITranscription,
     RecipeScraperOpenGraph,
     RecipeScraperPackage,
     safe_scrape_html,
@@ -18,7 +17,7 @@ from .scraper_strategies import (
 
 DEFAULT_SCRAPER_STRATEGIES: list[type[ABCScraperStrategy]] = [
     RecipeScraperPackage,
-    RecipeScraperOpenAITranscription,
+    # also reads videos, since the import workflow it runs does
     RecipeScraperOpenAI,
     RecipeScraperOpenGraph,
 ]
