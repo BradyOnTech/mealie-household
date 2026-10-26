@@ -1,5 +1,6 @@
 import { useLoggedInState } from "~/composables/use-logged-in-state";
 import { useGroupSelf } from "~/composables/use-groups";
+import { useHouseholdUnread } from "~/composables/use-household-messages";
 import { useCookbookPreferences } from "~/composables/use-users/preferences";
 import { useCookbookStore, usePublicCookbookStore } from "~/composables/store/use-cookbook-store";
 import type { ReadCookBook } from "~/lib/api/types/cookbook";
@@ -12,6 +13,8 @@ export interface AppNavLink {
   /** Only shown to signed-in members of the group being viewed. */
   restricted?: boolean;
   subtitle?: string;
+  /** A count to show with the link, such as unread messages. */
+  badge?: number;
 }
 
 export interface AppNavSection {
@@ -31,6 +34,7 @@ export function useAppNavigation() {
   const route = useRoute();
   const { loggedIn, isOwnGroup } = useLoggedInState();
   const { group } = useGroupSelf();
+  const { unread } = useHouseholdUnread();
 
   const groupSlug = computed(() => (route.params.groupSlug as string) || auth.user.value?.groupSlug || "");
   const user = computed(() => auth.user.value);
@@ -46,7 +50,7 @@ export function useAppNavigation() {
     return groupSlug.value ? `/g/${groupSlug.value}` : "/";
   });
 
-  /** The four sections of the masthead and the phone tab bar. */
+  /** The sections of the masthead and the phone tab bar. */
   const primaryLinks = computed<AppNavLink[]>(() => visible([
     {
       key: "week",
@@ -67,6 +71,14 @@ export function useAppNavigation() {
       icon: $globals.icons.cartOutline,
       to: "/household/groceries",
       restricted: true,
+    },
+    {
+      key: "messages",
+      title: i18n.t("messages.nav"),
+      icon: $globals.icons.forumOutline,
+      to: "/household/messages",
+      restricted: true,
+      badge: unread.value,
     },
     {
       key: "cookbooks",
@@ -92,6 +104,7 @@ export function useAppNavigation() {
     const path = route.path;
     if (path.startsWith("/household/week")) return "week";
     if (path.startsWith("/household/assistant")) return "ask";
+    if (path.startsWith("/household/messages")) return "messages";
     if (path.startsWith("/household/groceries") || path.startsWith("/shopping-lists")) return "groceries";
     if (path.startsWith("/household/mealplan")) return "week";
     if (/^\/g\/[^/]+\/cookbooks/.test(path)) return "cookbooks";

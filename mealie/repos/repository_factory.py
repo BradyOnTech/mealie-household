@@ -17,6 +17,7 @@ from mealie.db.models.household.household import Household
 from mealie.db.models.household.household_to_recipe import HouseholdToRecipe
 from mealie.db.models.household.invite_tokens import GroupInviteToken
 from mealie.db.models.household.mealplan import GroupMealPlan, GroupMealPlanRules
+from mealie.db.models.household.messages import HouseholdMessage, UserPushSubscription
 from mealie.db.models.household.preferences import HouseholdPreferencesModel
 from mealie.db.models.household.recipe_action import GroupRecipeAction
 from mealie.db.models.household.shopping_list import (
@@ -66,6 +67,7 @@ from mealie.schema.household.webhook import ReadWebhook
 from mealie.schema.labels import MultiPurposeLabelOut
 from mealie.schema.meal_plan.new_meal import ReadPlanEntry
 from mealie.schema.meal_plan.plan_rules import PlanRulesOut
+from mealie.schema.messages.messages import HouseholdMessageOut, PushSubscriptionOut
 from mealie.schema.recipe import Recipe, RecipeCommentOut, RecipeToolOut
 from mealie.schema.recipe.recipe_category import CategoryOut, TagOut
 from mealie.schema.recipe.recipe_ingredient import IngredientFood, IngredientUnit
@@ -81,6 +83,7 @@ from .repository_generic import GroupRepositoryGeneric, HouseholdRepositoryGener
 from .repository_grocery import RepositoryGroceryRestock, RepositoryGroceryWeek
 from .repository_group import RepositoryGroup
 from .repository_meals import RepositoryMeals
+from .repository_messages import RepositoryHouseholdMessages, RepositoryPushSubscriptions
 from .repository_recipes import RepositoryRecipes
 from .repository_shopping_list import RepositoryShoppingList
 from .repository_users import RepositoryUserRatings, RepositoryUsers
@@ -349,6 +352,21 @@ class AllRepositories:
             group_id=self.group_id,
             household_id=self.household_id,
         )
+
+    @cached_property
+    def household_messages(self) -> RepositoryHouseholdMessages:
+        return RepositoryHouseholdMessages(
+            self.session,
+            PK_ID,
+            HouseholdMessage,
+            HouseholdMessageOut,
+            group_id=self.group_id,
+            household_id=self.household_id,
+        )
+
+    @cached_property
+    def push_subscriptions(self) -> RepositoryPushSubscriptions:
+        return RepositoryPushSubscriptions(self.session, PK_ID, UserPushSubscription, PushSubscriptionOut)
 
     @cached_property
     def households(self) -> RepositoryHousehold:

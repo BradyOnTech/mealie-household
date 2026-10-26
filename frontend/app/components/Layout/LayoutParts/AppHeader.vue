@@ -34,6 +34,10 @@
           :class="{ 'app-masthead__link--active': activeSection === link.key }"
         >
           {{ link.title }}
+          <template v-if="link.badge">
+            <span class="app-masthead__badge" aria-hidden="true">{{ link.badge > 99 ? "99+" : link.badge }}</span>
+            <span class="d-sr-only">{{ $t("messages.unread", { count: link.badge }) }}</span>
+          </template>
         </NuxtLink>
         <v-menu v-if="moreSections.length" location="bottom start" :offset="4">
           <template #activator="{ props: menuProps }">
@@ -266,6 +270,20 @@ onBeforeUnmount(() => {
   white-space: nowrap;
   cursor: pointer;
   transition: color 0.15s ease;
+}
+
+.app-masthead__badge {
+  min-width: 18px;
+  height: 18px;
+  margin-left: 4px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: rgb(var(--v-theme-tomato));
+  color: rgb(var(--v-theme-on-tomato));
+  font-size: 0.6875rem;
+  font-weight: 700;
+  line-height: 18px;
+  text-align: center;
 }
 
 .app-masthead__link:hover {

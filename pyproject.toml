@@ -48,6 +48,7 @@ dependencies = [
     "pint==0.26.1",
     "httpx-curl-cffi==0.1.5",
     "pypdfium2==5.14.0",
+    "pywebpush==2.5.0",
 ]
 
 [project.scripts]

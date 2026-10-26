@@ -119,6 +119,18 @@ households_mealplans_today = "/api/households/mealplans/today"
 """`/api/households/mealplans/today`"""
 households_members = "/api/households/members"
 """`/api/households/members`"""
+households_messages = "/api/households/messages"
+"""`/api/households/messages`"""
+households_messages_push = "/api/households/messages/push"
+"""`/api/households/messages/push`"""
+households_messages_push_subscriptions = "/api/households/messages/push/subscriptions"
+"""`/api/households/messages/push/subscriptions`"""
+households_messages_push_test = "/api/households/messages/push/test"
+"""`/api/households/messages/push/test`"""
+households_messages_read = "/api/households/messages/read"
+"""`/api/households/messages/read`"""
+households_messages_unread = "/api/households/messages/unread"
+"""`/api/households/messages/unread`"""
 households_permissions = "/api/households/permissions"
 """`/api/households/permissions`"""
 households_preferences = "/api/households/preferences"
@@ -453,6 +465,11 @@ def households_mealplans_item_id(item_id):
 def households_mealplans_rules_item_id(item_id):
     """`/api/households/mealplans/rules/{item_id}`"""
     return f"{prefix}/households/mealplans/rules/{item_id}"
+
+
+def households_messages_message_id(message_id):
+    """`/api/households/messages/{message_id}`"""
+    return f"{prefix}/households/messages/{message_id}"
 
 
 def households_recipe_actions_item_id(item_id):

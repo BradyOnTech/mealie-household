@@ -16,7 +16,16 @@
       color="tomato"
       :ripple="false"
     >
-      <v-icon :icon="link.icon" size="22" />
+      <v-badge
+        :model-value="!!link.badge"
+        :content="link.badge"
+        max="99"
+        color="tomato"
+        offset-x="-4"
+        offset-y="2"
+      >
+        <v-icon :icon="link.icon" size="22" />
+      </v-badge>
       <span class="app-tabbar__label">{{ link.title }}</span>
     </v-btn>
     <v-btn
@@ -48,8 +57,9 @@ import { useAppNavigation } from "~/composables/use-app-navigation";
 const { primaryLinks, activeSection } = useAppNavigation();
 const { newAnnouncements } = useAnnouncements();
 
-/** Phones get three sections plus "More"; cookbooks live in the sheet. */
-const tabLinks = computed(() => primaryLinks.value.filter(link => link.key !== "cookbooks"));
+/** Phones get four sections plus "More"; cookbooks and Ask live in the sheet. */
+const IN_SHEET = new Set(["cookbooks", "ask"]);
+const tabLinks = computed(() => primaryLinks.value.filter(link => !IN_SHEET.has(link.key)));
 const moreOpen = ref(false);
 
 const route = useRoute();

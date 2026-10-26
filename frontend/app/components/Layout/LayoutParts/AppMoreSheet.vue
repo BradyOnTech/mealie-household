@@ -47,6 +47,13 @@ const sections = computed<AppNavSection[]>(() => {
   const cookbooksIndex = primaryLinks.value.find(link => link.key === "cookbooks");
   const result = moreSections.value.map(section => ({ ...section, links: [...section.links] }));
 
+  // The tab bar leaves Ask out, so it leads the sheet
+  const ask = primaryLinks.value.find(link => link.key === "ask");
+  const plan = result.find(section => section.key === "plan");
+  if (ask && plan) {
+    plan.links.unshift(ask);
+  }
+
   if (cookbooksIndex) {
     const cookbookSection = result.find(section => section.key === "cookbooks");
     if (cookbookSection) {

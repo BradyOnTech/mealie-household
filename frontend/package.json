@@ -64,7 +64,9 @@
     "unplugin-auto-import": "^21.0.0",
     "vite-plugin-commonjs": "^0.10.4",
     "vitest": "^4.0.0",
-    "vue-tsc": "^3.3.13"
+    "vue-tsc": "^3.3.13",
+    "workbox-core": "7.4.1",
+    "workbox-precaching": "7.4.1"
   },
   "devEngines": {
     "packageManager": {
