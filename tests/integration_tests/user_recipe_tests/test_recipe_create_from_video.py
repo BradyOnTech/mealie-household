@@ -1,4 +1,5 @@
 import json
+from collections.abc import Generator
 from pathlib import Path
 
 import pytest
@@ -10,15 +11,77 @@ from mealie.core import exceptions
 from mealie.schema.group.ai_providers import AIProviderCreate, AIProviderSettingsUpdate
 from mealie.schema.openai.recipe import OpenAIRecipe, OpenAIRecipeIngredient, OpenAIRecipeInstruction
 from mealie.services.openai import OpenAIService
-from mealie.services.scraper.scraper_strategies import RecipeScraperOpenAITranscription
+from mealie.services.openai.transcription import VideoInfo
+from mealie.services.recipe.recipe_data_service import RecipeDataService
+from mealie.services.scraper.scraper_strategies import RecipeScraperOpenAI
 from tests.utils import api_routes
 from tests.utils.factories import random_int, random_string
 from tests.utils.fixture_schemas import TestUser
 
 VIDEO_URL = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
 
+# What YouTube serves for a video: its title, and structured data for the video rather than a recipe
+VIDEO_PAGE = (
+    "<html><head><title>Foolproof Pan Pizza - YouTube</title>"
+    '<meta property="og:title" content="Foolproof Pan Pizza">'
+    '<script type="application/ld+json">{"@context": "https://schema.org", "@type": "VideoObject"}</script>'
+    "</head><body></body></html>"
+)
 
-def _make_openai_recipe() -> OpenAIRecipe:
+
+@pytest.fixture(autouse=True)
+def default_provider(unique_user: TestUser) -> Generator[None]:
+    """Only a default provider, like a group whose one provider is a ChatGPT plan"""
+
+    provider = unique_user.repos.group_ai_providers.create(
+        AIProviderCreate(name=random_string(), model="gpt-4o", api_key="test-key")
+    )
+    unique_user.repos.group_ai_provider_settings.update(
+        unique_user.repos.group_id,
+        AIProviderSettingsUpdate(default_provider_id=provider.id, audio_provider_id=None, image_provider_id=None),
+    )
+
+    yield
+
+    unique_user.repos.group_ai_provider_settings.update(
+        unique_user.repos.group_id,
+        AIProviderSettingsUpdate(default_provider_id=None, audio_provider_id=None, image_provider_id=None),
+    )
+
+
+@pytest.fixture(autouse=True)
+def video_page(monkeypatch: pytest.MonkeyPatch):
+    async def mock_safe_scrape_html(url: str) -> str:
+        return VIDEO_PAGE
+
+    monkeypatch.setattr(recipe_scraper_module, "safe_scrape_html", mock_safe_scrape_html)
+
+
+@pytest.fixture(autouse=True)
+def no_image_downloads(monkeypatch: pytest.MonkeyPatch):
+    async def mock_scrape_image(*_, **__) -> str:
+        return "TEST_IMAGE"
+
+    monkeypatch.setattr(RecipeDataService, "scrape_image", mock_scrape_image)
+
+
+@pytest.fixture()
+def video(monkeypatch: pytest.MonkeyPatch) -> VideoInfo:
+    """The video yt-dlp reads for any URL, which tests adjust before importing it"""
+
+    info = VideoInfo(
+        title="Foolproof Pan Pizza",
+        description=random_string(),
+        thumbnail_url="https://example.com/thumbnail.jpg",
+        captions=random_string(),
+        can_download=True,
+    )
+    monkeypatch.setattr(transcription_module, "read_video", lambda url: info)
+    return info
+
+
+@pytest.fixture()
+def openai_recipe() -> OpenAIRecipe:
     return OpenAIRecipe(
         name=random_string(),
         description=random_string(),
@@ -27,177 +90,184 @@ def _make_openai_recipe() -> OpenAIRecipe:
     )
 
 
-@pytest.fixture(autouse=True)
-def video_scraper_setup(monkeypatch: pytest.MonkeyPatch, unique_user: TestUser):
-    # Restrict to only the video scraper so other strategies don't interfere
-    monkeypatch.setattr(recipe_scraper_module, "DEFAULT_SCRAPER_STRATEGIES", [RecipeScraperOpenAITranscription])
+@pytest.fixture()
+def messages(monkeypatch: pytest.MonkeyPatch, openai_recipe: OpenAIRecipe) -> list[str]:
+    """What's sent to the AI provider, which replies to every request with `openai_recipe`"""
 
-    provider = unique_user.repos.group_ai_providers.create(
-        AIProviderCreate(name=random_string(), model="gpt-4o", api_key="test-key")
-    )
-    unique_user.repos.group_ai_provider_settings.update(
-        unique_user.repos.group_id,
-        AIProviderSettingsUpdate(
-            default_provider_id=provider.id,
-            audio_provider_id=provider.id,
-            image_provider_id=None,
-        ),
-    )
+    sent: list[str] = []
 
-    # Prevent any real HTTP calls during scraping
-    async def mock_safe_scrape_html(url: str) -> str:
-        return "<html></html>"
+    async def mock_get_response(self, prompt, message, *args, response_schema=None, **kwargs):
+        sent.append(message)
+        return openai_recipe if response_schema is OpenAIRecipe else None
 
-    monkeypatch.setattr(recipe_scraper_module, "safe_scrape_html", mock_safe_scrape_html)
+    monkeypatch.setattr(OpenAIService, "get_response", mock_get_response)
+    return sent
+
+
+def _import(api_client: TestClient, user: TestUser):
+    return api_client.post(api_routes.recipes_create_url, json={"url": VIDEO_URL}, headers=user.token)
 
 
 def test_create_recipe_from_video(
     api_client: TestClient,
-    monkeypatch: pytest.MonkeyPatch,
     unique_user: TestUser,
+    video: VideoInfo,
+    openai_recipe: OpenAIRecipe,
+    messages: list[str],
 ):
-    openai_recipe = _make_openai_recipe()
-
-    def mock_download_video(url: str, temp_path: Path):
-        return {
-            "audio": temp_path / "mealie.mp3",
-            "subtitle": None,
-            "title": random_string(),
-            "description": random_string(),
-            "thumbnail_url": "https://example.com/thumbnail.jpg",
-            "transcription": random_string(),
-        }
-
-    async def mock_get_response(self, prompt, message, *args, **kwargs) -> OpenAIRecipe | None:
-        return openai_recipe
-
-    monkeypatch.setattr(transcription_module, "download_video", mock_download_video)
-    monkeypatch.setattr(OpenAIService, "get_response", mock_get_response)
-
-    r = api_client.post(api_routes.recipes_create_url, json={"url": VIDEO_URL}, headers=unique_user.token)
+    r = _import(api_client, unique_user)
     assert r.status_code == 201
 
-    slug = json.loads(r.text)
-    r = api_client.get(api_routes.recipes_slug(slug), headers=unique_user.token)
-    assert r.status_code == 200
+    assert len(messages) == 1
+    assert video.captions in messages[0]
+    assert video.description in messages[0]
 
-    recipe = r.json()
+    recipe = api_client.get(api_routes.recipes_slug(json.loads(r.text)), headers=unique_user.token).json()
     assert recipe["name"] == openai_recipe.name
+    assert recipe["orgURL"] == VIDEO_URL
     assert len(recipe["recipeIngredient"]) == len(openai_recipe.ingredients)
     assert len(recipe["recipeInstructions"]) == len(openai_recipe.instructions)
 
 
-def test_create_recipe_from_video_uses_subtitle_over_transcription(
+def test_create_recipe_from_video_without_captions_or_audio_provider(
     api_client: TestClient,
-    monkeypatch: pytest.MonkeyPatch,
     unique_user: TestUser,
-    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    video: VideoInfo,
+    messages: list[str],
 ):
-    openai_recipe = _make_openai_recipe()
+    """Plenty of short videos write their recipe in the description"""
 
-    subtitle_text = random_string()
-    subtitle_file = tmp_path / "mealie.en.vtt"
-    subtitle_file.write_text(f"WEBVTT\n\n1\n00:00:01.000 --> 00:00:03.000\n{subtitle_text}\n")
+    video.captions = ""
 
-    def mock_download_video(url: str, temp_path: Path):
-        return {
-            "audio": temp_path / "mealie.mp3",
-            "subtitle": subtitle_file,
-            "title": random_string(),
-            "description": random_string(),
-            "thumbnail_url": None,
-            "transcription": "",
-        }
+    def fail_if_downloaded(url: str, temp_path: Path) -> Path:
+        raise AssertionError("there's no audio provider to transcribe the audio")
 
-    # transcribe_audio must NOT be called when a subtitle is available
-    async def mock_transcribe_audio(self, audio_file_path: Path) -> str | None:
-        raise AssertionError("transcribe_audio should not be called when subtitles are available")
+    monkeypatch.setattr(transcription_module, "download_audio", fail_if_downloaded)
 
-    async def mock_get_response(self, prompt, message, *args, **kwargs) -> OpenAIRecipe | None:
-        assert subtitle_text in message
-        return openai_recipe
-
-    monkeypatch.setattr(transcription_module, "download_video", mock_download_video)
-    monkeypatch.setattr(OpenAIService, "transcribe_audio", mock_transcribe_audio)
-    monkeypatch.setattr(OpenAIService, "get_response", mock_get_response)
-
-    r = api_client.post(api_routes.recipes_create_url, json={"url": VIDEO_URL}, headers=unique_user.token)
+    r = _import(api_client, unique_user)
     assert r.status_code == 201
+    assert video.description in messages[0]
+    assert "## Video transcript" not in messages[0]
 
 
-def test_create_recipe_from_video_transcription_disabled(
+def test_create_recipe_from_video_transcribes_one_without_captions(
     api_client: TestClient,
-    monkeypatch: pytest.MonkeyPatch,
     unique_user: TestUser,
+    monkeypatch: pytest.MonkeyPatch,
+    video: VideoInfo,
+    messages: list[str],
 ):
+    settings = unique_user.repos.group_ai_provider_settings.get_one(unique_user.repos.group_id)
+    assert settings
+    unique_user.repos.group_ai_provider_settings.update(
+        unique_user.repos.group_id,
+        AIProviderSettingsUpdate(
+            default_provider_id=settings.default_provider_id,
+            audio_provider_id=settings.default_provider_id,
+            image_provider_id=None,
+        ),
+    )
+
+    video.captions = ""
+    transcript = random_string()
+
+    def mock_download_audio(url: str, temp_path: Path) -> Path:
+        assert url == VIDEO_URL
+        return temp_path / "audio.mp3"
+
+    async def mock_transcribe_audio(self, audio_file_path: Path) -> str:
+        return transcript
+
+    monkeypatch.setattr(transcription_module, "download_audio", mock_download_audio)
+    monkeypatch.setattr(OpenAIService, "transcribe_audio", mock_transcribe_audio)
+
+    r = _import(api_client, unique_user)
+    assert r.status_code == 201
+    assert f"## Video transcript\n\n{transcript}" in messages[0]
+
+
+@pytest.fixture()
+def video_strategy_only(monkeypatch: pytest.MonkeyPatch):
+    """
+    Leaves only the strategy that reads videos, so a failure isn't covered up by the Open Graph
+    strategy, which saves a placeholder recipe from the page's title rather than fail
+    """
+
+    monkeypatch.setattr(recipe_scraper_module, "DEFAULT_SCRAPER_STRATEGIES", [RecipeScraperOpenAI])
+
+
+@pytest.mark.usefixtures("video_strategy_only")
+def test_create_recipe_from_video_ai_disabled(api_client: TestClient, unique_user: TestUser, video: VideoInfo):
     unique_user.repos.group_ai_provider_settings.update(
         unique_user.repos.group_id,
         AIProviderSettingsUpdate(default_provider_id=None, audio_provider_id=None, image_provider_id=None),
     )
 
-    r = api_client.post(api_routes.recipes_create_url, json={"url": VIDEO_URL}, headers=unique_user.token)
+    r = _import(api_client, unique_user)
     assert r.status_code == 400
 
 
+@pytest.mark.usefixtures("video_strategy_only")
 def test_create_recipe_from_video_download_error(
     api_client: TestClient,
-    monkeypatch: pytest.MonkeyPatch,
     unique_user: TestUser,
+    monkeypatch: pytest.MonkeyPatch,
+    messages: list[str],
 ):
-    def mock_download_video(url: str, temp_path: Path):
+    def mock_read_video(url: str) -> VideoInfo:
         raise exceptions.VideoDownloadError("Mock video download error")
 
-    monkeypatch.setattr(transcription_module, "download_video", mock_download_video)
+    monkeypatch.setattr(transcription_module, "read_video", mock_read_video)
 
-    r = api_client.post(api_routes.recipes_create_url, json={"url": VIDEO_URL}, headers=unique_user.token)
+    r = _import(api_client, unique_user)
     assert r.status_code == 400
+    assert messages == []
 
 
+@pytest.mark.usefixtures("video_strategy_only")
 def test_create_recipe_from_video_transcription_error(
     api_client: TestClient,
-    monkeypatch: pytest.MonkeyPatch,
     unique_user: TestUser,
+    monkeypatch: pytest.MonkeyPatch,
+    video: VideoInfo,
+    messages: list[str],
 ):
-    def mock_download_video(url: str, temp_path: Path):
-        return {
-            "audio": temp_path / "mealie.mp3",
-            "subtitle": None,
-            "title": random_string(),
-            "description": random_string(),
-            "thumbnail_url": None,
-            "transcription": "",
-        }
+    settings = unique_user.repos.group_ai_provider_settings.get_one(unique_user.repos.group_id)
+    assert settings
+    unique_user.repos.group_ai_provider_settings.update(
+        unique_user.repos.group_id,
+        AIProviderSettingsUpdate(
+            default_provider_id=settings.default_provider_id,
+            audio_provider_id=settings.default_provider_id,
+            image_provider_id=None,
+        ),
+    )
+
+    video.captions = ""
 
     async def mock_transcribe_audio(self, audio_file_path: Path) -> str | None:
         raise Exception("Mock transcribe audio exception")
 
-    monkeypatch.setattr(transcription_module, "download_video", mock_download_video)
+    monkeypatch.setattr(transcription_module, "download_audio", lambda url, temp_path: temp_path / "audio.mp3")
     monkeypatch.setattr(OpenAIService, "transcribe_audio", mock_transcribe_audio)
 
-    r = api_client.post(api_routes.recipes_create_url, json={"url": VIDEO_URL}, headers=unique_user.token)
+    r = _import(api_client, unique_user)
     assert r.status_code == 400
+    assert messages == []
 
 
+@pytest.mark.usefixtures("video_strategy_only")
 def test_create_recipe_from_video_empty_openai_response(
     api_client: TestClient,
-    monkeypatch: pytest.MonkeyPatch,
     unique_user: TestUser,
+    monkeypatch: pytest.MonkeyPatch,
+    video: VideoInfo,
 ):
-    def mock_download_video(url: str, temp_path: Path):
-        return {
-            "audio": temp_path / "mealie.mp3",
-            "subtitle": None,
-            "title": random_string(),
-            "description": random_string(),
-            "thumbnail_url": None,
-            "transcription": random_string(),
-        }
-
     async def mock_get_response(self, prompt, message, *args, **kwargs) -> OpenAIRecipe | None:
         return None
 
-    monkeypatch.setattr(transcription_module, "download_video", mock_download_video)
     monkeypatch.setattr(OpenAIService, "get_response", mock_get_response)
 
-    r = api_client.post(api_routes.recipes_create_url, json={"url": VIDEO_URL}, headers=unique_user.token)
+    r = _import(api_client, unique_user)
     assert r.status_code == 400

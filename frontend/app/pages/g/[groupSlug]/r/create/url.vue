@@ -11,7 +11,7 @@
         <v-card-text>
           <v-card-text class="pa-0">
             <p>{{ $t('recipe.scrape-recipe-description') }}</p>
-            <p v-if="group?.aiProviderSettings?.audioProviderEnabled">
+            <p v-if="aiEnabled">
               {{ $t('recipe.scrape-recipe-description-transcription') }}
             </p>
           </v-card-text>

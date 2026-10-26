@@ -131,11 +131,11 @@ Mealie supports various integrations using OpenAI. For more information, check o
 | OPENAI_CUSTOM_PROMPT_DIR <br/> :octicons-tag-24: v3.10.0                |    None.    | Path to custom prompt files. Only existing files in your custom directory will override the defaults; any missing or empty custom files will automatically fall back to the system defaults. See https://github.com/mealie-recipes/mealie/tree/mealie-next/mealie/services/openai/prompts for expected file names.     |
 | CODEX_BIN                                                               |   `codex`   | The [Codex CLI](https://github.com/openai/codex), which [ChatGPT subscription providers](./ai-providers.md#using-a-chatgpt-subscription) run their requests through, as a name on `PATH` or an absolute path. The Docker image includes it.                                                                             |
 
-Recipe import can also transcribe a video's audio with AI (e.g. to import a recipe from a cooking video). This uses yt-dlp to download the video, which you can configure with the env variables below:
+Recipe import can also read a recipe from a video (e.g. a cooking video on YouTube), from its captions and description, or by transcribing its audio with AI when it has no captions. This uses yt-dlp to read the video, which you can configure with the env variables below. The Docker image includes [Deno](https://deno.com/), which yt-dlp needs to read YouTube reliably; outside Docker, [install a JavaScript runtime](https://github.com/yt-dlp/yt-dlp/wiki/EJS) for yt-dlp yourself.
 
 | Variables | Default | Description |
 |-------------------------------------------------------------------------|:-----------:|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| YTDLP_COOKIEFILE | None | Cookiefile for yt-dlp to use when downloading a video, needed for content that requires sign-in |
+| YTDLP_COOKIEFILE | None | Cookiefile for yt-dlp to use when reading a video, needed for content that requires sign-in |
 
 ### Recipe Scraper
 

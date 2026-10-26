@@ -11,9 +11,7 @@
       </v-card-text>
       <v-card-text v-else>
         <p>{{ $t('recipe.import-with-ai-description') }}</p>
-        <p v-if="videosEnabled">
-          {{ $t('recipe.import-with-ai-video-description') }}
-        </p>
+        <p>{{ $t('recipe.import-with-ai-video-description') }}</p>
         <br>
         <p>
           {{ $t('recipe.import-with-ai-without-ai-question') }}
@@ -195,7 +193,6 @@ const urlImporterTarget = computed(() => `/g/${groupSlug.value}/r/create/url`);
 const htmlOrJsonImporterTarget = computed(() => `/g/${groupSlug.value}/r/create/html`);
 const aiEnabled = computed(() => !!group.value?.aiProviderSettings?.aiEnabled);
 const imagesEnabled = computed(() => !!group.value?.aiProviderSettings?.imageProviderEnabled);
-const videosEnabled = computed(() => !!group.value?.aiProviderSettings?.audioProviderEnabled);
 
 const domUrlForm = ref<VForm | null>(null);
 const recipeUrl = ref<string | null>(null);
