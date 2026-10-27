@@ -27,6 +27,7 @@ from mealie.schema.recipe.recipe_ingredient import (
     RecipeIngredient,
 )
 from mealie.schema.response.pagination import OrderDirection, PaginationQuery
+from mealie.services.household_services.shop_extras import PRODUCT_OVERRIDE, SOURCE, STORE_OVERRIDE
 from mealie.services.parser_services._base import DataMatcher
 from mealie.services.parser_services.parser_utils import UnitConverter, merge_quantity_and_unit
 
@@ -47,12 +48,12 @@ class ShoppingListService:
         """Check to see if this item can be merged with another item"""
 
         # Weekly generated demand must stay separate from manual additions and purchased rows.
-        source1 = (item1.extras or {}).get("shop.source", "manual")
-        source2 = (item2.extras or {}).get("shop.source", "manual")
+        source1 = (item1.extras or {}).get(SOURCE, "manual")
+        source2 = (item2.extras or {}).get(SOURCE, "manual")
         if source1 != source2:
             return False
         if source1 == "week":
-            for key in ("shop.store_override", "shop.product_override"):
+            for key in (STORE_OVERRIDE, PRODUCT_OVERRIDE):
                 if (item1.extras or {}).get(key) != (item2.extras or {}).get(key):
                     return False
 

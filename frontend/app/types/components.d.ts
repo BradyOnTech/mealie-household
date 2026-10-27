@@ -19,7 +19,6 @@ import type BaseKeyValueEditor from "@/components/global/BaseKeyValueEditor.vue"
 import type BaseMenu from "@/components/global/BaseMenu.vue";
 import type BaseOverflowButton from "@/components/global/BaseOverflowButton.vue";
 import type BasePageTitle from "@/components/global/BasePageTitle.vue";
-import type ButtonLink from "@/components/global/ButtonLink.vue";
 import type ContextMenu from "@/components/global/ContextMenu.vue";
 import type CrudTable from "@/components/global/CrudTable.vue";
 import type DevDumpJson from "@/components/global/DevDumpJson.vue";
@@ -62,7 +61,6 @@ declare module "vue" {
     BaseMenu: typeof BaseMenu;
     BaseOverflowButton: typeof BaseOverflowButton;
     BasePageTitle: typeof BasePageTitle;
-    ButtonLink: typeof ButtonLink;
     ContextMenu: typeof ContextMenu;
     CrudTable: typeof CrudTable;
     DevDumpJson: typeof DevDumpJson;

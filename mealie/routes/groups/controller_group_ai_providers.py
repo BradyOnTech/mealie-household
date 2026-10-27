@@ -22,8 +22,9 @@ from mealie.services.openai import OpenAIService
 from mealie.services.openai.chatgpt import (
     ChatGPTError,
     ChatGPTLogin,
-    attach_chatgpt_credential,
     chatgpt_logins,
+    finished_chatgpt_login,
+    save_with_chatgpt_login,
 )
 
 logger = get_logger()
@@ -53,30 +54,18 @@ class GroupAIProviderController(BaseUserController):
     def mixins(self):
         return HttpRepo[AIProviderCreate, AIProviderOut, AIProviderCreate](self.repos.group_ai_providers, self.logger)
 
-    def _with_chatgpt_credential(self, data: AIProviderCreate) -> AIProviderCreate:
-        try:
-            return attach_chatgpt_credential(data, self.user.id)
-        except ChatGPTError as e:
-            raise e.as_http_error() from e
-
     def _chatgpt_login(self, data: AIProviderCreate) -> ChatGPTLogin | None:
         """The sign-in a ChatGPT provider is being tested with, if it names one"""
-        if data.provider_type != AIProviderType.chatgpt or not data.chatgpt_login_id:
-            return None
-
-        login = chatgpt_logins.get(data.chatgpt_login_id, self.user.id)
-        if not login or not login.credential:
-            raise ChatGPTError("That ChatGPT sign-in has expired. Sign in again.").as_http_error()
-        return login
+        try:
+            return finished_chatgpt_login(data, self.user.id)
+        except ChatGPTError as e:
+            raise e.as_http_error() from e
 
     @providers_router.post("", response_model=AIProviderOut)
     def create_ai_provider(self, data: AIProviderCreate) -> AIProviderOut:
         self.checks.can_manage()
 
-        provider = self.mixins.create_one(self._with_chatgpt_credential(data))
-        if data.chatgpt_login_id:
-            chatgpt_logins.forget(data.chatgpt_login_id)
-        return provider
+        return save_with_chatgpt_login(data, self.user.id, self.mixins.create_one)
 
     @providers_router.post("/test", response_model=AIProviderTestResult)
     async def test_ai_provider(self, data: AIProviderCreate) -> AIProviderTestResult:
@@ -147,10 +136,9 @@ class GroupAIProviderController(BaseUserController):
     def update_ai_provider(self, provider_id: UUID4, data: AIProviderUpdate) -> AIProviderOut:
         self.checks.can_manage()
 
-        provider = self.mixins.update_one(self._with_chatgpt_credential(data), provider_id)
-        if data.chatgpt_login_id:
-            chatgpt_logins.forget(data.chatgpt_login_id)
-        return provider
+        return save_with_chatgpt_login(
+            data, self.user.id, lambda prepared: self.mixins.update_one(prepared, provider_id)
+        )
 
     @providers_router.delete("/{provider_id}", response_model=AIProviderOut)
     def delete_ai_provider(self, provider_id: UUID4) -> AIProviderOut:

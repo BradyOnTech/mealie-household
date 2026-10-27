@@ -30,6 +30,7 @@ from mealie.schema.response.pagination import OrderDirection, PaginationQuery
 from mealie.schema.user.user import PrivateUser
 from mealie.services._base_service import BaseService
 from mealie.services.household_services.groceries import GroceryService, household_today, monday
+from mealie.services.household_services.shop_extras import SOURCE
 from mealie.services.openai.openai import (
     OpenAIChatMessage,
     OpenAIDataInjection,
@@ -379,7 +380,7 @@ class HouseholdAssistant(BaseService):
                 entry["product"] = purchase.product.name
             if purchase.package_count is not None:
                 entry["packages"] = purchase.package_count
-            if any((item.extras or {}).get("shop.source") == "restock" for item in purchase.items):
+            if any((item.extras or {}).get(SOURCE) == "restock" for item in purchase.items):
                 entry["from_out_of_list"] = True
             items.append(entry)
         return {

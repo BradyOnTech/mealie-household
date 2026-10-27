@@ -208,7 +208,7 @@ def test_import_pdf_creates_every_recipe(
     assert r.status_code == 200
     assert not get_recipe(api_client, unique_user, cookbook.names[2])["image"]
 
-    # and the cookbook shows up in the sidebar, showing the recipes with its tag
+    # and the cookbook shows up under Cookbooks, showing the recipes with its tag
     tag_id = pancakes["tags"][0]["id"]
     cookbooks = api_client.get(api_routes.households_cookbooks, headers=unique_user.token).json()["items"]
     [added] = [cookbook for cookbook in cookbooks if cookbook["name"] == book_name]

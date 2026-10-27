@@ -49,16 +49,19 @@ from mealie.schema.recipe.recipe import RecipeSummary
 from mealie.schema.recipe.recipe_ingredient import IngredientFood, IngredientUnit
 from mealie.schema.response.pagination import OrderDirection, PaginationQuery
 from mealie.services._base_service import BaseService
+from mealie.services.household_services.shop_extras import (
+    PRODUCT_OVERRIDE,
+    PURCHASED_AMOUNT,
+    PURCHASED_UNIT,
+    RESTOCK_ID,
+    SATISFIED,
+    SOURCE,
+    STORE_OVERRIDE,
+)
 from mealie.services.household_services.shopping_lists import ShoppingListService
 from mealie.services.parser_services.parser_utils import UnitConverter
 from mealie.services.query_filter.builder import QueryFilterBuilder
 
-SOURCE = "shop.source"
-STORE_OVERRIDE = "shop.store_override"
-PRODUCT_OVERRIDE = "shop.product_override"
-PURCHASED_AMOUNT = "shop.purchased_amount"
-PURCHASED_UNIT = "shop.purchased_unit"
-RESTOCK_ID = "shop.restock_id"
 EPSILON = 1e-8
 RESTOCK_RECENT = timedelta(days=14)
 """How long a bought item stays under "recently bought" on the Out of list"""
@@ -339,7 +342,7 @@ class GroceryService(BaseService):
                 if in_item is not None:
                     item.quantity = max(0.0, item.quantity - in_item)
                     if item.quantity <= EPSILON:
-                        item.extras = {**(item.extras or {}), "shop.satisfied": "true"}
+                        item.extras = {**(item.extras or {}), SATISFIED: "true"}
                     remaining -= deduction
                     self._scale_references(item, (in_rule - deduction) / in_rule if in_rule else 0)
         if skip_on_hand:
@@ -355,7 +358,7 @@ class GroceryService(BaseService):
                     and household.slug in foods[item.food_id].households_with_ingredient_food
                 )
             ]
-        return [item for item in desired if (item.extras or {}).get("shop.satisfied") != "true"]
+        return [item for item in desired if (item.extras or {}).get(SATISFIED) != "true"]
 
     @staticmethod
     def _scale_references(item: ShoppingListItemCreate, factor: float) -> None:
