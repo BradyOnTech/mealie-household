@@ -49,6 +49,8 @@ dependencies = [
     "httpx-curl-cffi==0.1.5",
     "pypdfium2==5.14.0",
     "pywebpush==2.5.0",
+    "py-vapid==1.9.6",
+    "cryptography==50.0.1",
 ]
 
 [project.scripts]

@@ -659,16 +659,42 @@ class _AIProviderWithCredential(AIProviderUpdate):
     chatgpt_credential: str
 
 
-def attach_chatgpt_credential(data: AIProviderCreate, user_id: UUID) -> AIProviderCreate:
+def finished_chatgpt_login(data: AIProviderCreate, user_id: UUID) -> ChatGPTLogin | None:
     """
-    Swap the finished sign-in a ChatGPT provider names (`chatgpt_login_id`) for the credential it
-    produced, ready to be saved. Anything else is returned as it is.
+    The finished sign-in a ChatGPT provider names (`chatgpt_login_id`), or None when it names none.
+    Raises `ChatGPTAuthError` when the sign-in has expired or was never finished.
     """
     if data.provider_type != AIProviderType.chatgpt or not data.chatgpt_login_id:
-        return data
+        return None
 
     login = chatgpt_logins.get(data.chatgpt_login_id, user_id)
     if not login or not login.credential:
         raise ChatGPTAuthError("That ChatGPT sign-in has expired. Sign in again.")
+    return login
 
+
+def attach_chatgpt_credential(data: AIProviderCreate, user_id: UUID) -> AIProviderCreate:
+    """
+    Swap the finished sign-in a ChatGPT provider names for the credential it produced, ready to be
+    saved. Anything else is returned as it is.
+    """
+    login = finished_chatgpt_login(data, user_id)
+    if not login:
+        return data
     return _AIProviderWithCredential.model_validate({**data.model_dump(), "chatgpt_credential": login.credential})
+
+
+def save_with_chatgpt_login[T](data: AIProviderCreate, user_id: UUID, save: Callable[[AIProviderCreate], T]) -> T:
+    """
+    Save a provider through `save`, with the credential of the ChatGPT sign-in it names, then let that
+    sign-in go. An expired sign-in becomes a 400 response.
+    """
+    try:
+        prepared = attach_chatgpt_credential(data, user_id)
+    except ChatGPTError as e:
+        raise e.as_http_error() from e
+
+    saved = save(prepared)
+    if data.chatgpt_login_id:
+        chatgpt_logins.forget(data.chatgpt_login_id)
+    return saved

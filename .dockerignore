@@ -40,3 +40,6 @@ tests/.temp
 frontend/.nuxt
 frontend/.output
 mealie/household-source.zip
+
+# Local design prototypes; the image bundles a source archive of the build context
+dev/prototypes

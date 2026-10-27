@@ -98,8 +98,7 @@
                 rounded
                 variant="outlined"
                 color="grey-lighten-1"
-                class="text-subtitle-2 d-flex mx-auto"
-                style="width: fit-content;"
+                class="text-subtitle-2 d-flex mx-auto setup-skip"
               >
                 {{ $t('admin.setup.already-set-up-bring-to-homepage') }}
               </v-btn>
@@ -641,6 +640,21 @@ async function onFinish() {
 </script>
 
 <style>
+/* The label is long; let it wrap on phones rather than run past the button */
+.setup-skip {
+  width: fit-content;
+  max-width: 100%;
+  height: auto !important;
+  min-height: 36px;
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+
+.setup-skip .v-btn__content {
+  white-space: normal;
+  text-align: center;
+}
+
 .icon-white {
   fill: white;
 }

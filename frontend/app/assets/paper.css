@@ -192,10 +192,6 @@ body,
   /* ----------------------------------------------------------------------------------------------
    * Editorial building blocks, shared by the redesigned pages.
    * -------------------------------------------------------------------------------------------- */
-  .paper-serif {
-    font-family: var(--paper-serif);
-    font-optical-sizing: auto;
-  }
   .paper-kicker {
     display: block;
     font-family: var(--paper-sans);
@@ -224,21 +220,6 @@ body,
   }
   .paper-muted {
     color: rgb(var(--v-theme-ink-muted));
-  }
-  .paper-accent {
-    color: rgb(var(--v-theme-tomato));
-  }
-  .paper-rule {
-    border-bottom: 1px solid rgb(var(--v-theme-rule));
-  }
-  .paper-rule-top {
-    border-top: 1px solid rgb(var(--v-theme-rule));
-  }
-  .paper-rule-ink {
-    border-bottom: 1px solid rgb(var(--v-theme-on-background));
-  }
-  .paper-double-rule {
-    border-bottom: 3px double rgb(var(--v-theme-rule));
   }
   .paper-section-title {
     display: flex;

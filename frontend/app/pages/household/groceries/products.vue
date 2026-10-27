@@ -17,12 +17,12 @@
     <v-alert v-if="error" type="error" closable class="mb-4" @click:close="error = ''">
       {{ error }}
     </v-alert>
-    <v-tabs v-model="tab" color="primary" class="catalog-tabs mb-6">
+    <v-tabs v-model="tab" color="primary" :grow="xs" class="catalog-tabs mb-6">
       <v-tab value="products">
         {{ $t('groceries.catalog') }}
       </v-tab>
       <v-tab value="rules">
-        {{ $t('groceries.pantry') }} &amp; {{ $t('groceries.staples') }}
+        {{ $t('groceries.rules-tab') }}
       </v-tab>
     </v-tabs>
     <v-progress-linear v-if="loading" indeterminate color="primary" class="mb-4" />
@@ -154,6 +154,8 @@ import type { GroceryFoodRuleOut, GroceryProductOut } from "~/lib/api/types/groc
 
 definePageMeta({ middleware: ["household-only"] });
 const route = useRoute();
+// On phones the two tabs share the width, so neither label runs off the edge
+const { xs } = useDisplay();
 const { api, products, rules, foods, error, loading, load } = useGroceryCatalog();
 const tab = ref("products");
 const search = ref("");

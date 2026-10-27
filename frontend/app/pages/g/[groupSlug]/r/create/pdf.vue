@@ -232,7 +232,7 @@ async function refreshActiveReport() {
   if (!importing.value) {
     pause();
     fetchReports();
-    // the import may have added a cookbook to the sidebar, and tags
+    // the import may have added a cookbook to the navigation, and tags
     cookbooks.actions.refresh();
     tags.actions.refresh();
   }

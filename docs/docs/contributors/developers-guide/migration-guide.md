@@ -40,7 +40,7 @@ AI recipe creation is now a workflow of separate steps, each with its own prompt
 | `recipes/parse-recipe-image.txt` | `recipes/compile-source.txt` and `recipes/build-recipe.txt` |
 | — | `recipes/resolve-organizers.txt` (new) |
 
-`compile-source.txt` transcribes whatever the user supplied, and `build-recipe.txt` turns that transcription into recipe data. Overrides of the removed files are ignored. `recipes/parse-recipe-video.txt` and `recipes/parse-recipe-ingredients.txt` are unchanged.
+`compile-source.txt` transcribes whatever the user supplied, and `build-recipe.txt` turns that transcription into recipe data. Overrides of the removed files are ignored. `recipes/parse-recipe-ingredients.txt` is unchanged. `recipes/parse-recipe-video.txt` is removed too: videos go through the same import, reading the video's captions and description.
 
 ## V1 → V2
 

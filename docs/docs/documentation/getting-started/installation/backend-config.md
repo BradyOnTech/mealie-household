@@ -20,6 +20,7 @@
 | LOG_CONFIG_OVERRIDE           |                       | Override the config for logging with a custom path                                                                                                      |
 | LOG_LEVEL                     |         info          | Logging level (e.g. critical, error, warning, info, debug)                                                                                              |
 | DAILY_SCHEDULE_TIME           |         23:45         | The time of day to run daily server tasks, in HH:MM format. Use the server's local time, *not* UTC                                                      |
+| WEB_PUSH_SUBJECT              |                       | Contact for push notification services, as `mailto:you@example.com` or an https URL. Defaults to `BASE_URL`'s host when that's a public https address, then `SMTP_FROM_EMAIL`, then `https://mealie.io` |
 
 <super>\*</super> Starting in v1.4.0 this was changed to default to `false` as part of a security review of the application.
 

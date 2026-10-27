@@ -13,8 +13,8 @@ docker compose -f compose.household.yml up -d --build
 
 Open `http://localhost:9925`. On a new installation, Mealie's initial account is
 `changeme@example.com` / `MyPassword`. Change its password on first login.
-Set `BASE_URL` in `compose.household.yml` to the address your household will actually use,
-such as your server's local hostname. The time zone defaults to America/Chicago.
+Set `MEALIE_BASE_URL` in a `.env` file next to `compose.household.yml` to the address your household will
+actually use (see below). The time zone defaults to America/Chicago.
 
 Use Mealie's admin interface or household invitation flow to put family members in the same
 **group and household**. Public registration is disabled in the supplied Compose configuration.
@@ -45,26 +45,19 @@ Enable [Prevent automatic sleeping when the display is off](https://support.appl
 in System Settings so the phone can reach the app while you are away.
 After a reboot, verify Docker and Tailscale are running before testing phone access.
 
-If the `tailscale` command is unavailable on macOS, use the CLI included in the application:
-
-```bash
-/Applications/Tailscale.app/Contents/MacOS/Tailscale serve --bg --https=8443 http://127.0.0.1:9925
-/Applications/Tailscale.app/Contents/MacOS/Tailscale serve status
-```
-
-Run those commands after starting the app as described below.
-
-Start the app and then its HTTPS proxy on the same host:
-
-This project uses HTTPS port `8443` so an existing service on the host's default HTTPS port can keep running.
-Check `tailscale serve status` first; if `8443` is already used, choose another free HTTPS port
-and include that same port in `MEALIE_BASE_URL`.
+Start the app and then its HTTPS proxy on the same host. These commands use HTTPS port `8443`, so an existing
+service on the host's default HTTPS port can keep running. Check `tailscale serve status` first; if `8443` is
+already used, choose another free HTTPS port and include that same port in `MEALIE_BASE_URL`.
+(The household's own install uses `8445`; [DEPLOY.md](DEPLOY.md) describes it.)
 
 ```bash
 MEALIE_BIND_IP=127.0.0.1 docker compose -f compose.household.yml up -d --build
 tailscale serve --bg --https=8443 http://127.0.0.1:9925
 tailscale serve status
 ```
+
+If the `tailscale` command is unavailable on macOS, use the CLI included in the application,
+`/Applications/Tailscale.app/Contents/MacOS/Tailscale`.
 
 Serve reports an address such as `https://your-host.your-tailnet.ts.net:8443`. Put the actual address
 and the bind setting in the project's `.env` file so they survive future Compose commands:
@@ -262,25 +255,23 @@ it requires a signed-in household user and contains source/build instructions wi
   `use-web-push.ts`: the Messages page, the unread count, and turning notifications on.
 - `frontend/service-worker/sw.ts`: the app's service worker. It precaches the build and shows notifications.
 
-One Alembic migration adds the three grocery tables, a second adds the Out of list, and a third adds messages,
-read markers and push subscriptions. When merging a later upstream release with new migrations,
+The fork adds four Alembic migrations: the three grocery tables, ChatGPT subscription AI providers, the Out of
+list, and messages with read markers and push subscriptions. When merging a later upstream release with new migrations,
 check for multiple Alembic heads and create/test an Alembic merge revision when required.
 Preferences live in household tables so a shared Food does not impose one household's preferred products on another.
 
 ## Validation
 
-Focused tests cover aggregation, repeated generation, store fallbacks, overrides, purchased package overage,
-pantry snapshots, recurring rules, manual additions, validation, authentication, and tenant isolation.
-The existing shopping-list regression tests are included in verification.
-Verification passed 76 backend tests, 125 focused frontend tests, backend lint/type checks, and SQLite migration
-upgrade, rollback, and re-upgrade. The new migration also renders successfully for PostgreSQL; a live PostgreSQL
-server was not used in these checks. Desktop and mobile browser checks cover login, list generation and repeat
-updates, dinner suggestions, product overrides, manual items, new-product entry, ingredient permissions, and
-the signed-in source download.
+Each feature has integration tests in `tests/integration_tests/user_household_tests/` (groceries, the Out of
+list, Common items, the assistant, Messages) and unit tests under `tests/unit_tests/`. They cover aggregation,
+repeated generation, store fallbacks, overrides, package overage, pantry snapshots, recurring rules, manual
+additions, validation, authentication, and isolation between households. Before each merge, the full backend
+suite, the frontend tests, lint, and type checks run, and new migrations are upgraded, downgraded and re-upgraded
+on SQLite. Migrations haven't been run against a live PostgreSQL server.
 
-The frontend production build succeeds. Full frontend type checking reports the same existing errors on the
-unmodified v3.28.0 checkout and this fork; no additional errors are reported in the grocery feature files.
-Docker image execution itself requires a Docker host and is not validated by the browser/runtime checks.
+Full frontend type checking reports errors that are already in upstream v3.28.0; the fork's own files add none.
+The production Docker image runs on the household Mac mini; [DEPLOY.md](DEPLOY.md) covers building and
+checking it.
 
 ## License
 

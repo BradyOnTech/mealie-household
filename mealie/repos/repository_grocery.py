@@ -23,6 +23,7 @@ from mealie.db.models.recipe.labels import MultiPurposeLabel
 from mealie.schema.grocery.grocery import GroceryRestockOut, GroceryWeekOut
 from mealie.schema.household.group_shopping_list import ShoppingListItemCreate, ShoppingListItemUpdateBulk
 from mealie.schema.recipe.recipe_ingredient import IngredientUnit
+from mealie.services.household_services.shop_extras import WEEK
 
 from .repository_generic import HouseholdRepositoryGeneric
 
@@ -113,7 +114,7 @@ class RepositoryGroceryWeek(HouseholdRepositoryGeneric[GroceryWeekOut, GroceryWe
                 group_id=self.group_id,
                 user_id=user_id,
                 name=f"Groceries · {week_start.isoformat()}",
-                extras={"shop.week": week_start.isoformat()},
+                extras={WEEK: week_start.isoformat()},
             )
             self.session.add(shopping_list)
             self.session.flush()

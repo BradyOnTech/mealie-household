@@ -148,7 +148,10 @@ class AppSettings(AppLoggingSettings):
         return self.BASE_URL == "http://localhost:8080"
 
     WEB_PUSH_SUBJECT: str | None = None
-    """contact for push services, as `mailto:you@example.com` or an https URL; defaults to BASE_URL's host"""
+    """
+    contact for push services, as `mailto:you@example.com` or an https URL. Defaults to BASE_URL's host when that's
+    a public https address, then SMTP_FROM_EMAIL, then https://mealie.io
+    """
 
     STATIC_FILES: str = str(PACKAGE_DIR / "frontend")
     """path to static files directory (ex. `mealie/dist`)"""

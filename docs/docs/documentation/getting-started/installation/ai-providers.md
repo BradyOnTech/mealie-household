@@ -98,7 +98,7 @@ The import happens in two passes:
 1. **Finding the recipes.** The text of the PDF's pages goes to your default provider a couple of dozen pages at a time, and it lists each recipe and the pages it's on. Tables of contents, introductions, and section pages are skipped.
 2. **Importing them.** Each recipe is read from the text of its pages, along with an image of each page if you've configured an image provider. Designed cookbooks often store their text out of reading order, so the page images let the AI see which heading, ingredient, and step goes where. Without an image provider, only the text is read.
 
-Each recipe's photo is cut straight out of the PDF, cropped the way the page shows it, so photos are imported even without an image provider. Every recipe is tagged with the cookbook's name and gets a note saying which page it came from. Unless you turn it off, the cookbook is also added to the sidebar, showing the recipes with its tag. You can optionally have tags, categories, and tools added to each recipe too, which takes one more AI request per recipe.
+Each recipe's photo is cut straight out of the PDF, cropped the way the page shows it, so photos are imported even without an image provider. Every recipe is tagged with the cookbook's name and gets a note saying which page it came from. Unless you turn it off, the cookbook is also added under **Cookbooks**, showing the recipes with its tag. You can optionally have tags, categories, and tools added to each recipe too, which takes one more AI request per recipe.
 
 A PDF with no text in it, such as a scanned book, can still be imported if you have an image provider, since every page is then read from an image of it. That's slower, and takes more of your provider's usage.
 

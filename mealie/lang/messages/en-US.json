@@ -29,7 +29,7 @@
             "provider-returned-nothing": "The AI provider did not return a recipe",
             "unknown-error": "Something went wrong while creating the recipe. Please try again",
             "unreadable-source": "Unable to read any content from the provided source",
-            "video-download-failed": "Unable to download the video. It may be private, removed, or from an unsupported site",
+            "video-download-failed": "Unable to read the video. It may be private, removed, or from an unsupported site",
             "video-has-no-captions": "This video has no captions or description to read a recipe from. Set up an audio provider in your group's AI settings to have videos like this one transcribed"
         },
         "pdf-import": {
