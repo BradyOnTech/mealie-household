@@ -65,7 +65,9 @@ class GroupAIProviderController(BaseUserController):
     def create_ai_provider(self, data: AIProviderCreate) -> AIProviderOut:
         self.checks.can_manage()
 
-        return save_with_chatgpt_login(data, self.user.id, self.mixins.create_one)
+        provider = save_with_chatgpt_login(data, self.user.id, self.mixins.create_one)
+        self.repos.group_ai_provider_settings.adopt(provider)
+        return provider
 
     @providers_router.post("/test", response_model=AIProviderTestResult)
     async def test_ai_provider(self, data: AIProviderCreate) -> AIProviderTestResult:

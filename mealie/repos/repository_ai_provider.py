@@ -122,3 +122,32 @@ class GroupRepositoryAIProviderSettings(GroupRepositoryGeneric[AIProviderSetting
                 )
 
         return super().update(match_value, new_data)
+
+    def adopt(self, provider: AIProviderOut) -> AIProviderSettingsOut | None:
+        """
+        Give a provider someone just added the jobs no provider has yet, so a group's first provider turns AI on
+        without a second step. It becomes the default provider, and a ChatGPT one, which reads images, the image
+        provider too. Audio is left alone: a ChatGPT provider can't transcribe, and whether an API-key one can
+        depends on its model.
+        """
+        settings = self.get_one(self.group_id) if self.group_id else None
+        if settings is None:
+            return None
+
+        updates: dict[str, UUID4] = {}
+        if not settings.default_provider_id:
+            updates["default_provider_id"] = provider.id
+        if not settings.image_provider_id and provider.provider_type == AIProviderType.chatgpt:
+            updates["image_provider_id"] = provider.id
+        if not updates:
+            return settings
+
+        return self.update(
+            self.group_id,
+            {
+                "default_provider_id": settings.default_provider_id,
+                "audio_provider_id": settings.audio_provider_id,
+                "image_provider_id": settings.image_provider_id,
+                **updates,
+            },
+        )

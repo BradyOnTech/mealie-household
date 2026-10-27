@@ -10,7 +10,7 @@ To set up AI providers, visit your group settings.
 
 [Group Settings Demo](https://demo.mealie.io/group){ .md-button .md-button--primary }
 
-- To enable AI features at all, you *must* set a default provider (e.g. `gpt-5`)
+- To enable AI features at all, you *must* set a default provider (e.g. `gpt-5`). The first provider you add becomes the default automatically, and a ChatGPT subscription provider also becomes the image provider when there isn't one, since it can read images
 - To enable image recognition features, such as creating a recipe from an image, configure a provider capable of image recognition (e.g. `gpt-5`)
 - To transcribe videos that have no captions when importing them, configure a provider capable of audio transcriptions (e.g. `whisper-1`). Videos with captions don't need one
 
@@ -24,9 +24,12 @@ While Mealie has prompts for each AI task, you can override these with your own 
 
 ### Using a ChatGPT subscription
 
-Instead of an API key, a provider can use a ChatGPT plan (Plus, Pro, Business, and so on), so its requests count against the plan's usage limits rather than being billed as API usage. When you create the provider, choose **ChatGPT subscription** as the provider type and click **Sign in with ChatGPT**. Mealie shows a link and a short code: open the link on any device, sign in to ChatGPT, and enter the code. Nothing has to reach Mealie from OpenAI's site, so this works however Mealie is hosted.
+Instead of an API key, a provider can use a ChatGPT plan (Plus, Pro, Business, and so on), so its requests count against the plan's usage limits rather than being billed as API usage. Nothing has to reach Mealie from OpenAI's site, so this works however Mealie is hosted.
 
-If OpenAI won't accept the code, turn on device code sign-in for Codex in your ChatGPT security settings. On a workspace plan, a workspace admin may need to allow it.
+1. **Allow sign-in with a code.** In ChatGPT, open **Settings → Security** and turn on **Device code authorization for Codex**. ChatGPT turns codes down until this is on, with "Sorry, something went wrong" on OpenAI's page. On a workspace plan (Business, Enterprise, Edu), a workspace admin has to allow it.
+2. **Add the provider.** Click **Add AI provider**, choose **ChatGPT subscription**, and click **Get a sign-in code**.
+3. **Enter the code.** Click **Copy code and open OpenAI**, sign in to ChatGPT if it asks, paste the code, and approve. You can do this on any device. Codes last 15 minutes.
+4. **Save it.** Mealie notices the sign-in, checks the connection, and you click **Add**.
 
 A few things to know:
 

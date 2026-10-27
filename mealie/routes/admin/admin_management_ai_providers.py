@@ -30,7 +30,10 @@ class AdminGroupAIProviderController(BaseAdminController):
 
     @router.post("/providers", response_model=AIProviderOut, tags=["Admin: AI Providers"])
     def create_ai_provider(self, group_id: UUID4, data: AIProviderCreate):
-        return save_with_chatgpt_login(data, self.user.id, self._mixins(group_id).create_one)
+        provider = save_with_chatgpt_login(data, self.user.id, self._mixins(group_id).create_one)
+        if provider:
+            self._group_repos(group_id).group_ai_provider_settings.adopt(provider)
+        return provider
 
     @router.get("/providers/{provider_id}", response_model=AIProviderOut, tags=["Admin: AI Providers"])
     def get_ai_provider(self, group_id: UUID4, provider_id: UUID4):

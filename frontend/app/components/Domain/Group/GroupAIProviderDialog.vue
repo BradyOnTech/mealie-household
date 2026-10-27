@@ -1,47 +1,80 @@
 <template>
   <BaseDialog
     v-model="dialog"
-    :title="isEdit ? $t('group.ai-provider-settings.edit-provider') : $t('group.ai-provider-settings.create-provider')"
+    :title="isEdit ? $t('group.ai-provider-settings.edit-provider') : $t('group.ai-provider-settings.add-provider')"
     :icon="$globals.icons.robot"
     :loading="loading"
+    width="560"
     can-submit
     :submit-icon="isEdit ? $globals.icons.save : $globals.icons.createAlt"
-    :submit-text="isEdit ? $t('general.update') : $t('general.create')"
+    :submit-text="isEdit ? $t('general.update') : $t('group.ai-provider-settings.add')"
     :submit-disabled="submitDisabled"
+    disable-submit-on-enter
     @submit="handleSubmit"
     @close="resetForm"
   >
-    <v-card-text v-if="init" style="max-height: 70vh; overflow-y: auto;">
-      <v-form ref="form" v-no-autofill>
-        <v-select
-          v-model="formData.providerType"
-          :label="$t('group.ai-provider-settings.provider-type')"
-          :items="providerTypes"
-          :disabled="isEdit"
-          :hint="isChatGPT ? $t('group.ai-provider-settings.chatgpt-description') : undefined"
-          :persistent-hint="isChatGPT"
-          density="compact"
-          variant="outlined"
-          class="mb-4"
-        />
-        <v-text-field
-          v-model="formData.name"
-          :label="$t('group.ai-provider-settings.provider-name')"
-          :rules="[validators.required]"
-          density="compact"
-          variant="outlined"
-          class="mb-4"
-        />
-        <v-text-field
-          v-model="formData.model"
-          :label="$t('group.ai-provider-settings.model')"
-          :hint="$t(isChatGPT ? 'group.ai-provider-settings.chatgpt-model-description' : 'group.ai-provider-settings.model-description')"
-          :rules="isChatGPT ? [] : [validators.required]"
-          density="compact"
-          variant="outlined"
-          class="mb-4"
-        />
-        <template v-if="!isChatGPT">
+    <v-card-text v-if="init" class="ai-provider-dialog">
+      <v-form ref="form" v-no-autofill @submit.prevent>
+        <!-- How to connect: a choice when adding, a label when editing -->
+        <fieldset v-if="!isEdit" class="ai-provider-types">
+          <legend class="ai-provider-dialog__label">
+            {{ $t('group.ai-provider-settings.how-to-connect') }}
+          </legend>
+          <button
+            v-for="option in providerOptions"
+            :key="option.value"
+            type="button"
+            class="ai-provider-type"
+            :class="{ 'ai-provider-type--active': formData.providerType === option.value }"
+            :aria-pressed="formData.providerType === option.value"
+            @click="chooseType(option.value)"
+          >
+            <span class="ai-provider-type__title">
+              {{ option.title }}
+              <span v-if="option.recommended" class="ai-provider-type__badge">{{ $t('group.ai-provider-settings.recommended') }}</span>
+            </span>
+            <span class="ai-provider-type__text">{{ option.description }}</span>
+          </button>
+        </fieldset>
+        <p v-else class="ai-provider-dialog__label">
+          {{ isChatGPT ? $t('group.ai-provider-settings.provider-type-chatgpt') : $t('group.ai-provider-settings.provider-type-api-key') }}
+        </p>
+
+        <template v-if="isChatGPT">
+          <p v-if="!isEdit" class="ai-provider-dialog__intro">
+            {{ $t('group.ai-provider-settings.chatgpt-description') }}
+          </p>
+          <GroupChatGPTSignIn
+            ref="signIn"
+            v-model:login="login"
+            :saved-account="savedAccount"
+            class="mb-6"
+            @connected="onConnected"
+          />
+          <v-text-field
+            v-model="formData.name"
+            :label="$t('group.ai-provider-settings.provider-name')"
+            :hint="$t('group.ai-provider-settings.provider-name-description')"
+            :rules="[validators.required]"
+            density="compact"
+            variant="outlined"
+            class="mb-4"
+          />
+        </template>
+
+        <template v-else>
+          <p v-if="!isEdit" class="ai-provider-dialog__intro">
+            {{ $t('group.ai-provider-settings.api-key-intro') }}
+          </p>
+          <v-text-field
+            v-model="formData.name"
+            :label="$t('group.ai-provider-settings.provider-name')"
+            :hint="$t('group.ai-provider-settings.provider-name-description')"
+            :rules="[validators.required]"
+            density="compact"
+            variant="outlined"
+            class="mb-4"
+          />
           <v-text-field
             v-model="formData.apiKey"
             :label="$t('group.ai-provider-settings.api-key')"
@@ -55,6 +88,16 @@
             density="compact"
             variant="outlined"
             type="password"
+            autocomplete="off"
+            class="mb-4"
+          />
+          <v-text-field
+            v-model="formData.model"
+            :label="$t('group.ai-provider-settings.model')"
+            :hint="$t('group.ai-provider-settings.model-description')"
+            :rules="[validators.required]"
+            density="compact"
+            variant="outlined"
             class="mb-4"
           />
           <v-text-field
@@ -66,107 +109,60 @@
             class="mb-4"
           />
         </template>
-        <v-number-input
-          v-model.number="formData.timeout"
-          :label="$t('group.ai-provider-settings.request-timeout-seconds')"
-          type="number"
-          :min="0"
-          hide-details
-          density="compact"
-          variant="outlined"
-          class="mb-4"
-        />
 
-        <div v-if="isChatGPT">
-          <v-alert
-            v-if="login?.state === 'waiting'"
-            type="info"
-            density="compact"
-            variant="tonal"
-            class="mb-3"
-          >
-            <div>{{ $t('group.ai-provider-settings.chatgpt-sign-in-instructions') }}</div>
-            <a :href="login.verificationUrl ?? undefined" target="_blank" rel="noopener noreferrer">
-              {{ login.verificationUrl }}
-            </a>
-            <div class="d-flex align-center my-2">
-              <code class="text-h6 font-weight-bold" style="letter-spacing: 0.1em;">{{ login.userCode }}</code>
-              <AppButtonCopy :copy-text="login.userCode ?? ''" icon class="ms-2" />
-            </div>
-            <div class="text-caption">
-              {{ $t('group.ai-provider-settings.chatgpt-waiting') }}
-            </div>
-          </v-alert>
-          <v-alert
-            v-else-if="login?.state === 'failed' || login?.state === 'expired'"
-            type="error"
-            density="compact"
-            variant="tonal"
-            class="mb-3"
-          >
-            {{ login.error || $t('group.ai-provider-settings.chatgpt-sign-in-failed') }}
-          </v-alert>
-          <v-alert
-            v-else-if="signedInAccount !== undefined"
-            type="success"
-            density="compact"
-            variant="tonal"
-            class="mb-3"
-          >
-            {{ signedInAccount
-              ? $t('group.ai-provider-settings.chatgpt-signed-in-as', [signedInAccount])
-              : $t('group.ai-provider-settings.chatgpt-signed-in') }}
-          </v-alert>
-
-          <div class="d-flex align-center flex-wrap ga-2 mb-2">
-            <BaseButton
-              v-if="login?.state !== 'waiting'"
-              :loading="startingLogin"
-              :icon="$globals.icons.user"
-              :text="signedInAccount !== undefined
-                ? $t('group.ai-provider-settings.chatgpt-use-different-account')
-                : $t('group.ai-provider-settings.chatgpt-sign-in')"
-              @click="startLogin"
-            />
-            <BaseButton v-else cancel @click="cancelLogin" />
-          </div>
-          <div class="text-caption text-medium-emphasis">
-            {{ $t('group.ai-provider-settings.chatgpt-device-code-help') }}
-          </div>
-        </div>
-
-        <v-expansion-panels v-else v-model="advancedPanel" variant="accordion">
-          <v-expansion-panel>
-            <v-expansion-panel-title class="text-subtitle-2" expand-icon="$expand" collapse-icon="$expand">
+        <v-expansion-panels v-model="advancedPanel" variant="accordion" class="ai-provider-dialog__advanced">
+          <v-expansion-panel value="advanced" elevation="0">
+            <v-expansion-panel-title class="text-subtitle-2">
               {{ $t('search.advanced') }}
             </v-expansion-panel-title>
-            <v-expansion-panel-text class="px-0">
-              <div class="mb-2 text-subtitle-2">
-                {{ $t('group.ai-provider-settings.request-headers') }}
-              </div>
-              <BaseKeyValueEditor
-                v-model="formData.requestHeaders"
+            <v-expansion-panel-text>
+              <v-text-field
+                v-if="isChatGPT"
+                v-model="formData.model"
+                :label="$t('group.ai-provider-settings.model')"
+                :hint="$t('group.ai-provider-settings.chatgpt-model-description')"
+                persistent-hint
+                density="compact"
+                variant="outlined"
                 class="mb-4"
               />
-              <v-divider class="mb-4" />
-              <div class="mb-2 text-subtitle-2">
-                {{ $t('group.ai-provider-settings.request-params') }}
-              </div>
-              <BaseKeyValueEditor
-                v-model="formData.requestParams"
+              <v-number-input
+                v-model.number="formData.timeout"
+                :label="$t('group.ai-provider-settings.request-timeout-seconds')"
+                :hint="$t('group.ai-provider-settings.request-timeout-description')"
+                persistent-hint
+                :min="0"
+                density="compact"
+                variant="outlined"
+                class="mb-4"
               />
+              <template v-if="!isChatGPT">
+                <div class="mb-2 text-subtitle-2">
+                  {{ $t('group.ai-provider-settings.request-headers') }}
+                </div>
+                <BaseKeyValueEditor v-model="formData.requestHeaders" class="mb-4" />
+                <v-divider class="mb-4" />
+                <div class="mb-2 text-subtitle-2">
+                  {{ $t('group.ai-provider-settings.request-params') }}
+                </div>
+                <BaseKeyValueEditor v-model="formData.requestParams" />
+              </template>
             </v-expansion-panel-text>
           </v-expansion-panel>
         </v-expansion-panels>
 
+        <div v-if="testing" class="ai-provider-dialog__testing" role="status">
+          <v-progress-circular indeterminate size="16" width="2" color="primary" />
+          {{ $t('group.ai-provider-settings.testing-connection') }}
+        </div>
         <v-alert
-          v-if="testResult"
+          v-else-if="testResult"
           :type="testResult.success ? 'success' : 'error'"
           density="compact"
           variant="tonal"
           class="mt-4"
         >
-          {{ connectionMessage }}{{ imageSupportMessage }}
+          {{ connectionMessage }}
         </v-alert>
       </v-form>
     </v-card-text>
@@ -186,7 +182,7 @@
 </template>
 
 <script setup lang="ts">
-import { useIntervalFn } from "@vueuse/core";
+import GroupChatGPTSignIn from "~/components/Domain/Group/GroupChatGPTSignIn.vue";
 import { useAIProviders } from "~/composables/use-ai-providers";
 import { validators } from "~/composables/use-validators";
 import type {
@@ -200,8 +196,11 @@ import type { AIProviderPayload } from "~/lib/api/user/group-ai-providers";
 
 const props = withDefaults(defineProps<{
   providerId?: string;
+  /** Which kind a new provider starts as */
+  initialType?: AIProviderType;
 }>(), {
   providerId: undefined,
+  initialType: "chatgpt",
 });
 
 const emit = defineEmits<{
@@ -211,32 +210,37 @@ const emit = defineEmits<{
 
 const dialog = defineModel<boolean>({ default: false });
 
-const { $globals } = useNuxtApp();
 const i18n = useI18n();
-const {
-  loading,
-  getOne,
-  testOne,
-  testSavedOne,
-  startChatGPTLogin,
-  getChatGPTLogin,
-  cancelChatGPTLogin,
-} = useAIProviders();
+const { loading, getOne, testOne, testSavedOne } = useAIProviders();
 const init = ref(false);
 
 const form = ref();
-const advancedPanel = ref<number | undefined>(undefined);
+const signIn = ref<InstanceType<typeof GroupChatGPTSignIn> | null>(null);
+const advancedPanel = ref<string | undefined>(undefined);
 
 const isEdit = computed(() => !!props.providerId);
 
-const providerTypes = computed(() => [
-  { title: i18n.t("group.ai-provider-settings.provider-type-api-key"), value: "openai" },
-  { title: i18n.t("group.ai-provider-settings.provider-type-chatgpt"), value: "chatgpt" },
+const providerOptions = computed(() => [
+  {
+    value: "chatgpt" as AIProviderType,
+    title: i18n.t("group.ai-provider-settings.provider-type-chatgpt"),
+    description: i18n.t("group.ai-provider-settings.provider-type-chatgpt-description"),
+    recommended: true,
+  },
+  {
+    value: "openai" as AIProviderType,
+    title: i18n.t("group.ai-provider-settings.provider-type-api-key"),
+    description: i18n.t("group.ai-provider-settings.provider-type-api-key-description"),
+    recommended: false,
+  },
 ]);
 
-const defaultForm = () => ({
-  providerType: "openai" as AIProviderType,
-  name: "",
+/** What a new provider is called until someone renames it */
+const DEFAULT_NAMES: Record<AIProviderType, string> = { chatgpt: "ChatGPT", openai: "OpenAI" };
+
+const defaultForm = (providerType: AIProviderType = props.initialType) => ({
+  providerType,
+  name: DEFAULT_NAMES[providerType],
   model: "",
   apiKey: "",
   baseUrl: "",
@@ -255,44 +259,22 @@ const testResult = ref<AIProviderTestResult | null>(null);
 // (undefined if it has none); `login` is a sign-in started in this dialog, which replaces it on save.
 const savedAccount = ref<string | null | undefined>(undefined);
 const login = ref<ChatGPTLoginOut | null>(null);
-const startingLogin = ref(false);
 const loginConnected = computed(() => login.value?.state === "connected");
 
-/** The account this provider will be signed in to once saved: undefined if none, null if the email is unknown */
-const signedInAccount = computed<string | null | undefined>(() => {
-  if (loginConnected.value) return login.value?.account ?? null;
-  return savedAccount.value;
-});
-
-const { pause: stopPolling, resume: startPolling } = useIntervalFn(pollLogin, 3000, { immediate: false });
-
-async function startLogin() {
-  startingLogin.value = true;
-  testResult.value = null;
-  try {
-    const { data } = await startChatGPTLogin();
-    login.value = data;
-    if (data?.state === "waiting") startPolling();
+function chooseType(providerType: AIProviderType) {
+  if (formData.providerType === providerType) return;
+  // Keep a name someone typed; swap one that's still the other kind's default
+  if (!formData.name.trim() || formData.name === DEFAULT_NAMES[formData.providerType]) {
+    formData.name = DEFAULT_NAMES[providerType];
   }
-  finally {
-    startingLogin.value = false;
-  }
+  formData.providerType = providerType;
+  formData.model = "";
 }
 
-async function pollLogin() {
-  if (!login.value) return stopPolling();
-  const { data } = await getChatGPTLogin(login.value.id);
-  // The dialog may have been closed or a new sign-in started while this was in flight
-  if (!data || data.id !== login.value?.id) return;
-  login.value = data;
-  if (data.state !== "waiting") stopPolling();
-}
-
-async function cancelLogin() {
-  stopPolling();
-  const current = login.value;
-  login.value = null;
-  if (current?.state === "waiting") await cancelChatGPTLogin(current.id);
+async function onConnected() {
+  if (!formData.name.trim()) formData.name = DEFAULT_NAMES.chatgpt;
+  // Check the new sign-in works now, rather than leaving it to the button
+  await handleTest();
 }
 
 const submitDisabled = computed(() => {
@@ -309,18 +291,12 @@ const testDisabled = computed(() => {
 const connectionMessage = computed(() => {
   const result = testResult.value;
   if (!result) return "";
-  if (result.success) return i18n.t("group.ai-provider-settings.test-connection-succeeded");
-  return result.message || i18n.t("group.ai-provider-settings.test-connection-failed");
-});
-
-// Capability info rather than a second pass/fail check - a text-only provider is a valid setup,
-// it just can't be used as the image provider. Appended to the connection message above.
-const imageSupportMessage = computed(() => {
-  const result = testResult.value;
-  if (!result?.success) return "";
+  if (!result.success) return result.message || i18n.t("group.ai-provider-settings.test-connection-failed");
+  // Capability info rather than a second pass/fail check: a text-only provider is a valid setup,
+  // it just can't be the image provider
   return result.supportsImages
-    ? ` — ${i18n.t("group.ai-provider-settings.supports-images")}`
-    : ` — ${i18n.t("group.ai-provider-settings.text-only-provider")}`;
+    ? i18n.t("group.ai-provider-settings.test-connection-succeeded-images")
+    : i18n.t("group.ai-provider-settings.test-connection-succeeded-text-only");
 });
 
 // Fetch existing provider when editing; reset form for create mode
@@ -330,7 +306,6 @@ watch(
     if (!open) return;
     testResult.value = null;
     if (!id) {
-      // Create mode — just show the empty form
       resetForm();
       init.value = true;
       return;
@@ -348,6 +323,10 @@ watch(
       formData.requestHeaders = { ...(data.requestHeaders ?? {}) };
       formData.requestParams = { ...(data.requestParams ?? {}) };
       savedAccount.value = formData.providerType === "chatgpt" ? data.chatgptAccount : undefined;
+      // Open Advanced when something in it has been set, so it isn't hidden
+      const customized = (isChatGPT.value && formData.model) || formData.timeout !== 300
+        || Object.keys(formData.requestHeaders).length || Object.keys(formData.requestParams).length;
+      advancedPanel.value = customized ? "advanced" : undefined;
     }
   },
   { immediate: true },
@@ -357,18 +336,12 @@ watch(() => formData.providerType, () => {
   testResult.value = null;
 });
 
-// Closing the dialog any way other than submitting goes through resetForm, which cancels a
-// sign-in still in progress. This covers the dialog being torn down while one is running.
-onBeforeUnmount(() => {
-  void cancelLogin();
-});
-
 /** The form's current values, as sent to create, update, and test */
 function buildPayload(): AIProviderPayload {
   if (isChatGPT.value) {
     return {
       providerType: "chatgpt",
-      name: formData.name,
+      name: formData.name.trim(),
       model: formData.model.trim(),
       timeout: formData.timeout,
       ...(loginConnected.value && login.value ? { chatgptLoginId: login.value.id } : {}),
@@ -377,9 +350,9 @@ function buildPayload(): AIProviderPayload {
 
   return {
     providerType: "openai",
-    name: formData.name,
-    model: formData.model,
-    baseUrl: formData.baseUrl || null,
+    name: formData.name.trim(),
+    model: formData.model.trim(),
+    baseUrl: formData.baseUrl.trim() || null,
     timeout: formData.timeout,
     requestHeaders: Object.keys(formData.requestHeaders).length ? formData.requestHeaders : undefined,
     requestParams: Object.keys(formData.requestParams).length ? formData.requestParams : undefined,
@@ -389,7 +362,6 @@ function buildPayload(): AIProviderPayload {
 }
 
 function handleSubmit() {
-  // Required field guard (button is also disabled, but keep as a safeguard)
   if (submitDisabled.value) return;
 
   const payload = buildPayload();
@@ -401,12 +373,12 @@ function handleSubmit() {
   }
 
   // The sign-in now belongs to the provider being saved, so don't cancel it on close
-  stopPolling();
-  login.value = null;
+  signIn.value?.release();
 }
 
 function resetForm() {
-  void cancelLogin();
+  void signIn.value?.cancel();
+  login.value = null;
   Object.assign(formData, defaultForm());
   // resetValidation rather than reset: reset() would clear every field, provider type included
   form.value?.resetValidation();
@@ -421,16 +393,14 @@ async function handleTest() {
   try {
     let data: AIProviderTestResult | null;
     if (isEdit.value && props.providerId) {
-      // Test the form's CURRENT values, not what's saved in the DB — the user may have just
-      // changed the model/base_url. If they left the API key blank (meaning "keep the existing
-      // one"), the backend falls back to the saved key since we don't have that value here.
-      // Likewise a ChatGPT provider is tested with its saved sign-in unless there's a new one.
+      // Test the form's current values, not what's saved: the user may have just changed the
+      // model or base URL. A blank API key keeps the saved one, and a ChatGPT provider is tested
+      // with its saved sign-in unless there's a new one.
       ({ data } = await testSavedOne(props.providerId, buildPayload()));
     }
     else {
       ({ data } = await testOne(buildPayload()));
     }
-
     testResult.value = data;
   }
   finally {
@@ -438,3 +408,108 @@ async function handleTest() {
   }
 }
 </script>
+
+<style scoped>
+.ai-provider-dialog {
+  padding-top: 8px;
+}
+
+.ai-provider-dialog__label {
+  margin: 0 0 10px;
+  padding: 0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgb(var(--v-theme-ink-muted));
+}
+
+.ai-provider-dialog__intro {
+  margin: 0 0 18px;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: rgb(var(--v-theme-ink-muted));
+}
+
+.ai-provider-types {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin: 0 0 18px;
+  padding: 0;
+  border: 0;
+}
+
+.ai-provider-type {
+  appearance: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 14px;
+  border: 1px solid rgb(var(--v-theme-rule));
+  border-radius: 12px;
+  background: rgb(var(--v-theme-surface));
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ai-provider-type--active {
+  border-color: rgb(var(--v-theme-on-background));
+  box-shadow: inset 0 0 0 1px rgb(var(--v-theme-on-background));
+}
+
+.ai-provider-type:focus-visible {
+  outline: 2px solid rgb(var(--v-theme-tomato));
+  outline-offset: 2px;
+}
+
+.ai-provider-type__title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.ai-provider-type__badge {
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: rgba(var(--v-theme-sage), 0.15);
+  color: rgb(var(--v-theme-sage));
+  font-size: 0.6875rem;
+  font-weight: 700;
+}
+
+.ai-provider-type__text {
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  color: rgb(var(--v-theme-ink-muted));
+}
+
+.ai-provider-dialog__advanced {
+  border: 1px solid rgb(var(--v-theme-rule));
+  border-radius: 10px;
+}
+
+.ai-provider-dialog__advanced :deep(.v-expansion-panel) {
+  background: transparent;
+}
+
+.ai-provider-dialog__testing {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 16px;
+  font-size: 0.875rem;
+}
+
+@media (max-width: 599px) {
+  .ai-provider-types {
+    grid-template-columns: 1fr;
+  }
+}
+</style>

@@ -134,3 +134,22 @@ def test_admin_can_manage_providers_across_groups(api_client: TestClient, admin_
         )
     finally:
         api_client.delete(api_routes.admin_groups_item_id(foreign_group_id), headers=admin_user.token)
+
+
+def test_admin_created_provider_turns_ai_on_for_the_group(
+    api_client: TestClient, admin_user: TestUser, unique_user_fn_scoped: TestUser
+):
+    """A group's first provider becomes its default, whoever adds it."""
+    user = unique_user_fn_scoped
+    response = api_client.post(
+        api_routes.admin_groups_group_id_ai_providers_providers(user.group_id),
+        json={"name": random_string(), "model": "gpt-4o", "apiKey": "admin-created-key"},
+        headers=admin_user.token,
+    )
+    assert response.status_code == 200
+    provider = response.json()
+
+    settings = user.repos.group_ai_provider_settings.get_one(user.group_id)
+    assert settings is not None
+    assert str(settings.default_provider_id) == provider["id"]
+    assert settings.image_provider_id is None
