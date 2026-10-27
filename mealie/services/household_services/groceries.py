@@ -13,6 +13,8 @@ from mealie.db.models.household.grocery import GroceryRestockItem, GroceryWeek
 from mealie.db.models.household.shopping_list import ShoppingListItem
 from mealie.repos.all_repositories import AllRepositories, get_repositories
 from mealie.schema.grocery.grocery import (
+    GroceryCommonItemList,
+    GroceryCommonItemOut,
     GroceryFoodRuleCreate,
     GroceryFoodRuleOut,
     GroceryFoodRuleSave,
@@ -29,6 +31,7 @@ from mealie.schema.grocery.grocery import (
     GroceryRestockOut,
     GroceryRestockStatus,
     GroceryRuleKind,
+    GroceryStore,
     GrocerySuggestionOut,
     GroceryUnit,
     GroceryWeekGenerate,
@@ -603,6 +606,55 @@ class GroceryService(BaseService):
             self.repos.session.rollback()
             raise
         return self.view(value)
+
+    # ------------------------------------------------------------------
+    # Common items: the ingredients the household has saved products for. The picker adds them
+    # through the Out of list, so they follow its rules.
+
+    def common_items(self) -> GroceryCommonItemList:
+        """
+        The ingredients the household has enabled products for, to add to the grocery list in one tap.
+        Each one's products start with the one the list new items go on would buy.
+        """
+        target = self.weeks.newest_from(monday(household_today()))
+        stores = list(target.stores) if target and target.stores else [store.value for store in GroceryStore]
+        order = {store: i for i, store in enumerate(stores)}
+        by_food: dict[UUID, list[GroceryProductOut]] = defaultdict(list)
+        for product in self.repos.grocery_products.get_all():
+            if product.enabled:
+                by_food[product.food_id].append(product)
+        listed: set[UUID] = set()
+        shopping_list = self.repos.group_shopping_lists.get_one(target.shopping_list_id) if target else None
+        for item in shopping_list.list_items if shopping_list else []:
+            # Out of items are left to the Out of list, which the picker reads itself
+            if item.food_id and not item.checked and (item.extras or {}).get(SOURCE) != "restock":
+                listed.add(item.food_id)
+        aisles = self.weeks.food_aisles(set(by_food))
+        items = [
+            GroceryCommonItemOut(
+                food=products[0].food,
+                aisle=aisles.get(food_id),
+                # The order choose_product uses, with stores the week isn't visiting last
+                products=sorted(
+                    products,
+                    key=lambda product: (
+                        product.store not in order,
+                        product.priority,
+                        order.get(product.store, 99),
+                        product.name.lower(),
+                        str(product.id),
+                    ),
+                ),
+                listed=food_id in listed,
+            )
+            for food_id, products in by_food.items()
+        ]
+        items.sort(key=lambda item: (item.food.name.lower(), str(item.food.id)))
+        return GroceryCommonItemList(
+            items=items,
+            next_list_week=target.week_start if target else None,
+            stores=[GroceryStore(store) for store in target.stores] if target else [],
+        )
 
     # ------------------------------------------------------------------
     # The Out of list: things the household has run out of, recipe or no recipe. Each one rides on

@@ -23,9 +23,14 @@
         {{ $t("restock.add") }}
       </v-btn>
     </form>
-    <p class="restock__where">
-      {{ whereSentence }}
-    </p>
+    <div class="restock__where-row">
+      <p class="restock__where">
+        {{ whereSentence }}
+      </p>
+      <button type="button" class="restock__common" @click="commonOpen = true">
+        <v-icon size="16" :icon="$globals.icons.playlistPlus" />{{ $t("common-items.open") }}
+      </button>
+    </div>
     <v-alert
       v-if="error"
       type="error"
@@ -140,11 +145,13 @@
         </v-card-actions>
       </v-card>
     </v-dialog>
+    <GroceryCommonItemsDialog v-model="commonOpen" />
   </section>
 </template>
 
 <script setup lang="ts">
-import { groceryStores, groceryUnits, isoLocalDate, mondayFor, storeTitle, unitTitle } from "~/composables/groceries/grocery-utils";
+import GroceryCommonItemsDialog from "./GroceryCommonItemsDialog.vue";
+import { formatWeek, groceryStores, groceryUnits, isoLocalDate, mondayFor, storeTitle, unitTitle } from "~/composables/groceries/grocery-utils";
 import { useGroceryRestock } from "~/composables/groceries/use-grocery-restock";
 import { alert } from "~/composables/use-toast";
 import type { GroceryRestockOut, GroceryStore, GroceryUnit } from "~/lib/api/types/grocery";
@@ -159,6 +166,7 @@ const auth = useMealieAuth();
 const { list, items, recentlyBought, busy, loading, error, load, add: addItem, update, remove: removeItem, setBought } = useGroceryRestock();
 
 const name = ref("");
+const commonOpen = ref(false);
 const editing = ref<GroceryRestockOut | null>(null);
 const form = reactive<{ name: string; quantity: number | string; unit: GroceryUnit; store: GroceryStore | null; note: string }>({
   name: "", quantity: "", unit: "count", store: null, note: "",
@@ -167,7 +175,7 @@ const form = reactive<{ name: string; quantity: number | string; unit: GroceryUn
 const currentWeek = mondayFor(isoLocalDate(new Date()));
 
 function weekLabel(week: string) {
-  return new Intl.DateTimeFormat(i18n.locale.value, { month: "short", day: "numeric" }).format(new Date(`${week}T12:00:00`));
+  return formatWeek(week, i18n.locale.value);
 }
 
 const whereSentence = computed(() => {
@@ -277,11 +285,47 @@ onMounted(load);
   min-width: 0;
 }
 
+.restock__where-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 16px;
+  margin-top: 8px;
+}
+
 .restock__where {
-  margin: 8px 0 0;
+  flex: 1 1 220px;
+  margin: 0;
   font-size: 0.78125rem;
   line-height: 1.45;
   color: rgb(var(--v-theme-ink-muted));
+}
+
+.restock__common {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 0;
+  border: 0;
+  background: none;
+  color: rgb(var(--v-theme-tomato));
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.restock__common:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.restock__common:focus-visible {
+  outline: 2px solid rgb(var(--v-theme-tomato));
+  outline-offset: 2px;
 }
 
 .restock__items {

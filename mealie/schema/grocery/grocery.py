@@ -284,3 +284,27 @@ class GroceryRestockList(MealieModel):
 
 class GroceryRestockBought(MealieModel):
     bought: bool = True
+
+
+class GroceryCommonItemOut(MealieModel):
+    """An ingredient the household has saved products for, which it can add to the list in one tap"""
+
+    food: IngredientFoodSummary
+    aisle: str | None = None
+    """The ingredient's label, which is its aisle on the grocery list"""
+    products: list[GroceryProductOut]
+    """Its enabled products, starting with the one the list would buy"""
+    listed: bool = False
+    """
+    Already on the list new items go on, for a recipe, a staple, or an addition, and not checked off.
+    Out of items don't count here; they're on the Out of list.
+    """
+
+
+class GroceryCommonItemList(MealieModel):
+    items: list[GroceryCommonItemOut] = Field(default_factory=list)
+    """By ingredient name"""
+    next_list_week: date | None = None
+    """The week of the list new items go on, or empty when they wait for the next list"""
+    stores: list[GroceryStore] = Field(default_factory=list)
+    """The stores that list is shopping at"""

@@ -1,6 +1,6 @@
 import { BaseAPI } from "../base/base-clients";
 import type {
-  GroceryFoodRuleCreate, GroceryFoodRuleOut, GroceryItemAssignment, GroceryItemCheck,
+  GroceryCommonItemList, GroceryFoodRuleCreate, GroceryFoodRuleOut, GroceryItemAssignment, GroceryItemCheck,
   GroceryItemDelete, GroceryManualItemCreate, GroceryProductCreate, GroceryProductOut,
   GroceryRestockBought, GroceryRestockCreate, GroceryRestockList,
   GrocerySuggestionOut, GroceryWeekGenerate, GroceryWeekView,
@@ -27,6 +27,7 @@ export class GroceriesAPI extends BaseAPI {
   addItem(week: string, data: GroceryManualItemCreate) { return this.requests.post<GroceryWeekView>(`${weekRoute(week)}/items`, data); }
   deleteItems(week: string, data: GroceryItemDelete) { return this.requests.post<GroceryWeekView>(`${weekRoute(week)}/items/delete`, data); }
   suggestions(date: string) { return this.requests.get<GrocerySuggestionOut[]>(`${base}/suggestions`, { plan_date: date }); }
+  commonItems() { return this.requests.get<GroceryCommonItemList>(`${base}/common-items`); }
   restock() { return this.requests.get<GroceryRestockList>(`${base}/restock`); }
   addRestock(data: GroceryRestockCreate) { return this.requests.post<GroceryRestockList>(`${base}/restock`, data); }
   updateRestock(id: string, data: GroceryRestockCreate) { return this.requests.put<GroceryRestockList, GroceryRestockCreate>(`${base}/restock/${id}`, data); }

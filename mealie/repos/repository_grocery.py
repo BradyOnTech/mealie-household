@@ -19,6 +19,7 @@ from mealie.db.models.recipe.ingredient import (
     IngredientUnitModel,
     RecipeIngredientModel,
 )
+from mealie.db.models.recipe.labels import MultiPurposeLabel
 from mealie.schema.grocery.grocery import GroceryRestockOut, GroceryWeekOut
 from mealie.schema.household.group_shopping_list import ShoppingListItemCreate, ShoppingListItemUpdateBulk
 from mealie.schema.recipe.recipe_ingredient import IngredientUnit
@@ -52,6 +53,17 @@ class RepositoryGroceryWeek(HouseholdRepositoryGeneric[GroceryWeekOut, GroceryWe
         for recipe_id, food_id in rows:
             result.setdefault(recipe_id, set()).add(food_id)
         return result
+
+    def food_aisles(self, food_ids: set[UUID]) -> dict[UUID, str]:
+        """The aisle of each of these foods that has one, which is its label, as on the grocery list"""
+        if not food_ids:
+            return {}
+        rows = self.session.execute(
+            select(IngredientFoodModel.id, MultiPurposeLabel.name)
+            .join(MultiPurposeLabel, MultiPurposeLabel.id == IngredientFoodModel.label_id)
+            .where(IngredientFoodModel.id.in_(food_ids), IngredientFoodModel.group_id == self.group_id)
+        )
+        return dict(rows.tuples().all())
 
     def standard_unit(self, name: str) -> IngredientUnit | None:
         if name == "count":

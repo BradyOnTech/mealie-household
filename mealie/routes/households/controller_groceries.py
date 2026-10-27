@@ -9,6 +9,7 @@ from starlette.responses import FileResponse
 from mealie.routes._base.base_controllers import BaseCrudController
 from mealie.routes._base.controller import controller
 from mealie.schema.grocery.grocery import (
+    GroceryCommonItemList,
     GroceryFoodRuleCreate,
     GroceryFoodRuleOut,
     GroceryItemAssignment,
@@ -68,6 +69,10 @@ class GroceryController(BaseCrudController):
                 household_id=week.household_id,
             )
         return result
+
+    @router.get("/common-items", response_model=GroceryCommonItemList)
+    def common_items(self) -> GroceryCommonItemList:
+        return self.service.common_items()
 
     @router.get("/restock", response_model=GroceryRestockList)
     def restock(self) -> GroceryRestockList:
