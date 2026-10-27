@@ -233,14 +233,13 @@ export default defineNuxtConfig({
       enabled: false,
       suppressWarnings: true,
     },
-    workbox: {
-      navigateFallback: "/",
-      navigateFallbackAllowlist: [/^(?!\/api|\/docs)/],
+    // A service worker of our own, for push notifications; it keeps the caching the generated one had
+    strategies: "injectManifest",
+    srcDir: "../service-worker", // relative to app/, which is vite's root
+    filename: "sw.ts",
+    injectManifest: {
       globPatterns: ["**/*.{js,css,html,png,svg,ico}"],
       globIgnores: ["404.html", "200.html", "index.html"],
-      cleanupOutdatedCaches: true,
-      skipWaiting: true,
-      clientsClaim: true,
     },
     client: {
       installPrompt: true,

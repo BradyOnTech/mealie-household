@@ -181,6 +181,23 @@ list and answers questions about the grocery list, the meal plan, and your recip
 plan dinners. It uses tool calling through either an API-key provider or a ChatGPT subscription provider, and
 its tools act only on the signed-in member's household.
 
+### Messages
+
+**Messages** in the navigation is one shared conversation for everyone in the household, for notes like
+"we're out of milk" or "tacos on Thursday?". The open page checks for new messages every 5 seconds, and the
+tab shows how many you haven't read. You can delete your own messages: tap one, then **Delete**.
+
+Each device can also get a notification for each new message. On an iPhone or iPad (iOS 16.4 or later),
+this only works in the Home Screen app: add Mealie to the Home Screen, open it from there, go to Messages and
+tap **Turn on notifications**. **Send a test** checks the device. The Home Screen icon shows the unread count.
+Notifications go through each browser's push service (Apple's, for iPhones), so the host needs internet access.
+They show the sender's name and the start of the message.
+
+The server signs notifications with a key it creates on first use, kept in the data volume as
+`.vapid_private.pem`. Volume backups include it. If the key is lost, each device has to turn notifications on
+again. Apple requires a contact for the server. By default that is the host of an https `BASE_URL`, or
+`SMTP_FROM_EMAIL`. Set `WEB_PUSH_SUBJECT` (`mailto:you@example.com` or an https URL) to choose another.
+
 ### Household collaboration
 
 Product preferences, pantry/staple rules, and weeks are scoped to the authenticated household.
@@ -239,8 +256,14 @@ it requires a signed-in household user and contains source/build instructions wi
 - `frontend/app/pages/household/assistant.vue`: the Ask page.
 - `frontend/app/components/Domain/Grocery/`: product and pantry/staple editors, the Out of panel, and the
   Common items picker (`GroceryCommonItemsDialog.vue`, fed by `GroceryService.common_items`).
+- `mealie/services/household_services/messages.py` and `mealie/services/web_push/web_push.py`: Messages and its
+  push notifications, at `/api/households/messages`.
+- `frontend/app/pages/household/messages.vue`, `frontend/app/composables/use-household-messages.ts` and
+  `use-web-push.ts`: the Messages page, the unread count, and turning notifications on.
+- `frontend/service-worker/sw.ts`: the app's service worker. It precaches the build and shows notifications.
 
-One Alembic migration adds the three grocery tables, and a second adds the Out of list. When merging a later upstream release with new migrations,
+One Alembic migration adds the three grocery tables, a second adds the Out of list, and a third adds messages,
+read markers and push subscriptions. When merging a later upstream release with new migrations,
 check for multiple Alembic heads and create/test an Alembic merge revision when required.
 Preferences live in household tables so a shared Food does not impose one household's preferred products on another.
 

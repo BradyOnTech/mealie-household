@@ -147,6 +147,9 @@ class AppSettings(AppLoggingSettings):
         """Returns True if BASE_URL has not been changed from the default."""
         return self.BASE_URL == "http://localhost:8080"
 
+    WEB_PUSH_SUBJECT: str | None = None
+    """contact for push services, as `mailto:you@example.com` or an https URL; defaults to BASE_URL's host"""
+
     STATIC_FILES: str = str(PACKAGE_DIR / "frontend")
     """path to static files directory (ex. `mealie/dist`)"""
 

@@ -10,6 +10,7 @@ from . import (
     controller_invitations,
     controller_mealplan,
     controller_mealplan_rules,
+    controller_messages,
     controller_shopping_lists,
     controller_webhooks,
 )
@@ -17,6 +18,7 @@ from . import (
 router = APIRouter()
 router.include_router(controller_groceries.router)
 router.include_router(controller_assistant.router)
+router.include_router(controller_messages.router)
 
 router.include_router(controller_cookbooks.router)
 router.include_router(controller_group_notifications.router)

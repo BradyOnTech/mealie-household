@@ -13,12 +13,21 @@
 import AppHeader from "~/components/Layout/LayoutParts/AppHeader.vue";
 import AppTabBar from "~/components/Layout/LayoutParts/AppTabBar.vue";
 import TheSnackbar from "~/components/Layout/LayoutParts/TheSnackbar.vue";
+import { useHouseholdMessageWatcher } from "~/composables/use-household-messages";
 import { useLoggedInState } from "~/composables/use-logged-in-state";
+import { useWebPush } from "~/composables/use-web-push";
 
 const { smAndDown } = useDisplay();
 const { isOwnGroup } = useLoggedInState();
 
 const showTabBar = computed(() => smAndDown.value && isOwnGroup.value);
+
+useHouseholdMessageWatcher();
+// Re-send this device's push subscription on every launch, since iOS can drop or replace it quietly
+const webPush = useWebPush();
+watch(isOwnGroup, (own) => {
+  if (own) void webPush.refresh();
+}, { immediate: true });
 </script>
 
 <style>

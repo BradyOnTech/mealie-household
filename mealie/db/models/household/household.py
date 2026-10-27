@@ -25,6 +25,7 @@ if TYPE_CHECKING:
         HouseholdPreferencesModel,
     )
     from .grocery import GroceryFoodRule, GroceryProduct, GroceryRestockItem, GroceryWeek
+    from .messages import HouseholdMessage
 
 
 class Household(SqlAlchemyBase, BaseMixins):
@@ -63,6 +64,7 @@ class Household(SqlAlchemyBase, BaseMixins):
     grocery_food_rules: Mapped[list[GroceryFoodRule]] = orm.relationship("GroceryFoodRule", **COMMON_ARGS)
     grocery_weeks: Mapped[list[GroceryWeek]] = orm.relationship("GroceryWeek", **COMMON_ARGS)
     grocery_restock_items: Mapped[list[GroceryRestockItem]] = orm.relationship("GroceryRestockItem", **COMMON_ARGS)
+    household_messages: Mapped[list[HouseholdMessage]] = orm.relationship("HouseholdMessage", **COMMON_ARGS)
 
     recipe_actions: Mapped[list[GroupRecipeAction]] = orm.relationship("GroupRecipeAction", **COMMON_ARGS)
     cookbooks: Mapped[list[CookBook]] = orm.relationship("CookBook", **COMMON_ARGS)
