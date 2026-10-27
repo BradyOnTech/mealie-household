@@ -140,7 +140,7 @@
         {{ $t("recipe.instructions") }}
       </h2>
       <BaseButton
-        v-if="!isEditForm && !isCookMode"
+        v-if="!isEditForm && !isCookMode && instructionList.length"
         minor
         cancel
         color="primary"
@@ -152,6 +152,10 @@
         {{ $t("recipe.cook-mode") }}
       </BaseButton>
     </div>
+    <!-- An imported recipe can arrive without steps; its notes say where to find them -->
+    <p v-if="!isEditForm && !instructionList.length" class="recipe-method__empty">
+      {{ $t("recipe.no-steps-yet") }}
+    </p>
     <v-bottom-sheet
       v-model="linkedNotesSheetOpen"
       max-width="900"
@@ -1121,6 +1125,12 @@ function openImageUpload(index: number) {
 .recipe-method__head--cook {
   justify-content: flex-end;
   border-bottom: 0;
+}
+
+.recipe-method__empty {
+  margin: 12px 0 0;
+  font-size: 0.9375rem;
+  color: rgb(var(--v-theme-ink-muted));
 }
 
 .recipe-method__title {

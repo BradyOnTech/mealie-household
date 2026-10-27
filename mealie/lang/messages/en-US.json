@@ -9,7 +9,9 @@
         "recipe-defaults": {
             "ingredient-note": "1 Cup Flour",
             "name": "New Recipe",
-            "step-text": "Recipe steps as well as other fields in the recipe page support markdown syntax.\n\n**Add a link**\n\n[My Link](https://demo.mealie.io)\n"
+            "step-text": "Recipe steps as well as other fields in the recipe page support markdown syntax.\n\n**Add a link**\n\n[My Link](https://demo.mealie.io)\n",
+            "missing-steps-title": "Steps",
+            "missing-steps-text": "The steps weren't included where this recipe came from. You'll find them in the original: {url}"
         },
         "servings-text": {
             "makes": "Makes",
@@ -30,7 +32,9 @@
             "unknown-error": "Something went wrong while creating the recipe. Please try again",
             "unreadable-source": "Unable to read any content from the provided source",
             "video-download-failed": "Unable to read the video. It may be private, removed, or from an unsupported site",
-            "video-has-no-captions": "This video has no captions or description to read a recipe from. Set up an audio provider in your group's AI settings to have videos like this one transcribed"
+            "video-has-no-captions": "This video has no captions or description to read a recipe from. Set up an audio provider in your group's AI settings to have videos like this one transcribed",
+            "video-needs-ai": "Importing from Instagram, TikTok, YouTube and other video posts needs an AI provider. Add one in your group settings, or paste the recipe into Import with AI",
+            "post-has-no-recipe": "This post doesn't include the recipe in its caption. Creators often keep it behind the link in their bio, or send it when you comment. Import that recipe page's link instead, or paste the recipe into Import with AI"
         },
         "pdf-import": {
             "already-importing": "This PDF is already being imported",

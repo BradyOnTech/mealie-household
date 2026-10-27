@@ -9,6 +9,7 @@ import mealie.services.openai.transcription as transcription_module
 from mealie.core import exceptions
 from mealie.services.openai import transcription
 from mealie.services.openai.transcription import CaptionTrack, Chapter
+from mealie.services.recipe.import_workflow.compilers.linked_recipe import names_match
 from mealie.services.recipe.import_workflow.compilers.transcription import TranscriptionCompiler
 
 # YouTube's recognized captions, as yt-dlp downloads them: each cue repeats the line before it,
@@ -427,3 +428,38 @@ async def test_transcribe_audio_errors(tmp_path: Path, result: Any, expected: ty
 
     with pytest.raises(expected):
         await transcription.transcribe_audio(tmp_path / "audio.mp3", ai)
+
+
+@pytest.mark.parametrize(
+    ("title", "description", "expected"),
+    [
+        # Instagram titles every post after its account; the caption's first line names the dish
+        (
+            "Video by spendpennies",
+            "Roasted Cabbage Steaks turn a humble veggie\n\nRecipe: ...",
+            "Roasted Cabbage Steaks turn a humble veggie",
+        ),
+        ("Video by pinchofnom", "#food #yum\n\nFAJITA BOMBS 💕 Get ready #fajitas", "FAJITA BOMBS 💕 Get ready"),
+        ("Photo by someone", "", "Photo by someone"),
+        ("Foolproof Pan Pizza", "A different first line", "Foolproof Pan Pizza"),
+        ("", "Lemon Orzo", "Lemon Orzo"),
+        ("Video by cook", "x" * 200, "x" * 149 + "…"),
+    ],
+)
+def test_post_title(title: str, description: str, expected: str):
+    assert transcription.post_title(title, description) == expected
+
+
+def test_read_video_names_an_instagram_post_from_its_caption(fake_yt_dlp: type[_FakeYoutubeDL]):
+    fake_yt_dlp.info = {
+        **VIDEO_INFO,
+        "title": "Video by spendpennies",
+        "description": "Roasted Cabbage Steaks turn a humble veggie into a fancy side dish.\n\nRecipe below",
+        "automatic_captions": {},
+    }
+
+    video = transcription.read_video("https://www.instagram.com/reel/C5bRObqqJLV/")
+
+    assert video.title == "Roasted Cabbage Steaks turn a humble veggie into a fancy side dish."
+    # so the written recipe its caption links to can be recognized as the post's
+    assert names_match("Roasted Cabbage Steaks", video.title)

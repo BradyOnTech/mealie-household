@@ -184,13 +184,28 @@ class RecipeService(RecipeServiceBase):
             for i in range(len(additional_attrs.get("tags", []))):
                 additional_attrs["tags"][i]["group_id"] = self.user.group_id
 
+        # A new, empty recipe gets an example ingredient and step, as hints for whoever fills it in.
+        # An imported one comes from somewhere: a hint there would read as part of the recipe, so a
+        # missing part is left empty, and missing steps get a note pointing back to the source.
+        source = additional_attrs.get("org_url")
+
         if not additional_attrs.get("recipe_ingredient"):
-            additional_attrs["recipe_ingredient"] = [
-                RecipeIngredient(note=self.t("recipe.recipe-defaults.ingredient-note"))
-            ]
+            additional_attrs["recipe_ingredient"] = (
+                [] if source else [RecipeIngredient(note=self.t("recipe.recipe-defaults.ingredient-note"))]
+            )
 
         if not additional_attrs.get("recipe_instructions"):
-            additional_attrs["recipe_instructions"] = [RecipeStep(text=self.t("recipe.recipe-defaults.step-text"))]
+            if source:
+                additional_attrs["recipe_instructions"] = []
+                additional_attrs["notes"] = [
+                    *(additional_attrs.get("notes") or []),
+                    {
+                        "title": self.t("recipe.recipe-defaults.missing-steps-title"),
+                        "text": self.t("recipe.recipe-defaults.missing-steps-text", url=source),
+                    },
+                ]
+            else:
+                additional_attrs["recipe_instructions"] = [RecipeStep(text=self.t("recipe.recipe-defaults.step-text"))]
 
         return Recipe(**additional_attrs)
 

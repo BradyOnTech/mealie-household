@@ -271,3 +271,98 @@ def test_create_recipe_from_video_empty_openai_response(
 
     r = _import(api_client, unique_user)
     assert r.status_code == 400
+
+
+INSTAGRAM_URL = "https://www.instagram.com/reel/C66-jHYy5_k/"
+
+
+def _import_url(api_client: TestClient, user: TestUser, url: str):
+    return api_client.post(api_routes.recipes_create_url, json={"url": url}, headers=user.token)
+
+
+def _message(response) -> str:
+    return response.json()["detail"]["message"]
+
+
+def test_a_video_post_is_never_saved_as_a_placeholder(
+    api_client: TestClient, unique_user: TestUser, monkeypatch: pytest.MonkeyPatch, video: VideoInfo
+):
+    """A video site's page is only the post's caption, so a failed read is reported, not saved from the page"""
+
+    async def mock_get_response(self, prompt, message, *args, **kwargs) -> OpenAIRecipe | None:
+        return None
+
+    monkeypatch.setattr(OpenAIService, "get_response", mock_get_response)
+
+    r = _import_url(api_client, unique_user, INSTAGRAM_URL)
+    assert r.status_code == 400
+
+
+def test_a_video_post_isnt_fetched_as_a_page(
+    api_client: TestClient,
+    unique_user: TestUser,
+    monkeypatch: pytest.MonkeyPatch,
+    video: VideoInfo,
+    messages: list[str],
+):
+    fetched: list[str] = []
+
+    async def mock_safe_scrape_html(url: str) -> str:
+        fetched.append(url)
+        return VIDEO_PAGE
+
+    monkeypatch.setattr(recipe_scraper_module, "safe_scrape_html", mock_safe_scrape_html)
+
+    r = _import_url(api_client, unique_user, INSTAGRAM_URL)
+    assert r.status_code == 201
+    assert fetched == []
+    assert video.description in messages[0]
+
+
+def test_a_video_post_without_ai_says_it_needs_a_provider(
+    api_client: TestClient, unique_user: TestUser, video: VideoInfo
+):
+    unique_user.repos.group_ai_provider_settings.update(
+        unique_user.repos.group_id,
+        AIProviderSettingsUpdate(default_provider_id=None, audio_provider_id=None, image_provider_id=None),
+    )
+
+    r = _import_url(api_client, unique_user, INSTAGRAM_URL)
+    assert r.status_code == 400
+    assert "needs an AI provider" in _message(r)
+
+
+def test_a_post_without_its_recipe_says_where_to_look(
+    api_client: TestClient, unique_user: TestUser, monkeypatch: pytest.MonkeyPatch, video: VideoInfo
+):
+    """A teaser post ("full recipe at the link in our bio") has nothing to build a recipe from"""
+
+    video.captions = ""
+    video.description = "FAJITA BOMBS 💕 Full recipe can be found via the link in our bio"
+
+    async def mock_get_response(self, prompt, message, *args, response_schema=None, **kwargs):
+        return OpenAIRecipe(name="Fajita Bombs", ingredients=[], instructions=[])
+
+    monkeypatch.setattr(OpenAIService, "get_response", mock_get_response)
+
+    r = _import_url(api_client, unique_user, INSTAGRAM_URL)
+    assert r.status_code == 400
+    assert "link in their bio" in _message(r)
+
+
+def test_an_imported_recipe_without_steps_points_to_its_source(
+    api_client: TestClient, unique_user: TestUser, video: VideoInfo, messages: list[str], openai_recipe: OpenAIRecipe
+):
+    """Ingredients in the caption, steps in a comment: the editor's sample step would read as the recipe's"""
+
+    openai_recipe.instructions = []
+
+    r = _import_url(api_client, unique_user, INSTAGRAM_URL)
+    assert r.status_code == 201
+
+    recipe = api_client.get(api_routes.recipes_slug(r.json()), headers=unique_user.token).json()
+    assert recipe["recipeInstructions"] == []
+    assert len(recipe["recipeIngredient"]) == len(openai_recipe.ingredients)
+    steps_note = recipe["notes"][-1]
+    assert steps_note["title"] == "Steps"
+    assert INSTAGRAM_URL.rstrip("/") in steps_note["text"]

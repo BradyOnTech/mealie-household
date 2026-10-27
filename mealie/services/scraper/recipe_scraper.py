@@ -4,6 +4,8 @@ from mealie.core.root_logger import get_logger
 from mealie.lang.providers import Translator
 from mealie.repos.repository_factory import AllRepositories
 from mealie.schema.recipe.recipe import Recipe
+from mealie.services.openai import transcription
+from mealie.services.recipe.import_workflow.exceptions import NoRecipeDataError
 from mealie.services.scraper import cleaner
 from mealie.services.scraper.scraped_extras import ScrapedExtras
 
@@ -59,7 +61,13 @@ class RecipeScraper:
         organizers, so that strategies which have to ask a provider for them can skip the request.
         """
 
-        if not html:
+        # On Instagram, TikTok, YouTube and the like, the post is the video: their pages hold nothing but
+        # its caption, which only the AI import reads (along with the video's captions and any recipe
+        # the caption links to). The other strategies would save a placeholder recipe named after the
+        # page, so they're skipped, and the AI import's errors, which say what to do, are passed on.
+        video_site = transcription.is_video_site(url)
+
+        if not html and not video_site:
             if on_progress:
                 await on_progress(self.translator.t("recipe.create-progress.fetching-webpage"))
 
@@ -68,6 +76,9 @@ class RecipeScraper:
                 return None, None
 
         for ScraperClass in self.scrapers:
+            if video_site and not issubclass(ScraperClass, RecipeScraperOpenAI):
+                continue
+
             scraper = ScraperClass(
                 url,
                 self.translator,
@@ -77,12 +88,16 @@ class RecipeScraper:
                 include_categories=include_categories,
             )
             if not scraper.can_scrape():
+                if video_site:
+                    raise NoRecipeDataError(self.translator.t("recipe.import-errors.video-needs-ai"))
                 self.logger.debug(f"Skipping {scraper.__class__.__name__}")
                 continue
 
             try:
                 result = await scraper.parse(on_progress=on_progress)
             except Exception:
+                if video_site:
+                    raise
                 self.logger.exception(f"Failed to scrape HTML with {scraper.__class__.__name__}")
                 result = None
 

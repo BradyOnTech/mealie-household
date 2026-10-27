@@ -11,8 +11,8 @@
         <v-card-text>
           <v-card-text class="pa-0">
             <p>{{ $t('recipe.scrape-recipe-description') }}</p>
-            <p v-if="aiEnabled">
-              {{ $t('recipe.scrape-recipe-description-transcription') }}
+            <p>
+              {{ $t(aiEnabled ? 'recipe.scrape-recipe-description-transcription' : 'recipe.scrape-recipe-description-video-needs-ai') }}
             </p>
           </v-card-text>
           <v-card-text class="px-0">
@@ -93,7 +93,7 @@
         color="error"
         class="mt-6 white--text"
       >
-        <v-card-title class="ma-0 pa-0">
+        <v-card-title class="ma-0 pa-0 text-wrap">
           <v-icon
             start
             color="white"
@@ -106,7 +106,11 @@
         <v-divider class="my-3 mx-2" />
 
         <div class="force-url-white">
-          <p>
+          <!-- The server says why, when it knows: a post with no recipe in it, or no AI provider -->
+          <p v-if="state.errorMessage" class="text-body-1 mb-3">
+            {{ state.errorMessage }}
+          </p>
+          <p v-if="!isVideoPost">
             {{ $t("recipe.scrape-recipe-website-being-blocked") }}
             <router-link :to="htmlOrJsonImporterTarget">{{ $t("recipe.scrape-recipe-try-importing-raw-html-instead") }}</router-link>
           </p>
@@ -114,12 +118,14 @@
             {{ $t("recipe.scrape-recipe-have-ai-read-the-page") }}
             <router-link :to="aiImporterTarget">{{ $t("recipe.import-with-ai") }}</router-link>.
           </p>
-          <br>
-          <p>
-            {{ $t("new-recipe.error-details") }}
-          </p>
+          <template v-if="!isVideoPost">
+            <br>
+            <p>
+              {{ $t("new-recipe.error-details") }}
+            </p>
+          </template>
         </div>
-        <div class="d-flex row justify-space-around my-3 force-url-white">
+        <div v-if="!isVideoPost" class="d-flex row justify-space-around my-3 force-url-white">
           <a
             class="dark text-primary"
             href="https://developers.google.com/search/docs/data-types/recipe"
@@ -164,6 +170,7 @@ definePageMeta({
 });
 const state = reactive({
   error: false,
+  errorMessage: "",
   loading: false,
 });
 
@@ -189,9 +196,10 @@ const htmlOrJsonImporterTarget = computed(() => `/g/${groupSlug.value}/r/create/
 const aiImporterTarget = computed(() => `/g/${groupSlug.value}/r/create/ai`);
 const aiEnabled = computed(() => !!group.value?.aiProviderSettings?.aiEnabled);
 
-function handleResponse(response: AxiosResponse<string> | null, refreshTags = false) {
+function handleResponse(response: AxiosResponse<string> | null, refreshTags = false, errorMessage = "") {
   if (response?.status !== 201) {
     state.error = true;
+    state.errorMessage = errorMessage;
     state.loading = false;
     return;
   }
@@ -231,6 +239,10 @@ const recipeUrl = computed({
     return null;
   },
 });
+
+/** Video posts are read from their captions, so advice about a website's recipe markup doesn't apply */
+const VIDEO_POST = /^https?:\/\/([a-z0-9-]+\.)*(instagram\.com|tiktok\.com|youtube\.com|youtu\.be|vimeo\.com|facebook\.com|fb\.watch|dailymotion\.com)\//i;
+const isVideoPost = computed(() => VIDEO_POST.test(recipeUrl.value ?? ""));
 
 onMounted(() => {
   if (recipeUrl.value) {
@@ -281,14 +293,16 @@ async function createByUrl(url: string | null, importKeywordsAsTags: boolean, im
     return;
   }
   state.loading = true;
-  const { response } = await api.recipes.createOneByUrl(
+  state.error = false;
+  state.errorMessage = "";
+  const { response, error } = await api.recipes.createOneByUrl(
     url,
     importKeywordsAsTags,
     importCategories,
     (message: string) => createStatus.value = message,
   );
   createStatus.value = null;
-  handleResponse(response, importKeywordsAsTags);
+  handleResponse(response, importKeywordsAsTags, (error as { message?: string } | null)?.message ?? "");
 }
 </script>
 

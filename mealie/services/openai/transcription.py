@@ -36,6 +36,11 @@ Longest video whose audio is sent to the audio provider. Providers cap uploads b
 OpenAI's 25 MB cap is reached by an hour and three quarters of the 32 kbps audio sent to them.
 """
 
+GENERIC_TITLE = re.compile(r"^(?:video|photo|post|reel)\s+by\s+\S+$", re.IGNORECASE)
+"""The title Instagram gives every post, "Video by <account>", which says nothing about the dish"""
+HASHTAG = re.compile(r"(?:^|\s)#[^\s#]+")
+TITLE_LENGTH = 150
+
 CUE_TIMING = re.compile(r"(?:(\d+):)?(\d{1,2}):(\d{2})[.,]\d+\s*-->")
 MARKUP = re.compile(r"<[^>]*>")
 SOUND_CUE = re.compile(r"\[[^\]]*\]|\([^)]*\)|[♪\s]+")
@@ -113,6 +118,22 @@ def is_video_site(url: str) -> bool:
     return name is not None and name.split(":")[0].lower() in VIDEO_SITES
 
 
+def post_title(title: str, description: str) -> str:
+    """
+    A video's title, or for a post titled "Video by <account>", the first line of its caption, which is
+    where the dish is named ("FAJITA BOMBS 💕 Get ready for…").
+    """
+
+    if title.strip() and not GENERIC_TITLE.match(title.strip()):
+        return title
+
+    for line in description.splitlines():
+        if line := HASHTAG.sub("", line).strip():
+            return line if len(line) <= TITLE_LENGTH else f"{line[: TITLE_LENGTH - 1].rstrip()}…"
+
+    return title
+
+
 def _ydl_options(**options: Any) -> dict[str, Any]:
     ydl_opts: dict[str, Any] = {
         "quiet": True,
@@ -169,9 +190,10 @@ def read_video(url: str) -> VideoInfo:
     except Exception as e:
         raise exceptions.VideoDownloadError(f"Failed to read video: {e}") from e
 
+    description = info.get("description") or ""
     return VideoInfo(
-        title=info.get("title") or "",
-        description=info.get("description") or "",
+        title=post_title(info.get("title") or "", description),
+        description=description,
         thumbnail_url=info.get("thumbnail") or None,
         duration=info.get("duration"),
         chapters=chapters,
