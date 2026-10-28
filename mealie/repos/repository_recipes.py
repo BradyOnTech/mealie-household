@@ -375,8 +375,13 @@ class RepositoryRecipes(RecipeSuggestionMixin, HouseholdRepositoryGeneric[Recipe
     def get_extras_values(self, key: str, value_prefix: str = "") -> list[str]:
         """Returns the values of an API extra across this repo's recipes, optionally just those with a prefix"""
 
+        return [value for value, _ in self.get_extras_with_recipe_names(key, value_prefix)]
+
+    def get_extras_with_recipe_names(self, key: str, value_prefix: str = "") -> list[tuple[str, str]]:
+        """Extra values and recipe names, scoped to this repository's group and household."""
+
         stmt = (
-            sa.select(ApiExtras.value)
+            sa.select(ApiExtras.value, RecipeModel.name)
             .join(RecipeModel, RecipeModel.id == ApiExtras.recipee_id)
             .filter(ApiExtras.key_name == key)
         )
@@ -387,4 +392,28 @@ class RepositoryRecipes(RecipeSuggestionMixin, HouseholdRepositoryGeneric[Recipe
         if self.household_id:
             stmt = stmt.filter(RecipeModel.household_id == self.household_id)
 
-        return [value for value in self.session.execute(stmt).scalars().all() if value is not None]
+        return [(value, name) for value, name in self.session.execute(stmt).all() if value is not None]
+
+    def replace_extras_values(self, key: str, replacements: dict[str, str]) -> None:
+        """Changes the values of an API extra across this repo's recipes, each key in `replacements` to its value"""
+
+        if not replacements:
+            return
+
+        recipe_ids = sa.select(RecipeModel.id)
+        if self.group_id:
+            recipe_ids = recipe_ids.filter(RecipeModel.group_id == self.group_id)
+        if self.household_id:
+            recipe_ids = recipe_ids.filter(RecipeModel.household_id == self.household_id)
+
+        try:
+            for old, new in replacements.items():
+                self.session.execute(
+                    sa.update(ApiExtras)
+                    .where(ApiExtras.key_name == key, ApiExtras.value == old, ApiExtras.recipee_id.in_(recipe_ids))
+                    .values(value=new)
+                )
+            self.session.commit()
+        except Exception:
+            self.session.rollback()
+            raise

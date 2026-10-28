@@ -24,6 +24,7 @@ from mealie.schema.grocery.grocery import (
     GroceryStore,
     GroceryUnit,
 )
+from mealie.schema.group.ai_providers import AITask
 from mealie.schema.meal_plan.new_meal import PlanEntryType, SavePlanEntry
 from mealie.schema.recipe.recipe import Recipe
 from mealie.schema.response.pagination import OrderDirection, PaginationQuery
@@ -153,7 +154,9 @@ class HouseholdAssistant(BaseService):
             raise OpenAINotEnabledException("Set up an AI provider in your group settings to chat with the assistant.")
 
         history = [OpenAIChatMessage(role=message.role.value, content=message.content) for message in messages]
-        text = await self.ai.chat(self.instructions(), history[-MAX_HISTORY:], self.tools())
+        text = await self.ai.chat(
+            self.instructions(), history[-MAX_HISTORY:], self.tools(), task=AITask.household_assistant
+        )
         if not text and not self.actions:
             raise OpenAIServiceError("The assistant didn't reply. Try asking again.")
         return AssistantChatResponse(reply=text or "Done.", actions=self.actions)

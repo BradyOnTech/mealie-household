@@ -1,11 +1,20 @@
 /* tslint:disable */
-
+/* eslint-disable */
 /**
 /* This file was automatically generated from pydantic models by running pydantic2ts.
 /* Do not modify it by hand - just update the pydantic models and then re-run the script
 */
 
 export type WebhookType = "mealplan";
+export type AITask =
+  | "household_assistant"
+  | "recipe_source_reading"
+  | "recipe_building"
+  | "cookbook_discovery"
+  | "cookbook_extraction"
+  | "ingredient_parsing"
+  | "recipe_translation"
+  | "organizer_matching";
 export type AIProviderType = "openai" | "chatgpt";
 export type AuthMethod = "Mealie" | "LDAP" | "OIDC";
 
@@ -95,15 +104,28 @@ export interface AIProviderSettingsOut {
   defaultProviderId: string | null;
   audioProviderId: string | null;
   imageProviderId: string | null;
+  taskSettings?: AITaskSettingOut[];
   providers: AIProviderSummary[];
   aiEnabled: boolean;
   audioProviderEnabled: boolean;
   imageProviderEnabled: boolean;
+  imageReadingTasks: AITask[];
+}
+export interface AITaskSettingOut {
+  task: AITask;
+  providerId?: string | null;
+  model?: string | null;
+  reasoningEffort?: string | null;
+  imageProviderId?: string | null;
+  imageModel?: string | null;
+  imageReasoningEffort?: string | null;
 }
 export interface AIProviderSummary {
   id: string;
   name: string;
   providerType?: AIProviderType;
+  model?: string;
+  reasoningEffort?: string | null;
 }
 export interface GroupSummary {
   name: string;

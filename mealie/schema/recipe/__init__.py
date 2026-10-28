@@ -46,6 +46,7 @@ from .recipe_comments import (
     RecipeCommentUpdate,
     UserBase,
 )
+from .recipe_cookbook_import import CookbookImportCreate, CookbookImportOut, CookbookImportRecipe
 from .recipe_image_types import RecipeImageTypes
 from .recipe_ingredient import (
     CreateIngredientFood,
@@ -131,6 +132,9 @@ __all__ = [
     "RecipeSlug",
     "SlugResponse",
     "UpdateImageResponse",
+    "CookbookImportCreate",
+    "CookbookImportOut",
+    "CookbookImportRecipe",
     "RecipeNote",
     "CategoryBase",
     "CategoryIn",

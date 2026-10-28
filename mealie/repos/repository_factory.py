@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session, with_expression
 from mealie.db.models._model_utils.guid import GUID
 from mealie.db.models.group import Group, ReportEntryModel, ReportModel
 from mealie.db.models.group.ai_providers import AIProvider, AIProviderSettings
+from mealie.db.models.group.cookbook_import import CookbookImportModel
 from mealie.db.models.group.exports import GroupDataExportsModel
 from mealie.db.models.group.preferences import GroupPreferencesModel
 from mealie.db.models.household.cookbook import CookBook
@@ -41,6 +42,7 @@ from mealie.db.models.users import LongLiveToken, User
 from mealie.db.models.users.password_reset import PasswordResetModel
 from mealie.db.models.users.user_to_recipe import UserToRecipe
 from mealie.repos.repository_ai_provider import GroupRepositoryAIProvider, GroupRepositoryAIProviderSettings
+from mealie.repos.repository_cookbook_imports import RepositoryCookbookImports
 from mealie.repos.repository_cookbooks import RepositoryCookbooks
 from mealie.repos.repository_foods import RepositoryFood
 from mealie.repos.repository_household import RepositoryHousehold, RepositoryHouseholdRecipes
@@ -70,6 +72,7 @@ from mealie.schema.meal_plan.plan_rules import PlanRulesOut
 from mealie.schema.messages.messages import HouseholdMessageOut, PushSubscriptionOut
 from mealie.schema.recipe import Recipe, RecipeCommentOut, RecipeToolOut
 from mealie.schema.recipe.recipe_category import CategoryOut, TagOut
+from mealie.schema.recipe.recipe_cookbook_import import CookbookImportOut
 from mealie.schema.recipe.recipe_ingredient import IngredientFood, IngredientUnit
 from mealie.schema.recipe.recipe_share_token import RecipeShareToken
 from mealie.schema.recipe.recipe_timeline_events import RecipeTimelineEventOut
@@ -295,6 +298,12 @@ class AllRepositories:
     @cached_property
     def group_report_entries(self) -> GroupRepositoryGeneric[ReportEntryOut, ReportEntryModel]:
         return GroupRepositoryGeneric(self.session, PK_ID, ReportEntryModel, ReportEntryOut, group_id=self.group_id)
+
+    @cached_property
+    def cookbook_imports(self) -> RepositoryCookbookImports:
+        return RepositoryCookbookImports(
+            self.session, PK_ID, CookbookImportModel, CookbookImportOut, group_id=self.group_id
+        )
 
     @cached_property
     def group_ai_provider_settings(self) -> GroupRepositoryAIProviderSettings:

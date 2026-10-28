@@ -1,7 +1,7 @@
 # Household Groceries fork
 
 This checkout adds preferred grocery products, multi-store weekly lists, pantry/staple rules, dinner suggestions,
-an Out of list and Common items, the Ask assistant, recipe imports from PDF cookbooks and videos, and household
+an Out of list and Common items, the Ask assistant, recipe imports from PDF and EPUB cookbooks and videos, and household
 Messages with push notifications.
 See [HOUSEHOLD_GROCERIES.md](HOUSEHOLD_GROCERIES.md) for setup and usage, and [DEPLOY.md](DEPLOY.md) for deploying
 to the household Mac mini.

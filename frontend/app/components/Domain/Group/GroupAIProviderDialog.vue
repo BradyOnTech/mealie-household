@@ -116,14 +116,13 @@
               {{ $t('search.advanced') }}
             </v-expansion-panel-title>
             <v-expansion-panel-text>
-              <v-text-field
-                v-if="isChatGPT"
-                v-model="formData.model"
-                :label="$t('group.ai-provider-settings.model')"
-                :hint="$t('group.ai-provider-settings.chatgpt-model-description')"
-                persistent-hint
-                density="compact"
-                variant="outlined"
+              <GroupAIModelFields
+                v-model:model="chatgptModel"
+                v-model:effort="formData.reasoningEffort"
+                :provider-type="formData.providerType"
+                :show-model="isChatGPT"
+                :catalog="catalogKey ? catalogs[catalogKey] ?? null : null"
+                :catalog-loading="!!(catalogKey && catalogLoading[catalogKey])"
                 class="mb-4"
               />
               <v-number-input
@@ -182,8 +181,10 @@
 </template>
 
 <script setup lang="ts">
+import GroupAIModelFields from "~/components/Domain/Group/GroupAIModelFields.vue";
 import GroupChatGPTSignIn from "~/components/Domain/Group/GroupChatGPTSignIn.vue";
 import { useAIProviders } from "~/composables/use-ai-providers";
+import { useAIModelCatalogs } from "~/composables/use-ai-task-settings";
 import { validators } from "~/composables/use-validators";
 import type {
   AIProviderCreate,
@@ -211,7 +212,7 @@ const emit = defineEmits<{
 const dialog = defineModel<boolean>({ default: false });
 
 const i18n = useI18n();
-const { loading, getOne, testOne, testSavedOne } = useAIProviders();
+const { loading, getOne, testOne, testSavedOne, listModels, listChatGPTLoginModels } = useAIProviders();
 const init = ref(false);
 
 const form = ref();
@@ -245,6 +246,7 @@ const defaultForm = (providerType: AIProviderType = props.initialType) => ({
   apiKey: "",
   baseUrl: "",
   timeout: 300,
+  reasoningEffort: null as string | null,
   requestHeaders: {} as Record<string, string>,
   requestParams: {} as Record<string, string>,
 });
@@ -261,6 +263,28 @@ const savedAccount = ref<string | null | undefined>(undefined);
 const login = ref<ChatGPTLoginOut | null>(null);
 const loginConnected = computed(() => login.value?.state === "connected");
 
+// The models a ChatGPT provider can pick from: its new sign-in's, or else the saved provider's. Listed only once
+// Advanced is opened, since listing them starts Codex on the server.
+const { catalogs, loading: catalogLoading, load: loadCatalog } = useAIModelCatalogs(async (key) => {
+  const [kind, id] = key.split(":", 2) as [string, string];
+  const { data } = kind === "login" ? await listChatGPTLoginModels(id) : await listModels(id);
+  return data;
+});
+const catalogKey = computed(() => {
+  if (!isChatGPT.value) return null;
+  if (loginConnected.value && login.value) return `login:${login.value.id}`;
+  return isEdit.value && props.providerId && savedAccount.value !== undefined ? `provider:${props.providerId}` : null;
+});
+watch([advancedPanel, catalogKey], ([panel, key]) => {
+  if (panel === "advanced" && key) void loadCatalog(key);
+});
+
+/** The model field holds "" for "the plan's default"; the picker uses null for it */
+const chatgptModel = computed({
+  get: () => formData.model || null,
+  set: (value: string | null | undefined) => { formData.model = value ?? ""; },
+});
+
 function chooseType(providerType: AIProviderType) {
   if (formData.providerType === providerType) return;
   // Keep a name someone typed; swap one that's still the other kind's default
@@ -269,6 +293,8 @@ function chooseType(providerType: AIProviderType) {
   }
   formData.providerType = providerType;
   formData.model = "";
+  // Levels differ between the two kinds, so one chosen for the other doesn't carry over
+  formData.reasoningEffort = null;
 }
 
 async function onConnected() {
@@ -320,11 +346,12 @@ watch(
       formData.apiKey = "";
       formData.baseUrl = data.baseUrl ?? "";
       formData.timeout = data.timeout ?? 300;
+      formData.reasoningEffort = data.reasoningEffort ?? null;
       formData.requestHeaders = { ...(data.requestHeaders ?? {}) };
       formData.requestParams = { ...(data.requestParams ?? {}) };
       savedAccount.value = formData.providerType === "chatgpt" ? data.chatgptAccount : undefined;
       // Open Advanced when something in it has been set, so it isn't hidden
-      const customized = (isChatGPT.value && formData.model) || formData.timeout !== 300
+      const customized = (isChatGPT.value && formData.model) || formData.reasoningEffort || formData.timeout !== 300
         || Object.keys(formData.requestHeaders).length || Object.keys(formData.requestParams).length;
       advancedPanel.value = customized ? "advanced" : undefined;
     }
@@ -344,6 +371,7 @@ function buildPayload(): AIProviderPayload {
       name: formData.name.trim(),
       model: formData.model.trim(),
       timeout: formData.timeout,
+      reasoningEffort: formData.reasoningEffort,
       ...(loginConnected.value && login.value ? { chatgptLoginId: login.value.id } : {}),
     };
   }
@@ -354,6 +382,7 @@ function buildPayload(): AIProviderPayload {
     model: formData.model.trim(),
     baseUrl: formData.baseUrl.trim() || null,
     timeout: formData.timeout,
+    reasoningEffort: formData.reasoningEffort,
     requestHeaders: Object.keys(formData.requestHeaders).length ? formData.requestHeaders : undefined,
     requestParams: Object.keys(formData.requestParams).length ? formData.requestParams : undefined,
     // Left out when blank, which on edit means "keep the existing key"

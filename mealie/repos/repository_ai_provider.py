@@ -1,9 +1,18 @@
+from typing import Any
+
 import sqlalchemy as sa
 from fastapi import HTTPException, status
-from pydantic import UUID4, BaseModel
+from pydantic import UUID4, BaseModel, ValidationError
 
-from mealie.db.models.group.ai_providers import AIProvider, AIProviderSettings
-from mealie.schema.group.ai_providers import AIProviderCreate, AIProviderOut, AIProviderSettingsOut, AIProviderType
+from mealie.db.models.group.ai_providers import AIProvider, AIProviderSettings, AITaskSetting
+from mealie.schema.group.ai_providers import (
+    AIProviderCreate,
+    AIProviderOut,
+    AIProviderSettingsOut,
+    AIProviderSettingsUpdate,
+    AIProviderType,
+    AITaskSettingUpdate,
+)
 
 from .repository_generic import GroupRepositoryGeneric
 
@@ -42,8 +51,12 @@ class GroupRepositoryAIProvider(GroupRepositoryGeneric[AIProviderOut, AIProvider
             # api_key is excluded from the schema's dump, so carry it over by hand, the same
             # way create does. Without this every update looks like it omitted the key.
             api_key = new_data.api_key
+            fields_set = new_data.model_fields_set
             new_data = new_data.model_dump()
             new_data["api_key"] = api_key
+            # A client from before reasoning effort existed leaves it out, which mustn't clear a saved one
+            if "reasoning_effort" not in fields_set:
+                new_data.pop("reasoning_effort", None)
 
         # Keep the existing credentials unless new ones were given
         existing = self.get_one(match_value)
@@ -99,6 +112,24 @@ class GroupRepositoryAIProvider(GroupRepositoryGeneric[AIProviderOut, AIProvider
             .where(AIProviderSettings.image_provider_id == value)
             .values(image_provider_id=None)
         )
+        # A task's model and reasoning were chosen for this provider, so they go with it
+        self.session.execute(
+            sa.update(AITaskSetting)
+            .where(AITaskSetting.provider_id == value)
+            .values(provider_id=None, model=None, reasoning_effort=None)
+            .execution_options(synchronize_session=False)
+        )
+        self.session.execute(
+            sa.update(AITaskSetting)
+            .where(AITaskSetting.image_provider_id == value)
+            .values(image_provider_id=None, image_model=None, image_reasoning_effort=None)
+            .execution_options(synchronize_session=False)
+        )
+        self.session.execute(
+            sa.delete(AITaskSetting)
+            .where(AITaskSetting.provider_id.is_(None), AITaskSetting.image_provider_id.is_(None))
+            .execution_options(synchronize_session=False)
+        )
 
         # Delete
         return super().delete(value, match_key)
@@ -107,21 +138,84 @@ class GroupRepositoryAIProvider(GroupRepositoryGeneric[AIProviderOut, AIProvider
         raise NotImplementedError
 
 
+ROLE_FIELDS = ("default_provider_id", "audio_provider_id", "image_provider_id")
+
+
+def _bad_request(detail: str) -> HTTPException:
+    return HTTPException(status.HTTP_400_BAD_REQUEST, detail=detail)
+
+
 class GroupRepositoryAIProviderSettings(GroupRepositoryGeneric[AIProviderSettingsOut, AIProviderSettings]):
+    @staticmethod
+    def _read_update(new_data: dict | BaseModel, settings: AIProviderSettings) -> AIProviderSettingsUpdate:
+        """
+        Only the provider choices are taken from `new_data`; anything else on it (like the providers themselves,
+        when it's a whole `AIProviderSettingsOut`) is ignored, and a choice it leaves out keeps its saved value.
+        Task choices are left as None, meaning "keep the saved ones", unless `new_data` has them.
+        """
+        raw: dict[str, Any] = new_data if isinstance(new_data, dict) else new_data.__dict__
+        tasks = raw.get("task_settings")
+        try:
+            return AIProviderSettingsUpdate.model_validate(
+                {
+                    **{field: raw.get(field, getattr(settings, field)) for field in ROLE_FIELDS},
+                    "task_settings": None
+                    if tasks is None
+                    else [task.model_dump() if isinstance(task, BaseModel) else task for task in tasks],
+                }
+            )
+        except ValidationError as e:
+            raise _bad_request(f"Invalid AI settings: {e.errors()[0].get('msg', 'invalid value')}") from e
+
     def update(self, match_value: str | int | UUID4, new_data: dict | BaseModel) -> AIProviderSettingsOut:
-        new_data = new_data if isinstance(new_data, dict) else new_data.model_dump()
+        # The query is scoped to this repository's group, so another group's settings are never found
+        settings = self._query_one(match_value)
+        update = self._read_update(new_data, settings)
+        types = self._provider_types(settings.id, update.referenced_provider_ids())
 
-        if audio_provider_id := new_data.get("audio_provider_id"):
-            provider_type = self.session.execute(
-                sa.select(AIProvider.provider_type).where(AIProvider.id == audio_provider_id)
-            ).scalar_one_or_none()
-            if provider_type == AIProviderType.chatgpt:
-                raise HTTPException(
-                    status.HTTP_400_BAD_REQUEST,
-                    detail="A ChatGPT subscription provider can't transcribe audio, so it can't be the audio provider",
-                )
+        if update.audio_provider_id and types[update.audio_provider_id] == AIProviderType.chatgpt:
+            raise _bad_request(
+                "A ChatGPT subscription provider can't transcribe audio, so it can't be the audio provider"
+            )
 
-        return super().update(match_value, new_data)
+        if update.task_settings is not None:
+            self.session.execute(
+                sa.delete(AITaskSetting)
+                .where(AITaskSetting.settings_id == settings.id)
+                .execution_options(synchronize_session=False)
+            )
+            for task_setting in update.task_settings:
+                self.session.add(self._task_row(settings.id, task_setting))
+            # Re-read the collection, rather than trusting the copy loaded before the rows were replaced
+            self.session.flush()
+            self.session.expire(settings, ["task_settings"])
+
+        return super().update(match_value, {field: getattr(update, field) for field in ROLE_FIELDS})
+
+    def _provider_types(self, settings_id: UUID4, provider_ids: set[UUID4]) -> dict[UUID4, str]:
+        """
+        The type of each provider, which must all belong to the same group as the settings. One from another group
+        is refused, so settings can never point a group's AI requests at someone else's account.
+        """
+        if not provider_ids:
+            return {}
+
+        rows = self.session.execute(
+            sa.select(AIProvider.id, AIProvider.provider_type).where(
+                AIProvider.settings_id == settings_id, AIProvider.id.in_(provider_ids)
+            )
+        ).all()
+        types = {row.id: row.provider_type for row in rows}
+        if set(types) != provider_ids:
+            raise _bad_request("That AI provider doesn't exist in this group")
+        return types
+
+    def _task_row(self, settings_id: UUID4, task_setting: AITaskSettingUpdate) -> AITaskSetting:
+        return AITaskSetting(
+            session=self.session,
+            settings_id=settings_id,
+            **{**task_setting.model_dump(), "task": task_setting.task.value},
+        )
 
     def adopt(self, provider: AIProviderOut) -> AIProviderSettingsOut | None:
         """

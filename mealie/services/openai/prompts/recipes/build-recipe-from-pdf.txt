@@ -1,4 +1,4 @@
-The source is a single recipe from a PDF cookbook. The user message names the recipe, then gives each of its pages: a marker like "--- Page 12 ---", followed by the text extracted from that page. When images are attached, they show the same pages, in the same order.
+The source is a single recipe from a cookbook (a PDF, or an ebook cut into pages). The user message names the recipe, then gives each of its pages: a marker like "--- Page 12 ---", followed by the text extracted from that page. When images are attached, they show the same pages, in the same order.
 
 When reading the source:
 - Extracted text often comes out of reading order. Titles, columns of ingredients, step numbers, nutrition panels, and section headings can end up apart from the text they belong with. When there are page images, use them to see the layout and work out what belongs where, but take the wording from the extracted text.

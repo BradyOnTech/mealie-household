@@ -367,9 +367,19 @@ def groups_ai_providers_chatgpt_login_login_id(login_id):
     return f"{prefix}/groups/ai-providers/chatgpt-login/{login_id}"
 
 
+def groups_ai_providers_chatgpt_login_login_id_models(login_id):
+    """`/api/groups/ai-providers/chatgpt-login/{login_id}/models`"""
+    return f"{prefix}/groups/ai-providers/chatgpt-login/{login_id}/models"
+
+
 def groups_ai_providers_providers_provider_id(provider_id):
     """`/api/groups/ai-providers/providers/{provider_id}`"""
     return f"{prefix}/groups/ai-providers/providers/{provider_id}"
+
+
+def groups_ai_providers_providers_provider_id_models(provider_id):
+    """`/api/groups/ai-providers/providers/{provider_id}/models`"""
+    return f"{prefix}/groups/ai-providers/providers/{provider_id}/models"
 
 
 def groups_ai_providers_providers_provider_id_test(provider_id):

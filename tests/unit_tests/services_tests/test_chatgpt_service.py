@@ -113,6 +113,35 @@ for line in sys.stdin:
                 ],
             }}
         send({{"method": "turn/completed", "params": {{"threadId": "thread-1", "turn": turn}}}})
+    elif method == "model/list":
+        calls = []
+        if os.path.exists(os.path.join(RECORD, "model_list")):
+            with open(os.path.join(RECORD, "model_list")) as f:
+                calls = json.load(f)
+        record("model_list", calls + [params])
+        if MODE == "endless_models":
+            send({{"id": request_id, "result": {{"data": [], "nextCursor": f"page-{{len(calls) + 2}}"}}}})
+        elif not params.get("cursor"):
+            fast = {{
+                "id": "fast", "model": "fast-model", "displayName": "Fast", "description": "Quick answers",
+                "hidden": False, "isDefault": True, "defaultReasoningEffort": "low",
+                "supportedReasoningEfforts": [
+                    {{"reasoningEffort": "low", "description": "Quickest"}},
+                    {{"reasoningEffort": "medium", "description": "Balanced"}},
+                ],
+                "inputModalities": ["text", "image"], "futureField": {{"ignored": True}},
+            }}
+            hidden = dict(fast, id="hidden", model="hidden-model", hidden=True, isDefault=False)
+            page = [fast, hidden, {{"displayName": "No id"}}, "junk"]
+            send({{"id": request_id, "result": {{"data": page, "nextCursor": "page-2"}}}})
+        else:
+            deep = {{
+                "id": "deep", "model": "deep-model", "displayName": "Deep", "description": "",
+                "hidden": False, "isDefault": False, "defaultReasoningEffort": "high",
+                "supportedReasoningEfforts": [{{"reasoningEffort": "high", "description": "Thorough"}}],
+            }}
+            duplicate = {{"id": "fast", "model": "fast-model", "displayName": "Fast again", "hidden": False}}
+            send({{"id": request_id, "result": {{"data": [deep, duplicate], "nextCursor": None}}}})
     elif method == "account/login/start":
         send({{
             "id": request_id,

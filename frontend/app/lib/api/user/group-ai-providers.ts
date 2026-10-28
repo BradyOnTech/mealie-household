@@ -1,5 +1,6 @@
 import { BaseAPI } from "../base/base-clients";
 import type {
+  AIModelCatalog,
   AIProviderCreate,
   AIProviderOut,
   AIProviderTestResult,
@@ -17,8 +18,10 @@ const routes = {
   providersId: (id: string) => `${prefix}/providers/${id}`,
   providersTest: `${prefix}/providers/test`,
   providersIdTest: (id: string) => `${prefix}/providers/${id}/test`,
+  providersIdModels: (id: string) => `${prefix}/providers/${id}/models`,
   chatgptLogin: `${prefix}/chatgpt-login`,
   chatgptLoginId: (id: string) => `${prefix}/chatgpt-login/${id}`,
+  chatgptLoginIdModels: (id: string) => `${prefix}/chatgpt-login/${id}/models`,
 };
 
 export class AIProvidersAPI extends BaseAPI {
@@ -44,6 +47,21 @@ export class AIProvidersAPI extends BaseAPI {
 
   async testSavedOne(id: string, overrides?: AIProviderPayload) {
     return await this.requests.post<AIProviderTestResult>(routes.providersIdTest(id), overrides);
+  }
+
+  /** The models a saved ChatGPT provider's catalog lists. A catalog, not what the account is entitled to. */
+  async listModels(id: string, refresh = false) {
+    // The catalog's message is shown beside the model field, not as a pop-up
+    return await this.requests.get<AIModelCatalog>(
+      routes.providersIdModels(id),
+      refresh ? { refresh: true } : {},
+      { suppressAlert: true },
+    );
+  }
+
+  /** The models a finished, not yet saved, ChatGPT sign-in's catalog lists */
+  async listChatGPTLoginModels(id: string) {
+    return await this.requests.get<AIModelCatalog>(routes.chatgptLoginIdModels(id), {}, { suppressAlert: true });
   }
 
   async startChatGPTLogin() {

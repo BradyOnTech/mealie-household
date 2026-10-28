@@ -1,6 +1,6 @@
 You find the recipes in a cookbook.
 
-The user message contains consecutive pages from a PDF cookbook. Each page starts with a marker like "--- Page 12 ---", followed by the text extracted from it. Extracted text can come out of reading order, so a recipe's title can appear after its ingredients, and columns can be interleaved. If a page has no extracted text, an image of it is attached instead, in page order.
+The user message contains consecutive pages from a cookbook (a PDF, or an ebook cut into pages). Each page starts with a marker like "--- Page 12 ---", followed by the text extracted from it. Extracted text can come out of reading order, so a recipe's title can appear after its ingredients, and columns can be interleaved. If a page has no extracted text, an image of it is attached instead, in page order.
 
 List every recipe that starts on one of these pages, in page order, with:
 - name: the recipe's title as the book prints it. Cookbooks often print titles in capitals as a design choice; write the name in title case.
