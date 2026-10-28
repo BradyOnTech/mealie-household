@@ -229,8 +229,9 @@ export class RecipeAPI extends BaseCRUDAPI<CreateRecipe, Recipe, Recipe> {
     includeCategories: boolean,
     url: string | null = null,
     onProgress?: (message: string) => void,
+    organize = true,
   ): Promise<RequestResponse<string>> {
-    return this.streamRecipeCreate(routes.recipesCreateFromHtmlOrJson, { data, includeTags, includeCategories, url }, onProgress);
+    return this.streamRecipeCreate(routes.recipesCreateFromHtmlOrJson, { data, includeTags, includeCategories, url, organize }, onProgress);
   }
 
   async createOneByUrl(
@@ -238,8 +239,9 @@ export class RecipeAPI extends BaseCRUDAPI<CreateRecipe, Recipe, Recipe> {
     includeTags: boolean,
     includeCategories: boolean,
     onProgress?: (message: string) => void,
+    organize = true,
   ): Promise<RequestResponse<string>> {
-    return this.streamRecipeCreate(routes.recipesCreateUrl, { url, includeTags, includeCategories }, onProgress);
+    return this.streamRecipeCreate(routes.recipesCreateUrl, { url, includeTags, includeCategories, organize }, onProgress);
   }
 
   async createManyByUrl(payload: CreateRecipeByUrlBulk) {

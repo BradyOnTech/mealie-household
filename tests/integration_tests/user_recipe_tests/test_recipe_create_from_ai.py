@@ -499,23 +499,28 @@ def test_create_from_video_url_that_cannot_be_read(
     assert ai.requested_schemas == []
 
 
-def test_organizers_are_skipped_when_there_is_nothing_to_do(
+def test_standard_organizers_bootstrap_an_empty_collection(
     api_client: TestClient,
     unique_user: TestUser,
     monkeypatch: pytest.MonkeyPatch,
     openai_recipe: OpenAIRecipe,
 ):
-    """With no existing organizers and creation switched off, the step can't do anything."""
+    """An empty collection can acquire useful standard labels without enabling arbitrary creation."""
 
     assert not any(OrganizerResolver(unique_user.repos).existing_names().values()), (
         "this test needs a group that has no organizers yet"
     )
 
-    ai = AIResponses(recipe=openai_recipe, organizers=OpenAIOrganizers(tags=[random_string()])).install(monkeypatch)
+    ai = AIResponses(
+        recipe=openai_recipe, organizers=OpenAIOrganizers(tags=["Chicken"], categories=["Main Dish"])
+    ).install(monkeypatch)
 
     r = post_ai(api_client, unique_user, {"content": random_string()})
     assert r.status_code == 201
-    assert "OpenAIOrganizers" not in ai.requested_schemas
+    assert "OpenAIOrganizers" in ai.requested_schemas
+    recipe = api_client.get(api_routes.recipes_slug(json.loads(r.text)), headers=unique_user.token).json()
+    assert [tag["name"] for tag in recipe["tags"]] == ["Chicken"]
+    assert [category["name"] for category in recipe["recipeCategory"]] == ["Main Dish"]
 
 
 def test_existing_organizers_are_attached_without_creating_new_ones(

@@ -44,6 +44,7 @@
             persistent-hint
           />
         </v-card-text>
+        <RecipeImportOrganizationOption v-model="organize" :disabled="state.loading" />
         <v-checkbox
           v-model="importKeywordsAsTags"
           color="primary"
@@ -157,10 +158,11 @@
 </template>
 
 <script setup lang="ts">
+import RecipeImportOrganizationOption from "~/components/Domain/Recipe/RecipeImportOrganizationOption.vue";
 import type { AxiosResponse } from "axios";
 import { useUserApi } from "~/composables/api";
 import { useGroupSelf } from "~/composables/use-groups";
-import { useTagStore } from "~/composables/store/use-tag-store";
+import { useCategoryStore, useTagStore, useToolStore } from "~/composables/store";
 import { useNewRecipeOptions } from "~/composables/use-new-recipe-options";
 import { validators } from "~/composables/use-validators";
 import type { VForm } from "~/types/auto-forms";
@@ -182,6 +184,9 @@ const { group } = useGroupSelf();
 
 const router = useRouter();
 const tags = useTagStore();
+const categories = useCategoryStore();
+const tools = useToolStore();
+const organize = ref(true);
 
 const {
   importKeywordsAsTags,
@@ -196,16 +201,16 @@ const htmlOrJsonImporterTarget = computed(() => `/g/${groupSlug.value}/r/create/
 const aiImporterTarget = computed(() => `/g/${groupSlug.value}/r/create/ai`);
 const aiEnabled = computed(() => !!group.value?.aiProviderSettings?.aiEnabled);
 
-function handleResponse(response: AxiosResponse<string> | null, refreshTags = false, errorMessage = "") {
+function handleResponse(response: AxiosResponse<string> | null, errorMessage = "") {
   if (response?.status !== 201) {
     state.error = true;
     state.errorMessage = errorMessage;
     state.loading = false;
     return;
   }
-  if (refreshTags) {
-    tags.actions.refresh();
-  }
+  tags.actions.refresh();
+  categories.actions.refresh();
+  tools.actions.refresh();
 
   navigateToRecipe(response.data, groupSlug.value, `/g/${groupSlug.value}/r/create/url`);
 }
@@ -300,9 +305,10 @@ async function createByUrl(url: string | null, importKeywordsAsTags: boolean, im
     importKeywordsAsTags,
     importCategories,
     (message: string) => createStatus.value = message,
+    organize.value,
   );
   createStatus.value = null;
-  handleResponse(response, importKeywordsAsTags, (error as { message?: string } | null)?.message ?? "");
+  handleResponse(response, (error as { message?: string } | null)?.message ?? "");
 }
 </script>
 

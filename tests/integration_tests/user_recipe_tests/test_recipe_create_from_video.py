@@ -9,6 +9,7 @@ import mealie.services.openai.transcription as transcription_module
 import mealie.services.scraper.recipe_scraper as recipe_scraper_module
 from mealie.core import exceptions
 from mealie.schema.group.ai_providers import AIProviderCreate, AIProviderSettingsUpdate
+from mealie.schema.openai.organizers import OpenAIOrganizers
 from mealie.schema.openai.recipe import OpenAIRecipe, OpenAIRecipeIngredient, OpenAIRecipeInstruction
 from mealie.services.openai import OpenAIService
 from mealie.services.openai.transcription import VideoInfo
@@ -98,6 +99,8 @@ def messages(monkeypatch: pytest.MonkeyPatch, openai_recipe: OpenAIRecipe) -> li
 
     async def mock_get_response(self, prompt, message, *args, response_schema=None, **kwargs):
         sent.append(message)
+        if response_schema is OpenAIOrganizers:
+            return OpenAIOrganizers(categories=["Main Dish"])
         return openai_recipe if response_schema is OpenAIRecipe else None
 
     monkeypatch.setattr(OpenAIService, "get_response", mock_get_response)
@@ -118,13 +121,15 @@ def test_create_recipe_from_video(
     r = _import(api_client, unique_user)
     assert r.status_code == 201
 
-    assert len(messages) == 1
+    assert len(messages) == 2  # Extract once, then classify using the original video context.
     assert video.captions in messages[0]
     assert video.description in messages[0]
+    assert video.captions in messages[1]
 
     recipe = api_client.get(api_routes.recipes_slug(json.loads(r.text)), headers=unique_user.token).json()
     assert recipe["name"] == openai_recipe.name
     assert recipe["orgURL"] == VIDEO_URL
+    assert [category["name"] for category in recipe["recipeCategory"]] == ["Main Dish"]
     assert len(recipe["recipeIngredient"]) == len(openai_recipe.ingredients)
     assert len(recipe["recipeInstructions"]) == len(openai_recipe.instructions)
 

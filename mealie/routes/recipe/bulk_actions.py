@@ -5,7 +5,7 @@ from fastapi import APIRouter, HTTPException, status
 from pydantic import UUID4
 
 from mealie.core.dependencies.dependencies import get_temporary_zip_path
-from mealie.core.exceptions import PermissionDenied
+from mealie.core.exceptions import NoEntryFound, PermissionDenied
 from mealie.core.security import create_file_token
 from mealie.routes._base import BaseUserController, controller
 from mealie.schema.group.group_exports import GroupDataExport
@@ -16,8 +16,15 @@ from mealie.schema.recipe.recipe_bulk_actions import (
     DeleteRecipes,
     ExportRecipes,
 )
+from mealie.schema.recipe.recipe_organization import (
+    RecipeOrganizationApplyIn,
+    RecipeOrganizationOut,
+    RecipeOrganizationPreviewIn,
+)
 from mealie.schema.response.responses import ErrorResponse, SuccessResponse
+from mealie.services.openai.openai import OpenAINotEnabledException
 from mealie.services.recipe.recipe_bulk_service import RecipeBulkActionsService
+from mealie.services.recipe.recipe_organization_service import RecipeOrganizationService
 from mealie.services.recipe.recipe_service import RecipeService
 
 router = APIRouter(prefix="/bulk-actions")
@@ -32,6 +39,31 @@ class RecipeBulkActionsController(BaseUserController):
     @cached_property
     def recipe_service(self) -> RecipeService:
         return RecipeService(self.repos, self.user, self.household, self.translator)
+
+    @cached_property
+    def organization_service(self) -> RecipeOrganizationService:
+        return RecipeOrganizationService(self.repos, self.user, self.household, self.translator)
+
+    @router.post("/organize/preview", response_model=list[RecipeOrganizationOut])
+    async def preview_organization(self, data: RecipeOrganizationPreviewIn) -> list[RecipeOrganizationOut]:
+        try:
+            return await self.organization_service.preview(data.recipes)
+        except OpenAINotEnabledException as e:
+            raise HTTPException(400, self.t("recipe.import-errors.ai-not-enabled")) from e
+        except NoEntryFound as e:
+            raise HTTPException(404, str(e)) from e
+        except PermissionDenied as e:
+            raise HTTPException(403, str(e)) from e
+
+    @router.post("/organize/apply", response_model=SuccessResponse)
+    def apply_organization(self, data: RecipeOrganizationApplyIn) -> SuccessResponse:
+        try:
+            self.organization_service.apply(data.recipes)
+        except NoEntryFound as e:
+            raise HTTPException(404, str(e)) from e
+        except PermissionDenied as e:
+            raise HTTPException(403, str(e)) from e
+        return SuccessResponse(message="Recipe organization applied")
 
     # TODO Should these actions return some success response?
     @router.post("/tag")

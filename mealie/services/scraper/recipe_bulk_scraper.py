@@ -85,7 +85,7 @@ class RecipeBulkScraperService(BaseService):
         async def _do(url: str) -> Recipe | None:
             async with sem:
                 try:
-                    recipe, _ = await create_from_html(url, self.repos, self.translator)
+                    recipe, _ = await create_from_html(url, self.repos, self.translator, organize=urls.organize)
                     return recipe
                 except Exception as e:
                     self.service.logger.error(f"failed to scrape url during bulk url import {url}")
@@ -102,10 +102,12 @@ class RecipeBulkScraperService(BaseService):
                 continue
 
             if b.tags:
-                recipe.tags = b.tags
+                recipe.tags = list({tag.id: tag for tag in [*(recipe.tags or []), *b.tags]}.values())
 
             if b.categories:
-                recipe.recipe_category = b.categories
+                recipe.recipe_category = list(
+                    {cat.id: cat for cat in [*(recipe.recipe_category or []), *b.categories]}.values()
+                )
 
             try:
                 self.service.create_one(recipe)

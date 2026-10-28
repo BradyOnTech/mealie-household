@@ -77,7 +77,7 @@ from mealie.services.recipe.recipe_data_service import (
     RecipeDataService,
 )
 from mealie.services.scraper.recipe_bulk_scraper import RecipeBulkScraperService
-from mealie.services.scraper.scraped_extras import ScraperContext
+from mealie.services.scraper.scraped_extras import ScrapedExtras, ScraperContext
 from mealie.services.scraper.scraper import create_from_html
 from mealie.services.scraper.scraper_strategies import (
     ForceTimeoutException,
@@ -341,19 +341,24 @@ class RecipeController(BaseRecipeController):
                 on_progress=on_progress,
                 include_tags=req.include_tags,
                 include_categories=req.include_categories,
+                organize=req.organize,
             )
             return self._finish_recipe_from_web(req, recipe, extras)
 
         return self._stream_recipe_creation(create)
 
-    def _finish_recipe_from_web(self, req: ScrapeRecipe | ScrapeRecipeData, recipe: Recipe, extras: object) -> str:
-        if req.include_tags:
+    def _finish_recipe_from_web(
+        self, req: ScrapeRecipe | ScrapeRecipeData, recipe: Recipe, extras: ScrapedExtras | None
+    ) -> str:
+        if req.include_tags and extras:
             ctx = ScraperContext(self.repos)
-            recipe.tags = extras.use_tags(ctx)  # type: ignore
+            recipe.tags = [*{tag.id: tag for tag in [*(recipe.tags or []), *extras.use_tags(ctx)]}.values()]
 
-        if req.include_categories:
+        if req.include_categories and extras:
             ctx = ScraperContext(self.repos)
-            recipe.recipe_category = extras.use_categories(ctx)  # type: ignore
+            recipe.recipe_category = [
+                *{cat.id: cat for cat in [*(recipe.recipe_category or []), *extras.use_categories(ctx)]}.values()
+            ]
 
         new_recipe = self.service.create_one(recipe)
         self._publish_recipe_created(new_recipe)
@@ -472,7 +477,7 @@ class RecipeController(BaseRecipeController):
         file: Annotated[UploadFile, File()],
         name: Annotated[str | None, Form()] = None,
         add_cookbook: Annotated[bool, Form(alias="addCookbook")] = True,
-        add_organizers: Annotated[bool, Form(alias="addOrganizers")] = False,
+        add_organizers: Annotated[bool, Form(alias="addOrganizers")] = True,
     ) -> ScrapeRecipePdfStarted:
         """
         Imports every recipe in a cookbook PDF or EPUB using AI, tagging each with the cookbook's name. The

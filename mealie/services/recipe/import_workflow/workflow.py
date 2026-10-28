@@ -18,7 +18,8 @@ class RecipeImportWorkflow:
 
     Run by the `/recipes/create/ai` route and by `RecipeScraperOpenAI`, the fallback strategy for
     `/recipes/create/url`. The other scraper strategies don't use it, so an ordinary URL import of
-    a well-marked-up site never runs the workflow at all.
+    a well-marked-up site never runs the workflow at all. URL imports run the shared classifier
+    after extraction instead, so every strategy receives the same organization policy.
 
     The workflow never persists the recipe; it returns a draft for the caller to save.
     """

@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from slugify import slugify
 
 from mealie.repos.repository_factory import AllRepositories
-from mealie.schema.recipe import TagOut
+from mealie.schema.recipe.recipe import RecipeCategory, RecipeTag
 from mealie.schema.recipe.recipe_category import CategorySave, TagSave
 from mealie.schema.recipe.recipe_tool import RecipeToolOut, RecipeToolSave
 
@@ -22,6 +22,12 @@ class ScrapedExtras:
         self._tags: list[str] = []
         self._categories: list[str] = []
         self._tools: list[str] = []
+        self.source: str = ""
+        self.extract_source_organizers = False
+
+    @property
+    def classification_source(self) -> str:
+        return "\n".join([self.source, f"Source keywords: {self._tags}", f"Source categories: {self._categories}"])
 
     def set_tags(self, tags: list[str]) -> None:
         self._tags = tags
@@ -32,7 +38,7 @@ class ScrapedExtras:
     def set_tools(self, tools: list[str]) -> None:
         self._tools = tools
 
-    def use_tags(self, ctx: ScraperContext) -> list[TagOut]:
+    def use_tags(self, ctx: ScraperContext) -> list[RecipeTag]:
         if not self._tags:
             return []
 
@@ -57,9 +63,9 @@ class ScrapedExtras:
 
             tags.append(db_tag)
 
-        return tags
+        return [RecipeTag.model_validate(tag, from_attributes=True) for tag in tags]
 
-    def use_categories(self, ctx: ScraperContext) -> list[TagOut]:
+    def use_categories(self, ctx: ScraperContext) -> list[RecipeCategory]:
         if not self._categories:
             return []
 
@@ -84,7 +90,7 @@ class ScrapedExtras:
 
             categories.append(db_category)
 
-        return categories
+        return [RecipeCategory.model_validate(category, from_attributes=True) for category in categories]
 
     def use_tools(self, ctx: ScraperContext) -> list[RecipeToolOut]:
         if not self._tools:

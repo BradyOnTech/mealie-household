@@ -110,6 +110,7 @@ class CreateRecipeBulk(BaseModel):
 
 class CreateRecipeByUrlBulk(BaseModel):
     imports: list[CreateRecipeBulk]
+    organize: bool = True
 
 
 class CreateRecipe(MealieModel):

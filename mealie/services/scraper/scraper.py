@@ -11,10 +11,11 @@ from mealie.pkgs import cache
 from mealie.repos.repository_factory import AllRepositories
 from mealie.schema.recipe import Recipe
 from mealie.schema.recipe.recipe import create_recipe_slug
+from mealie.services.recipe.recipe_classifier import RecipeClassifier
 from mealie.services.recipe.recipe_data_service import RecipeDataService
 from mealie.services.scraper.scraped_extras import ScrapedExtras
 
-from .cleaner import NO_IMAGE
+from .cleaner import NO_IMAGE, clean_categories, clean_tags
 from .recipe_scraper import RecipeScraper
 
 
@@ -32,6 +33,7 @@ async def create_from_html(
     on_progress: Callable[[str], Awaitable[None]] | None = None,
     include_tags: bool = False,
     include_categories: bool = False,
+    organize: bool = True,
 ) -> tuple[Recipe, ScrapedExtras | None]:
     """Main entry point for generating a recipe from a URL. Pass in a URL and
     a Recipe object will be returned if successful. Optionally pass in the HTML to skip fetching it.
@@ -62,6 +64,28 @@ async def create_from_html(
 
     if not new_recipe:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, {"details": ParserErrors.BAD_RECIPE_DATA.value})
+
+    source_labels = bool(extras and extras.extract_source_organizers and (include_tags or include_categories))
+    if organize or source_labels:
+        classifier = RecipeClassifier(repos)
+        if classifier.enabled:
+            try:
+                if on_progress:
+                    await on_progress(translator.t("recipe.create-progress.organizing-recipe"))
+                names = await classifier.suggest(
+                    new_recipe,
+                    source=extras.classification_source if extras else "",
+                    create_new=source_labels,
+                )
+                if organize:
+                    classifier.attach(new_recipe, names)
+                # Explicit source-metadata imports may retain additional names. Automatic
+                # classification above still only creates standard labels or reuses existing ones.
+                if source_labels and extras:
+                    extras.set_tags(clean_tags(names.tags))
+                    extras.set_categories(clean_categories(names.categories))
+            except Exception:
+                get_logger().exception("Recipe classification failed; keeping the imported recipe")
 
     new_recipe = await finalize_scraped_recipe(new_recipe, translator, on_progress=on_progress)
     return new_recipe, extras

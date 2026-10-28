@@ -165,7 +165,7 @@
 <script setup lang="ts">
 import { useUserApi } from "~/composables/api";
 import { useGroupSelf } from "~/composables/use-groups";
-import { useTagStore } from "~/composables/store/use-tag-store";
+import { useCategoryStore, useTagStore, useToolStore } from "~/composables/store";
 import { useNewRecipeOptions } from "~/composables/use-new-recipe-options";
 import { validators } from "~/composables/use-validators";
 import type { VForm } from "~/types/auto-forms";
@@ -186,6 +186,8 @@ const api = useUserApi();
 const auth = useMealieAuth();
 const route = useRoute();
 const tags = useTagStore();
+const categories = useCategoryStore();
+const tools = useToolStore();
 const { group } = useGroupSelf();
 
 const groupSlug = computed(() => route.params.groupSlug as string || auth.user.value?.groupSlug || "");
@@ -283,9 +285,7 @@ async function createRecipe() {
     return;
   }
 
-  if (createNewOrganizers.value) {
-    tags.actions.refresh();
-  }
+  await Promise.all([tags.actions.refresh(), categories.actions.refresh(), tools.actions.refresh()]);
 
   navigateToRecipe(data, groupSlug.value, `/g/${groupSlug.value}/r/create/ai`);
 }

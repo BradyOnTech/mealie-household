@@ -1,5 +1,6 @@
 <template>
   <v-container fluid>
+    <RecipeOrganizationDialog v-model="organizationDialog" :recipes="selected" @applied="organizationApplied" />
     <!-- Export Purge Confirmation Dialog -->
     <BaseDialog
       v-model="purgeExportsDialog"
@@ -175,6 +176,7 @@
           @delete-selected="openDialog(MODES.delete)"
           @update-settings="openDialog(MODES.updateSettings)"
           @change-owner="openDialog(MODES.changeOwner)"
+          @organize-selected="organizationDialog = true"
         />
 
         <p
@@ -241,6 +243,8 @@
 
 <script setup lang="ts">
 import RecipeDataTable from "~/components/Domain/Recipe/RecipeDataTable.vue";
+import RecipeOrganizationDialog from "~/components/Domain/Recipe/RecipeOrganizationDialog.vue";
+import { useGroupSelf } from "~/composables/use-groups";
 import RecipeOrganizerSelector from "~/components/Domain/Recipe/RecipeOrganizerSelector.vue";
 import { useUserApi } from "~/composables/api";
 import { useRecipes, allRecipes } from "~/composables/recipes";
@@ -276,6 +280,13 @@ useSeoMeta({
 
 const { refreshRecipes } = useRecipes(true, true, false, `householdId=${auth.user.value?.householdId || ""}`);
 const selected = ref<Recipe[]>([]);
+const organizationDialog = ref(false);
+const { group } = useGroupSelf();
+
+async function organizationApplied() {
+  await refreshRecipes();
+  resetAll();
+}
 const search = ref("");
 
 function resetAll() {
@@ -309,7 +320,10 @@ const headerLabels = {
   dateAdded: i18n.t("general.date-added"),
 };
 
-const actions: MenuItem[] = [
+const actions = computed<MenuItem[]>(() => [
+  ...(group.value?.aiProviderSettings?.aiEnabled
+    ? [{ icon: $globals.icons.tags, text: i18n.t("recipe.organize-recipes"), event: "organize-selected" }]
+    : []),
   {
     icon: $globals.icons.database,
     text: i18n.t("export.export"),
@@ -340,7 +354,7 @@ const actions: MenuItem[] = [
     text: i18n.t("general.delete"),
     event: "delete-selected",
   },
-];
+]);
 
 const api = useUserApi();
 const loading = ref(false);

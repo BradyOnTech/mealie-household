@@ -144,6 +144,7 @@ export interface RecipeTag {
 }
 export interface CreateRecipeByUrlBulk {
   imports: CreateRecipeBulk[];
+  organize?: boolean;
 }
 export interface CreateRecipeIngredientSubstitution {
   substituteFoodId?: string | null;
@@ -419,6 +420,63 @@ export interface RecipeIngredientBase {
 export interface RecipeLastMade {
   timestamp: string;
 }
+export interface RecipeOrganizationApplyIn {
+  recipes: [RecipeOrganizationIn, ...RecipeOrganizationIn[]];
+}
+export interface RecipeOrganizationIn {
+  recipeId: string;
+  categories?: [] | [string] | [string, string] | [string, string, string];
+  tags?:
+    | []
+    | [string]
+    | [string, string]
+    | [string, string, string]
+    | [string, string, string, string]
+    | [string, string, string, string, string]
+    | [string, string, string, string, string, string]
+    | [string, string, string, string, string, string, string]
+    | [string, string, string, string, string, string, string, string];
+  tools?:
+    | []
+    | [string]
+    | [string, string]
+    | [string, string, string]
+    | [string, string, string, string]
+    | [string, string, string, string, string]
+    | [string, string, string, string, string, string]
+    | [string, string, string, string, string, string, string]
+    | [string, string, string, string, string, string, string, string];
+}
+export interface RecipeOrganizationOut {
+  recipeId: string;
+  categories?: [] | [string] | [string, string] | [string, string, string];
+  tags?:
+    | []
+    | [string]
+    | [string, string]
+    | [string, string, string]
+    | [string, string, string, string]
+    | [string, string, string, string, string]
+    | [string, string, string, string, string, string]
+    | [string, string, string, string, string, string, string]
+    | [string, string, string, string, string, string, string, string];
+  tools?:
+    | []
+    | [string]
+    | [string, string]
+    | [string, string, string]
+    | [string, string, string, string]
+    | [string, string, string, string, string]
+    | [string, string, string, string, string, string]
+    | [string, string, string, string, string, string, string]
+    | [string, string, string, string, string, string, string, string];
+  name: string;
+  slug: string;
+  error?: boolean;
+}
+export interface RecipeOrganizationPreviewIn {
+  recipes: [string, ...string[]];
+}
 export interface RecipeShareToken {
   recipeId: string;
   expiresAt?: string;
@@ -574,6 +632,7 @@ export interface SaveIngredientUnit {
 export interface ScrapeRecipe {
   includeTags?: boolean;
   includeCategories?: boolean;
+  organize?: boolean;
   url: string;
 }
 export interface ScrapeRecipeAI {
@@ -585,10 +644,12 @@ export interface ScrapeRecipeAI {
 export interface ScrapeRecipeBase {
   includeTags?: boolean;
   includeCategories?: boolean;
+  organize?: boolean;
 }
 export interface ScrapeRecipeData {
   includeTags?: boolean;
   includeCategories?: boolean;
+  organize?: boolean;
   data: string;
   url?: string | null;
 }

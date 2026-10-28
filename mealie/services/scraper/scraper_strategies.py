@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from abc import ABC, abstractmethod
 from collections.abc import Awaitable, Callable
 from typing import TYPE_CHECKING, Any
@@ -251,6 +252,13 @@ class RecipeScraperPackage(ABCScraperStrategy):
 
         extras.set_tags(try_get_default(scraped_data.keywords, "keywords", "", cleaner.clean_tags))
         extras.set_categories(try_get_default(scraped_data.category, "recipeCategory", "", cleaner.clean_categories))
+        schema_data = getattr(getattr(scraped_data, "schema", None), "data", {})
+        if isinstance(schema_data, dict):
+            extras.source = json.dumps(
+                {key: schema_data[key] for key in ("recipeCuisine", "suitableForDiet") if key in schema_data},
+                ensure_ascii=False,
+                default=str,
+            )
 
         recipe = Recipe(
             name=try_get_default(scraped_data.title, "name", "No Name Found", cleaner.clean_string),
@@ -347,10 +355,8 @@ class RecipeScraperOpenAI(ABCScraperStrategy):
             # extra material, which would compile the same page twice
             input=WorkflowInput(page_content=self.raw_html, url=self.url),
             options=WorkflowOptions(
-                # organizers are only worth asking for if the caller intends to use them, and
-                # they're reported back through ScrapedExtras so the caller stays in control
-                resolve_organizers=self.include_tags or self.include_categories,
-                attach_organizers=False,
+                # URL imports classify once, after any extraction strategy has finished.
+                resolve_organizers=False,
             ),
             repos=self.repos,
             translator=self.translator,
@@ -363,10 +369,9 @@ class RecipeScraperOpenAI(ABCScraperStrategy):
         result = await RecipeImportWorkflow().run(ctx)
 
         extras = ScrapedExtras()
-        if ctx.organizer_names:
-            # normalized the same way as organizers read out of a page's structured data
-            extras.set_tags(cleaner.clean_tags(ctx.organizer_names.tags))
-            extras.set_categories(cleaner.clean_categories(ctx.organizer_names.categories))
+        extras.extract_source_organizers = True
+        if ctx.compiled_source:
+            extras.source = ctx.compiled_source.content
 
         return result.recipe, extras
 

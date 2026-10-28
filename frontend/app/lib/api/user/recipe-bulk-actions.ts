@@ -1,5 +1,5 @@
 import { BaseAPI } from "../base/base-clients";
-import type { AssignCategories, AssignSettings, AssignTags, DeleteRecipes, ExportRecipes } from "~/lib/api/types/recipe";
+import type { AssignCategories, AssignSettings, AssignTags, DeleteRecipes, ExportRecipes, RecipeOrganizationIn, RecipeOrganizationOut } from "~/lib/api/types/recipe";
 import type { GroupDataExport } from "~/lib/api/types/group";
 
 // Many bulk actions return nothing
@@ -15,9 +15,18 @@ const routes = {
   bulkTag: prefix + "/recipes/bulk-actions/tag",
   bulkDelete: prefix + "/recipes/bulk-actions/delete",
   bulkSettings: prefix + "/recipes/bulk-actions/settings",
+  organization: prefix + "/recipes/bulk-actions/organize",
 };
 
 export class BulkActionsAPI extends BaseAPI {
+  async previewOrganization(recipes: string[]) {
+    return await this.requests.post<RecipeOrganizationOut[]>(routes.organization + "/preview", { recipes });
+  }
+
+  async applyOrganization(recipes: RecipeOrganizationIn[]) {
+    return await this.requests.post<BulkActionResponse>(routes.organization + "/apply", { recipes });
+  }
+
   async bulkExport(payload: ExportRecipes) {
     return await this.requests.post<BulkActionResponse>(routes.bulkExport, payload);
   }

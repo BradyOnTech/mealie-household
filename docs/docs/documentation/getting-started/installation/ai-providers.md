@@ -58,6 +58,29 @@ A few things to know:
 - The **Import a Cookbook (PDF or EPUB)** page imports every recipe in a cookbook PDF or EPUB, with their photos
 - The **Ask** page is a chat with a kitchen assistant that can keep your household's Out of list and answer questions about its groceries, meal plan, and recipes
 
+## Recipe organization
+
+When AI is enabled, recipe imports can automatically choose categories, tags, and tools using the
+**Organizer matching** task. This works for ordinary website imports as well as AI, bulk URL, PDF,
+and EPUB imports. URL imports have an **Automatically organize this recipe** option; cookbook
+imports have an **Add tags, categories, and tools to each recipe** option. Both default to enabled.
+Classification uses one additional AI request per recipe. If it fails, the recipe is still imported.
+
+The classifier prefers your group's existing labels and can create a small set of standard labels,
+such as **Main Dish**, **Dessert**, **Chicken**, **Pasta**, and **Oven**. It can infer an obvious course,
+main ingredient, or cooking method from the recipe. Dietary and cuisine labels require explicit
+support, and **Quick** requires a total time of 30 minutes or less. The AI import page's
+**Create new organizers** option allows additional names outside the standard vocabulary.
+
+Importing a website's original categories or keywords remains a separate option. Those options
+retain source labels, including names outside the standard vocabulary. Cookbook source notes and
+the cookbook tag used for navigation are preserved.
+
+To organize existing recipes, open **Group settings → Manage data → Recipes**, select up to 50
+recipes, and choose **Organize with AI**. Review the suggestions, remove unwanted labels or uncheck
+recipes, then apply. Preview does not save anything. Applying adds the accepted labels and preserves
+existing labels and recipe edits. You must have permission to edit every selected recipe.
+
 ## Ask
 
 The **Ask** page, in the main navigation once a default provider is set, is a chat for your household. Tell it what you've run out of ("we're out of rice and paper towels") and it adds those to the household's Out of list, which goes on the newest grocery list. You can also ask what's left on the grocery list, what's planned this week, or what's in a recipe, have it suggest or plan a dinner, and have it change, remove, or check off things on the Out of list.

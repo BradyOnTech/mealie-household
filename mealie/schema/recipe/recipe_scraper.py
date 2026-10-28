@@ -11,6 +11,8 @@ class ScrapeRecipeTest(MealieModel):
 class ScrapeRecipeBase(MealieModel):
     include_tags: bool = False
     include_categories: bool = False
+    organize: bool = True
+    """Classify the imported recipe when the group has AI enabled"""
 
 
 class ScrapeRecipe(ScrapeRecipeBase):

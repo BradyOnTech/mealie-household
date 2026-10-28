@@ -81,6 +81,12 @@ from .recipe_ingredient import (
 )
 from .recipe_notes import RecipeNote
 from .recipe_nutrition import Nutrition
+from .recipe_organization import (
+    RecipeOrganizationApplyIn,
+    RecipeOrganizationIn,
+    RecipeOrganizationOut,
+    RecipeOrganizationPreviewIn,
+)
 from .recipe_scraper import (
     ScrapeRecipe,
     ScrapeRecipeAI,
@@ -161,6 +167,10 @@ __all__ = [
     "ExportBase",
     "ExportRecipes",
     "ExportTypes",
+    "RecipeOrganizationApplyIn",
+    "RecipeOrganizationIn",
+    "RecipeOrganizationOut",
+    "RecipeOrganizationPreviewIn",
     "IngredientReferences",
     "NoteReference",
     "RecipeStep",

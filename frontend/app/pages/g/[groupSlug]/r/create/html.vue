@@ -62,6 +62,7 @@
           clearable
           rounded
         />
+        <RecipeImportOrganizationOption v-model="organize" :disabled="state.loading" />
         <v-checkbox
           v-model="importKeywordsAsTags"
           color="primary"
@@ -160,8 +161,9 @@
 </template>
 
 <script setup lang="ts">
+import RecipeImportOrganizationOption from "~/components/Domain/Recipe/RecipeImportOrganizationOption.vue";
 import type { AxiosResponse } from "axios";
-import { useTagStore } from "~/composables/store/use-tag-store";
+import { useCategoryStore, useTagStore, useToolStore } from "~/composables/store";
 import { useUserApi } from "~/composables/api";
 import { useGroupSelf } from "~/composables/use-groups";
 import { useNewRecipeOptions } from "~/composables/use-new-recipe-options";
@@ -184,6 +186,9 @@ const aiEnabled = computed(() => !!group.value?.aiProviderSettings?.aiEnabled);
 
 const api = useUserApi();
 const tags = useTagStore();
+const categories = useCategoryStore();
+const tools = useToolStore();
+const organize = ref(true);
 
 const {
   importKeywordsAsTags,
@@ -193,15 +198,15 @@ const {
   navigateToRecipe,
 } = useNewRecipeOptions();
 
-function handleResponse(response: AxiosResponse<string> | null, refreshTags = false) {
+function handleResponse(response: AxiosResponse<string> | null) {
   if (response?.status !== 201) {
     state.error = true;
     state.loading = false;
     return;
   }
-  if (refreshTags) {
-    tags.actions.refresh();
-  }
+  tags.actions.refresh();
+  categories.actions.refresh();
+  tools.actions.refresh();
 
   navigateToRecipe(response.data, groupSlug.value, `/g/${groupSlug.value}/r/create/html`);
 }
@@ -259,9 +264,10 @@ async function createFromHtmlOrJson(htmlOrJsonData: string | object | null, impo
     importCategories,
     url,
     (message: string) => createStatus.value = message,
+    organize.value,
   );
   createStatus.value = null;
-  handleResponse(response, importKeywordsAsTags);
+  handleResponse(response);
 }
 </script>
 

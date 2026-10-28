@@ -744,7 +744,8 @@ class PdfRecipeImportService(RecipeService):
                 input=WorkflowInput(content=format_pages(pages), images=[photo] if photo else []),
                 options=WorkflowOptions(
                     resolve_organizers=job.add_organizers,
-                    create_new_organizers=job.add_organizers,
+                    # Standard labels may be created; cookbook imports don't invent a vocabulary.
+                    create_new_organizers=False,
                 ),
                 repos=self.repos,
                 translator=self.translator,

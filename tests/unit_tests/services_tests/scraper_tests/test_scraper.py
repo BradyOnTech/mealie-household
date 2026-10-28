@@ -35,6 +35,7 @@ async def test_create_from_html_truncates_long_slug(monkeypatch):
         repos=None,  # type: ignore[arg-type]
         translator=translator,
         html="<html></html>",
+        organize=False,
     )
 
     # The full title is preserved (name column is unbounded)...

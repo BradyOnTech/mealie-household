@@ -134,7 +134,7 @@
 import { useIntervalFn } from "@vueuse/core";
 import { useUserApi } from "~/composables/api";
 import { useCookbookStore } from "~/composables/store/use-cookbook-store";
-import { useTagStore } from "~/composables/store/use-tag-store";
+import { useCategoryStore, useTagStore, useToolStore } from "~/composables/store";
 import { useGroupSelf } from "~/composables/use-groups";
 import { alert } from "~/composables/use-toast";
 import { validators } from "~/composables/use-validators";
@@ -152,6 +152,8 @@ const api = useUserApi();
 const { group } = useGroupSelf();
 const cookbooks = useCookbookStore();
 const tags = useTagStore();
+const categories = useCategoryStore();
+const tools = useToolStore();
 
 const aiEnabled = computed(() => !!group.value?.aiProviderSettings?.aiEnabled);
 // Image-only pages need both finding and reading recipes to have a provider that reads images
@@ -165,7 +167,7 @@ const domForm = ref<VForm | null>(null);
 const pdfFile = ref<File | null>(null);
 const cookbookName = ref("");
 const addCookbook = ref(true);
-const addOrganizers = ref(false);
+const addOrganizers = ref(true);
 
 // the name suggested from the last file picked, so picking another replaces it but not a name the user typed
 let suggestedName = "";
@@ -239,6 +241,8 @@ async function refreshActiveReport() {
     // the import may have added a cookbook to the navigation, and tags
     cookbooks.actions.refresh();
     tags.actions.refresh();
+    categories.actions.refresh();
+    tools.actions.refresh();
   }
 }
 

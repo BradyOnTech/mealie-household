@@ -173,7 +173,7 @@ def test_supplied_html_is_not_fetched_again(
     assert recipe["orgURL"] == recipe_url
 
 
-def test_organizers_are_not_requested_unless_they_are_wanted(
+def test_organization_can_be_disabled_independently_of_source_metadata(
     api_client: TestClient,
     unique_user: TestUser,
     monkeypatch: pytest.MonkeyPatch,
@@ -184,7 +184,7 @@ def test_organizers_are_not_requested_unless_they_are_wanted(
 
     response = api_client.post(
         api_routes.recipes_create_url,
-        json={"url": recipe_url, "include_tags": False, "include_categories": False},
+        json={"url": recipe_url, "include_tags": False, "include_categories": False, "organize": False},
         headers=unique_user.token,
     )
 

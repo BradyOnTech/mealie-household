@@ -121,6 +121,7 @@
             />
           </v-card-actions>
           <div class="px-0">
+            <RecipeImportOrganizationOption v-model="organize" :disabled="lockBulkImport" />
             <v-checkbox
               v-model="state.showCatTags"
               hide-details
@@ -157,6 +158,7 @@
 
 <script setup lang="ts">
 import { whenever } from "@vueuse/shared";
+import RecipeImportOrganizationOption from "~/components/Domain/Recipe/RecipeImportOrganizationOption.vue";
 import { useUserApi } from "~/composables/api";
 import { alert } from "~/composables/use-toast";
 import RecipeOrganizerSelector from "~/components/Domain/Recipe/RecipeOrganizerSelector.vue";
@@ -180,13 +182,14 @@ const i18n = useI18n();
 
 const bulkUrls = ref([{ url: "", categories: [], tags: [] }]);
 const lockBulkImport = ref(false);
+const organize = ref(true);
 
 async function bulkCreate() {
   if (bulkUrls.value.length === 0) {
     return;
   }
 
-  const { response } = await api.recipes.createManyByUrl({ imports: bulkUrls.value });
+  const { response } = await api.recipes.createManyByUrl({ imports: bulkUrls.value, organize: organize.value });
 
   if (response?.status === 202) {
     alert.success(i18n.t("recipe.bulk-import-process-has-started"));

@@ -460,8 +460,7 @@ def test_import_pdf_can_add_organizers(
     api_client: TestClient, unique_user: TestUser, monkeypatch: pytest.MonkeyPatch, cookbook: Cookbook
 ):
     ai = FakeCookbookAI().install(monkeypatch)
-    breakfast = random_string()
-    ai.organizers = OpenAIOrganizers(tags=[breakfast], categories=[], tools=[])
+    ai.organizers = OpenAIOrganizers(tags=["Eggs", "SEO spam"], categories=["Breakfast"], tools=[])
     book_name = random_string()
 
     r = import_pdf(api_client, unique_user, cookbook.path, name=book_name, addOrganizers="true", addCookbook="false")
@@ -469,7 +468,8 @@ def test_import_pdf_can_add_organizers(
     assert get_report(api_client, unique_user, r.json()["reportId"])["status"] == "success"
     assert len(ai.requests_for(OpenAIOrganizers)) == 3
     recipe = get_recipe(api_client, unique_user, cookbook.names[0])
-    assert sorted(tag["name"] for tag in recipe["tags"]) == sorted([breakfast, book_name])
+    assert sorted(tag["name"] for tag in recipe["tags"]) == sorted(["Eggs", book_name])
+    assert [category["name"] for category in recipe["recipeCategory"]] == ["Breakfast"]
 
     cookbooks = api_client.get(api_routes.households_cookbooks, headers=unique_user.token).json()["items"]
     assert book_name not in [cookbook["name"] for cookbook in cookbooks]
