@@ -1,3 +1,4 @@
+from mealie.schema.group.ai_providers import AITask
 from mealie.schema.openai.compiled_source import OpenAICompiledSource
 from mealie.services.openai.content import extract_page_content, truncate_source_content
 
@@ -34,6 +35,7 @@ class WebPageCompiler(SourceCompiler):
             self.ctx.ai.get_prompt(COMPILE_SOURCE_PROMPT),
             "\n".join(message_parts),
             response_schema=OpenAICompiledSource,
+            task=AITask.recipe_source_reading,
         )
 
         if compiled and not compiled.image_url:

@@ -59,6 +59,7 @@
               {{ provider.providerType === 'chatgpt'
                 ? $t('group.ai-provider-settings.provider-type-chatgpt')
                 : $t('group.ai-provider-settings.provider-type-api-key') }}
+              · {{ provider.model || $t('group.ai-provider-settings.model-plan-default') }}
             </span>
             <span v-if="rolesOf(provider.id).length" class="ai-settings__roles">
               <span v-for="role in rolesOf(provider.id)" :key="role" class="ai-settings__role">{{ role }}</span>
@@ -153,12 +154,18 @@
           </p>
         </div>
       </div>
+
+      <GroupAITaskSettings
+        :model-value="local"
+        @update:model-value="(value) => { local.taskSettings = value.taskSettings }"
+      />
     </template>
   </div>
 </template>
 
 <script setup lang="ts">
 import GroupAIProviderDialog from "~/components/Domain/Group/GroupAIProviderDialog.vue";
+import GroupAITaskSettings from "~/components/Domain/Group/GroupAITaskSettings.vue";
 import type { AIProviderCreate, AIProviderType, AIProviderUpdate } from "~/lib/api/types/group";
 import type { AIProviderSettingsOut } from "~/lib/api/types/user";
 

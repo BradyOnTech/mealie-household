@@ -22,6 +22,17 @@ Note that some models are capable of handling multiple features (e.g. `gpt-5` ca
 
 While Mealie has prompts for each AI task, you can override these with your own prompts if you'd like. For more information, check out the [backend configuration](../installation/backend-config.md).
 
+### Choosing a model and reasoning for each task
+
+Under **Choices for each task**, any of Mealie's AI tasks can have its own provider, model and reasoning level: the household assistant (Ask), reading recipe sources, writing up recipes, finding and reading the recipes in a cookbook, parsing ingredients, translating recipes, and choosing organizers. A task you leave alone uses the default provider, and its images the image provider, exactly as before.
+
+- These choices belong to the group, so every household in it shares them.
+- A task's provider is only used for text. Tasks that read images (recipe sources and cookbooks) have a separate choice for images, and otherwise use the group's image provider; Mealie never sends images to a different provider on its own.
+- A provider can also have a default reasoning level, which its tasks use unless they choose their own. Left alone, a ChatGPT provider reasons at `low`, and an API-key provider sends no reasoning setting at all, so the model's own default applies.
+- More reasoning, or a bigger model, can help with messy pages, but it's slower and uses more of your plan's limits or API credits.
+- For a ChatGPT provider, Mealie lists the models Codex knows about, along with the reasoning levels each one supports. Being listed isn't a promise your plan can use a model; if it can't, requests fail with a message saying so. You can always type a model name instead.
+- For an API-key provider, type the model name your service uses. Mealie only sends `reasoning_effort` when you choose a level, and not every model or OpenAI-compatible service accepts it, in which case requests fail with the provider's error. The assistant also needs a model that supports function calling through Chat Completions.
+
 ### Using a ChatGPT subscription
 
 Instead of an API key, a provider can use a ChatGPT plan (Plus, Pro, Business, and so on), so its requests count against the plan's usage limits rather than being billed as API usage. Nothing has to reach Mealie from OpenAI's site, so this works however Mealie is hosted.
@@ -44,7 +55,7 @@ A few things to know:
 - The OpenAI Ingredient Parser can be used as an alternative to the NLP and Brute Force parsers. Simply choose the OpenAI parser while parsing ingredients (:octicons-tag-24: v1.7.0)
 - When importing a recipe via URL, if the default recipe scraper is unable to read the recipe data from a webpage, the webpage contents will be parsed by AI (:octicons-tag-24: v1.9.0). A link to a video is read from the video instead (see [Videos](#videos))
 - The **Import with AI** page creates a recipe out of just about anything: pasted text, HTML, or JSON, photos of a recipe, a link, or any combination of them (:octicons-tag-24: v3.23.0)
-- The **Import a Cookbook (PDF)** page imports every recipe in a cookbook PDF, with their photos
+- The **Import a Cookbook (PDF or EPUB)** page imports every recipe in a cookbook PDF or EPUB, with their photos
 - The **Ask** page is a chat with a kitchen assistant that can keep your household's Out of list and answer questions about its groceries, meal plan, and recipes
 
 ## Ask
@@ -88,13 +99,13 @@ Mealie only assigns an organizer that the recipe itself refers to. It won't gues
 
 ### Which provider is used
 
-Reading the source material is the only step that needs to understand images or audio, so that's the only step that uses your image or audio provider. Turning what it read into a recipe, and working out its organizers, always use your default provider.
+Reading the source material is the only step that needs to understand images or audio, so that's the only step that uses your image or audio provider. Turning what it read into a recipe, and working out its organizers, use your default provider, unless you've [chosen another for that task](#choosing-a-model-and-reasoning-for-each-task).
 
 This means an import with photos attached is read by your image provider even if you also pasted text alongside them.
 
-## Import a Cookbook (PDF)
+## Import a Cookbook (PDF or EPUB)
 
-The **Import a Cookbook (PDF)** page, under *Create ➞ Import a Cookbook (PDF)*, imports every recipe in a cookbook PDF at once. Give it the PDF and a name for the cookbook, and it runs in the background, listing each recipe as it's imported. You can leave the page while it works and come back to it.
+The **Import a Cookbook (PDF or EPUB)** page, under *Create ➞ Import a Cookbook (PDF or EPUB)* or *Cookbooks ➞ Import from a PDF or EPUB*, imports every recipe in a cookbook PDF or EPUB at once. Give it the file and a name for the cookbook, and it runs in the background, listing each recipe as it's imported. You can leave the page while it works and come back to it.
 
 The import happens in two passes:
 
@@ -105,8 +116,10 @@ Each recipe's photo is cut straight out of the PDF, cropped the way the page sho
 
 A PDF with no text in it, such as a scanned book, can still be imported if you have an image provider, since every page is then read from an image of it. That's slower, and takes more of your provider's usage.
 
+An EPUB has no pages, so Mealie cuts it into page-sized pieces, starting a new one at each chapter and at each top-level heading, which is where cookbooks usually start a recipe. An EPUB's text is already in reading order, so no page images are sent with it, and each recipe's photo is the largest picture among its pages. The recipe's note names the book but not a page, since the pieces don't match any ebook reader's pages. EPUBs protected by DRM can't be imported.
+
 ### Large cookbooks and usage limits
 
 Importing a cookbook takes one AI request per recipe, plus a few to find them, so a 100-recipe book is a little over 100 requests. A request that fails for a passing reason, like a dropped connection, is tried again once the rest are done. If your provider runs out partway through, for example because a [ChatGPT subscription](#using-a-chatgpt-subscription) reached its plan's usage limit, the import stops and says so.
 
-Each imported recipe remembers which PDF and page it came from, so you can import the same PDF again to pick up where it left off: recipes that are already imported are skipped. The same goes for an import interrupted by Mealie restarting. If you delete an imported recipe, importing the PDF again brings it back.
+Each imported recipe remembers which file and page it came from, so you can import the same file again to pick up where it left off: recipes that are already imported are skipped. The same goes for an import interrupted by Mealie restarting. If you delete an imported recipe, importing the file again brings it back.

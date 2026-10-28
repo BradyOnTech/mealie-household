@@ -62,6 +62,25 @@ export interface CategorySave {
   name: string;
   groupId: string;
 }
+export interface CookbookImportCreate {
+  groupId: string;
+  fingerprint: string;
+  unreadPages?: string;
+  recipes?: CookbookImportRecipe[];
+}
+export interface CookbookImportRecipe {
+  name: string;
+  firstPage: number;
+  lastPage: number;
+  item: number;
+}
+export interface CookbookImportOut {
+  groupId: string;
+  fingerprint: string;
+  unreadPages?: string;
+  recipes?: CookbookImportRecipe[];
+  id: string;
+}
 export interface CreateIngredientFood {
   id?: string | null;
   name: string;

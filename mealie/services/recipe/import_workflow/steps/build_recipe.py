@@ -1,3 +1,4 @@
+from mealie.schema.group.ai_providers import AITask
 from mealie.schema.openai.recipe import OpenAIRecipe
 from mealie.services.openai import transcription
 from mealie.services.scraper import cleaner
@@ -28,6 +29,7 @@ class BuildRecipeStep(WorkflowStep):
             ctx.ai.get_prompt(BUILD_RECIPE_PROMPT),
             self._build_message(ctx),
             response_schema=OpenAIRecipe,
+            task=AITask.recipe_building,
         )
 
         if not response:

@@ -2,7 +2,7 @@
   <div>
     <!-- Create Dialog -->
     <BaseDialog
-      v-if="createTarget"
+      v-if="draft"
       v-model="dialogStates.create"
       width="100%"
       max-width="1100px"
@@ -10,13 +10,15 @@
       :title="$t('cookbook.create-a-cookbook')"
       :submit-icon="$globals.icons.save"
       :submit-text="$t('general.save')"
-      :submit-disabled="!createTarget.queryFilterString"
+      :submit-disabled="!draft.queryFilterString"
+      :loading="savingDraft"
+      keep-open
       can-submit
-      @submit="actions.updateOne(createTarget)"
-      @cancel="deleteCreateTarget()"
+      @submit="saveCookbook()"
+      @cancel="discardDraft()"
     >
       <v-card-text>
-        <CookbookEditor :key="createTargetKey" v-model="createTarget" />
+        <CookbookEditor :key="draftKey" v-model="draft" />
       </v-card-text>
     </BaseDialog>
 
@@ -66,7 +68,15 @@
       </div>
 
       <!-- Create New -->
-      <BaseButton create @click="createCookbook" />
+      <div class="d-flex flex-wrap ga-2">
+        <BaseButton create @click="createCookbook" />
+        <BaseButton
+          secondary
+          :to="`/g/${groupSlug}/r/create/pdf`"
+          :icon="$globals.icons.upload"
+          :text="$t('cookbook.import-from-file')"
+        />
+      </div>
 
       <!-- Cookbook List -->
       <v-expansion-panels class="cookbook-shelf mt-4" variant="accordion">
@@ -145,7 +155,8 @@ import { VueDraggable } from "vue-draggable-plus";
 import { useCookbookStore } from "~/composables/store/use-cookbook-store";
 import { useHouseholdSelf } from "@/composables/use-households";
 import CookbookEditor from "~/components/Domain/Cookbook/CookbookEditor.vue";
-import type { CreateCookBook, ReadCookBook } from "~/lib/api/types/cookbook";
+import type { ReadCookBook } from "~/lib/api/types/cookbook";
+import { useCookbookDraft } from "~/composables/use-cookbook-draft";
 import { useCookbookPreferences } from "~/composables/use-users/preferences";
 
 definePageMeta({
@@ -186,25 +197,29 @@ const { household } = useHouseholdSelf();
 const cookbookPreferences = useCookbookPreferences();
 
 // create
-const createTargetKey = ref(0);
-const createTarget = ref<ReadCookBook | null>(null);
-async function createCookbook() {
-  const name = i18n.t("cookbook.household-cookbook-name", [
-    household.value?.name || "",
-    String((myCookbooks.value?.length ?? 0) + 1),
-  ]) as string;
+const draftKey = ref(0);
+const { draft, saving: savingDraft, start: startDraft, save: saveDraft, discard: discardDraft } = useCookbookDraft(
+  myCookbooks,
+  n => i18n.t("cookbook.household-cookbook-name", [household.value?.name || "", String(n)]) as string,
+  data => actions.createOne(data as ReadCookBook),
+);
 
-  const data = { name } as CreateCookBook;
-  await actions.createOne(data).then((cookbook) => {
-    if (!cookbook) {
-      return;
-    }
-
-    myCookbooks.value.push(cookbook);
-    createTarget.value = cookbook as ReadCookBook;
-    createTargetKey.value++;
-  });
+// nothing is saved until the cookbook has been filled in and saved, so clicking Create
+// repeatedly, or leaving without saving, never leaves empty cookbooks behind
+function createCookbook() {
+  if (!draft.value) {
+    draftKey.value++;
+  }
+  startDraft();
   dialogStates.create = true;
+}
+
+async function saveCookbook() {
+  const cookbook = await saveDraft();
+  if (cookbook) {
+    myCookbooks.value.push(cookbook);
+    dialogStates.create = false;
+  }
 }
 
 // delete
@@ -222,29 +237,6 @@ async function deleteCookbook() {
   dialogStates.delete = false;
   deleteTarget.value = null;
 }
-
-async function deleteCreateTarget() {
-  if (!createTarget.value?.id) {
-    return;
-  }
-  await actions.deleteOne(createTarget.value.id);
-  myCookbooks.value = myCookbooks.value.filter(c => c.id !== createTarget.value?.id);
-  dialogStates.create = false;
-  createTarget.value = null;
-}
-function handleUnmount() {
-  if (!createTarget.value?.id || createTarget.value.queryFilterString) {
-    return;
-  }
-  deleteCreateTarget();
-}
-onMounted(() => {
-  window.addEventListener("beforeunload", handleUnmount);
-});
-onBeforeUnmount(() => {
-  handleUnmount();
-  window.removeEventListener("beforeunload", handleUnmount);
-});
 </script>
 
 <style scoped>

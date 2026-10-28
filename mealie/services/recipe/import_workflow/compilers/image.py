@@ -1,5 +1,6 @@
 import os
 
+from mealie.schema.group.ai_providers import AITask
 from mealie.schema.openai.compiled_source import OpenAICompiledSource
 from mealie.services.openai import OpenAILocalImage
 
@@ -7,7 +8,7 @@ from .base import COMPILE_SOURCE_PROMPT, SourceCompiler, SourceType
 
 
 class ImageCompiler(SourceCompiler):
-    """Reads uploaded images. Runs on the group's image provider, since it needs vision."""
+    """Reads uploaded images. Runs on the image provider chosen for reading recipe sources, since it needs vision."""
 
     source_type = SourceType.IMAGES
     progress_key = "recipe.create-progress.reading-images-with-ai"
@@ -27,4 +28,5 @@ class ImageCompiler(SourceCompiler):
             message,
             response_schema=OpenAICompiledSource,
             attachments=attachments,
+            task=AITask.recipe_source_reading,
         )

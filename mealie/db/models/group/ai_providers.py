@@ -82,6 +82,8 @@ class AIProvider(SqlAlchemyBase, BaseMixins):
     api_key: orm.Mapped[str] = orm.mapped_column(sa.String, nullable=False)
     model: orm.Mapped[str] = orm.mapped_column(sa.String, nullable=False)
     timeout: orm.Mapped[int] = orm.mapped_column(sa.Integer, nullable=False, default=300)
+    # How hard the model thinks by default; None keeps the provider type's behavior (ChatGPT: low, API key: not sent)
+    reasoning_effort: orm.Mapped[str | None] = orm.mapped_column(sa.String, nullable=True)
 
     # Codex's auth.json for a ChatGPT subscription provider; unused by API-key providers
     chatgpt_credential: orm.Mapped[str | None] = orm.mapped_column(sa.Text, nullable=True)
@@ -94,6 +96,38 @@ class AIProvider(SqlAlchemyBase, BaseMixins):
     )
 
     @unwrap_headers_and_params
+    @auto_init()
+    def __init__(self, **_) -> None:
+        pass
+
+
+class AITaskSetting(SqlAlchemyBase, BaseMixins):
+    """
+    Which provider, model and reasoning effort one AI task uses, instead of the group's defaults.
+    The image fields are for when the task is given images to read; left empty, it uses the group's image provider.
+    """
+
+    __tablename__ = "ai_task_settings"
+    __table_args__ = (sa.UniqueConstraint("settings_id", "task", name="ai_task_settings_settings_id_task_key"),)
+    id: orm.Mapped[GUID] = orm.mapped_column(GUID, primary_key=True, default=GUID.generate)
+
+    settings_id: orm.Mapped[GUID] = orm.mapped_column(
+        GUID, sa.ForeignKey("ai_provider_settings.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    task: orm.Mapped[str] = orm.mapped_column(sa.String, nullable=False)
+
+    provider_id: orm.Mapped[GUID | None] = orm.mapped_column(
+        GUID, sa.ForeignKey("ai_providers.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    model: orm.Mapped[str | None] = orm.mapped_column(sa.String, nullable=True)
+    reasoning_effort: orm.Mapped[str | None] = orm.mapped_column(sa.String, nullable=True)
+
+    image_provider_id: orm.Mapped[GUID | None] = orm.mapped_column(
+        GUID, sa.ForeignKey("ai_providers.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    image_model: orm.Mapped[str | None] = orm.mapped_column(sa.String, nullable=True)
+    image_reasoning_effort: orm.Mapped[str | None] = orm.mapped_column(sa.String, nullable=True)
+
     @auto_init()
     def __init__(self, **_) -> None:
         pass
@@ -113,6 +147,9 @@ class AIProviderSettings(SqlAlchemyBase, BaseMixins):
         uselist=True,
         single_parent=True,
         cascade="all, delete-orphan",
+    )
+    task_settings: orm.Mapped[list[AITaskSetting]] = orm.relationship(
+        AITaskSetting, cascade="all, delete-orphan", order_by=AITaskSetting.task
     )
 
     # Configured Providers

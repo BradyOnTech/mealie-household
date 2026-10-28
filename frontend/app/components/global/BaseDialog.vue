@@ -144,15 +144,14 @@ function submitEvent() {
 }
 
 function submitOnEnter() {
-  if (props.disableSubmitOnEnter) {
+  // Enter does what the dialog's button would, so it can't get past a disabled one
+  if (props.disableSubmitOnEnter || props.submitDisabled) {
     return;
   }
 
   if (props.canConfirm) {
-    if (!props.submitDisabled) {
-      emit("confirm");
-      dialog.value = false;
-    }
+    emit("confirm");
+    dialog.value = false;
     return;
   }
 

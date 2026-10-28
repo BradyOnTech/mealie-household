@@ -8,6 +8,7 @@ from mealie.routes._base import controller
 from mealie.routes._base.base_controllers import BaseUserController
 from mealie.routes._base.mixins import HttpRepo
 from mealie.schema.group.ai_providers import (
+    AIModelCatalog,
     AIProviderCreate,
     AIProviderOut,
     AIProviderSettingsOut,
@@ -16,6 +17,7 @@ from mealie.schema.group.ai_providers import (
     AIProviderType,
     AIProviderUpdate,
     ChatGPTLoginOut,
+    ChatGPTLoginState,
 )
 from mealie.schema.response import ErrorResponse
 from mealie.services.openai import OpenAIService
@@ -88,6 +90,7 @@ class GroupAIProviderController(BaseUserController):
             api_key=data.api_key,
             model=data.model,
             timeout=data.timeout,
+            reasoning_effort=data.reasoning_effort,
             request_headers=data.request_headers,
             request_params=data.request_params,
             chatgpt_credential=login.credential if login else None,
@@ -122,11 +125,29 @@ class GroupAIProviderController(BaseUserController):
                     "timeout": overrides.timeout,
                     "request_headers": overrides.request_headers,
                     "request_params": overrides.request_params,
+                    **(
+                        {"reasoning_effort": overrides.reasoning_effort}
+                        if "reasoning_effort" in overrides.model_fields_set
+                        else {}
+                    ),
                     **({"api_key": overrides.api_key} if overrides.api_key else {}),
                     **({"id": login.id, "chatgpt_credential": login.credential} if login else {}),
                 }
             )
         return await OpenAIService(self.repos).test_connection(provider)
+
+    @providers_router.get("/{provider_id}/models", response_model=AIModelCatalog)
+    async def list_ai_provider_models(self, provider_id: UUID4, refresh: bool = False) -> AIModelCatalog:
+        """
+        The models a saved ChatGPT provider's catalog lists, with the reasoning efforts each supports. This is a
+        catalog, not what the account is entitled to: only a request that succeeds shows a model can be used.
+        `discovered` is false when they couldn't be listed (or for API-key providers), and a model can still be
+        typed in.
+        """
+        self.checks.can_manage()
+
+        provider = self.mixins.get_one(provider_id)
+        return await OpenAIService(self.repos).list_models(provider, refresh=refresh)
 
     @providers_router.get("/{provider_id}", response_model=AIProviderOut)
     def get_ai_provider(self, provider_id: UUID4) -> AIProviderOut:
@@ -177,6 +198,21 @@ class GroupChatGPTLoginController(BaseUserController):
         self.checks.can_manage()
 
         return self._get_login(login_id).out()
+
+    @chatgpt_login_router.get("/{login_id}/models", response_model=AIModelCatalog)
+    async def list_chatgpt_login_models(self, login_id: UUID4) -> AIModelCatalog:
+        """The models a finished sign-in's catalog lists, for choosing one before the provider is saved"""
+        self.checks.can_manage()
+
+        login = self._get_login(login_id)
+        if login.state != ChatGPTLoginState.connected or not login.credential:
+            return AIModelCatalog(discovered=False, message="Finish signing in to ChatGPT first.")
+
+        # An unsaved provider takes its sign-in's id, which is how the service finds that sign-in's credential
+        provider = AIProviderOut(
+            id=login.id, name="ChatGPT", provider_type=AIProviderType.chatgpt, chatgpt_credential=login.credential
+        )
+        return await OpenAIService(self.repos).list_models(provider, account=login.account)
 
     @chatgpt_login_router.delete("/{login_id}")
     async def cancel_chatgpt_login(self, login_id: UUID4) -> None:

@@ -121,6 +121,7 @@ def test_chunk_pages_limits_text_and_images(monkeypatch: pytest.MonkeyPatch):
 
 
 def test_settle_orders_recipes_and_keeps_them_from_overlapping():
+    # recipes starting on the same page are numbered in the order they were found
     settled = _settle(
         [
             PdfRecipeLocation("Waffles", 5, 9),
@@ -134,6 +135,6 @@ def test_settle_orders_recipes_and_keeps_them_from_overlapping():
     assert settled == [
         PdfRecipeLocation("Pancakes", 2, 4),
         PdfRecipeLocation("Waffles", 5, 6),
-        PdfRecipeLocation("Syrup", 5, 5),
+        PdfRecipeLocation("Syrup", 5, 5, item=1),
         PdfRecipeLocation("Omelette", 7, 8),
     ]

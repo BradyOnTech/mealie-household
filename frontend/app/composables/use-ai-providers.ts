@@ -54,6 +54,14 @@ export function useAIProviders() {
     return await api.aiProviders.testSavedOne(id, overrides);
   }
 
+  async function listModels(id: string, refresh = false) {
+    return await api.aiProviders.listModels(id, refresh);
+  }
+
+  async function listChatGPTLoginModels(id: string) {
+    return await api.aiProviders.listChatGPTLoginModels(id);
+  }
+
   async function startChatGPTLogin() {
     return await api.aiProviders.startChatGPTLogin();
   }
@@ -74,6 +82,8 @@ export function useAIProviders() {
     deleteOne,
     testOne,
     testSavedOne,
+    listModels,
+    listChatGPTLoginModels,
     startChatGPTLogin,
     getChatGPTLogin,
     cancelChatGPTLogin,

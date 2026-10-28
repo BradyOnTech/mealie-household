@@ -165,6 +165,7 @@ def test_openai_parser_sanitize_output(
         self.image_provider = None
 
     monkeypatch.setattr(OpenAIService, "__init__", mock_openai_init)
+    monkeypatch.setattr(OpenAIService, "provider_for", lambda self, task, *, images=False: self.default_provider)
 
     with session_context() as session:
         parser = get_parser(RegisteredParser.openai, unique_local_group_id, session, get_locale_provider())

@@ -5,6 +5,7 @@ from pathlib import Path
 from fastapi import UploadFile
 
 from mealie.core.dependencies.dependencies import get_temporary_path
+from mealie.schema.group.ai_providers import AITask
 from mealie.schema.recipe.recipe import Recipe
 from mealie.services.openai import OpenAIService
 from mealie.services.scraper.scraper import finalize_scraped_recipe
@@ -125,5 +126,5 @@ class AIRecipeService(RecipeService):
         if not (settings and settings.ai_enabled):
             raise AIProviderNotEnabledError(self.t("recipe.import-errors.ai-not-enabled"))
 
-        if has_images and not settings.image_provider_enabled:
+        if has_images and not ai_service.can_read_images(AITask.recipe_source_reading):
             raise AIProviderNotEnabledError(self.t("recipe.import-errors.image-provider-not-enabled"))

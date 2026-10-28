@@ -6,6 +6,15 @@
 */
 
 export type AIProviderType = "openai" | "chatgpt";
+export type AITask =
+  | "household_assistant"
+  | "recipe_source_reading"
+  | "recipe_building"
+  | "cookbook_discovery"
+  | "cookbook_extraction"
+  | "ingredient_parsing"
+  | "recipe_translation"
+  | "organizer_matching";
 export type ChatGPTLoginState = "waiting" | "connected" | "failed" | "expired";
 export type SupportedMigrations =
   | "nextcloud"
@@ -19,12 +28,31 @@ export type SupportedMigrations =
   | "recipekeeper"
   | "cookn";
 
+export interface AIModelCatalog {
+  discovered: boolean;
+  models?: AIModelOption[];
+  message?: string | null;
+}
+export interface AIModelOption {
+  model: string;
+  displayName: string;
+  description?: string | null;
+  isDefault?: boolean;
+  defaultReasoningEffort?: string | null;
+  supportedReasoningEfforts?: AIReasoningEffortOption[];
+  inputModalities?: string[];
+}
+export interface AIReasoningEffortOption {
+  effort: string;
+  description?: string | null;
+}
 export interface AIProviderCreate {
   name: string;
   providerType?: AIProviderType;
   baseUrl?: string | null;
   model?: string;
   timeout?: number;
+  reasoningEffort?: string | null;
   requestHeaders?: {
     [k: string]: string;
   };
@@ -38,6 +66,7 @@ export interface AIProviderOut {
   baseUrl?: string | null;
   model?: string;
   timeout?: number;
+  reasoningEffort?: string | null;
   requestHeaders?: {
     [k: string]: string;
   };
@@ -53,6 +82,7 @@ export interface AIProviderSave {
   baseUrl?: string | null;
   model?: string;
   timeout?: number;
+  reasoningEffort?: string | null;
   requestHeaders?: {
     [k: string]: string;
   };
@@ -68,20 +98,43 @@ export interface AIProviderSettingsOut {
   defaultProviderId: string | null;
   audioProviderId: string | null;
   imageProviderId: string | null;
+  taskSettings?: AITaskSettingOut[];
   providers: AIProviderSummary[];
   aiEnabled: boolean;
   audioProviderEnabled: boolean;
   imageProviderEnabled: boolean;
+  imageReadingTasks: AITask[];
+}
+export interface AITaskSettingOut {
+  task: AITask;
+  providerId?: string | null;
+  model?: string | null;
+  reasoningEffort?: string | null;
+  imageProviderId?: string | null;
+  imageModel?: string | null;
+  imageReasoningEffort?: string | null;
 }
 export interface AIProviderSummary {
   id: string;
   name: string;
   providerType?: AIProviderType;
+  model?: string;
+  reasoningEffort?: string | null;
 }
 export interface AIProviderSettingsUpdate {
   defaultProviderId: string | null;
   audioProviderId: string | null;
   imageProviderId: string | null;
+  taskSettings?: AITaskSettingUpdate[] | null;
+}
+export interface AITaskSettingUpdate {
+  task: AITask;
+  providerId?: string | null;
+  model?: string | null;
+  reasoningEffort?: string | null;
+  imageProviderId?: string | null;
+  imageModel?: string | null;
+  imageReasoningEffort?: string | null;
 }
 export interface AIProviderTestResult {
   success: boolean;
@@ -94,12 +147,22 @@ export interface AIProviderUpdate {
   baseUrl?: string | null;
   model?: string;
   timeout?: number;
+  reasoningEffort?: string | null;
   requestHeaders?: {
     [k: string]: string;
   };
   requestParams?: {
     [k: string]: string;
   };
+}
+export interface AITaskSettingBase {
+  task: AITask;
+  providerId?: string | null;
+  model?: string | null;
+  reasoningEffort?: string | null;
+  imageProviderId?: string | null;
+  imageModel?: string | null;
+  imageReasoningEffort?: string | null;
 }
 export interface ChatGPTLoginOut {
   id: string;

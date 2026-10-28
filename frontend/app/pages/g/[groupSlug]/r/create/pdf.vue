@@ -19,7 +19,7 @@
           <v-file-input
             v-model="pdfFile"
             :label="$t('recipe.import-cookbook-pdf-file')"
-            accept="application/pdf,.pdf"
+            accept="application/pdf,.pdf,application/epub+zip,.epub"
             prepend-icon=""
             :prepend-inner-icon="$globals.icons.filePDF"
             variant="solo-filled"
@@ -154,7 +154,11 @@ const cookbooks = useCookbookStore();
 const tags = useTagStore();
 
 const aiEnabled = computed(() => !!group.value?.aiProviderSettings?.aiEnabled);
-const imagesEnabled = computed(() => !!group.value?.aiProviderSettings?.imageProviderEnabled);
+// Image-only pages need both finding and reading recipes to have a provider that reads images
+const imagesEnabled = computed(() => {
+  const tasks = group.value?.aiProviderSettings?.imageReadingTasks ?? [];
+  return tasks.includes("cookbook_discovery") && tasks.includes("cookbook_extraction");
+});
 
 const state = reactive({ loading: false });
 const domForm = ref<VForm | null>(null);
@@ -172,7 +176,7 @@ function nameFromFile(value: File | File[] | null) {
     return;
   }
 
-  suggestedName = file.name.replace(/\.pdf$/i, "").trim();
+  suggestedName = file.name.replace(/\.(pdf|epub)$/i, "").trim();
   cookbookName.value = suggestedName;
 }
 

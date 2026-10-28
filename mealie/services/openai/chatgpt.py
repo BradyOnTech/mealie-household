@@ -28,7 +28,7 @@ import shutil
 import tempfile
 import time
 from collections import deque
-from collections.abc import Awaitable, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable
 from pathlib import Path
 from typing import Any
 from uuid import UUID, uuid4
@@ -39,9 +39,11 @@ from mealie.core import root_logger
 from mealie.core.config import get_app_settings
 from mealie.core.settings.static import APP_VERSION
 from mealie.schema.group.ai_providers import (
+    AIModelOption,
     AIProviderCreate,
     AIProviderType,
     AIProviderUpdate,
+    AIReasoningEffortOption,
     ChatGPTLoginOut,
     ChatGPTLoginState,
     chatgpt_account_email,
@@ -85,7 +87,13 @@ TOOL_DEVELOPER_INSTRUCTIONS = (
     "Don't run commands, read files, or browse the web."
 )
 REASONING_EFFORT = "low"
-"""Mealie's requests are extraction and formatting, which don't benefit from long reasoning"""
+"""
+The effort a ChatGPT provider uses when nobody chose one: Mealie's requests are mostly extraction and formatting,
+which don't benefit from long reasoning
+"""
+MODEL_LIST_PAGE_SIZE = 100
+MODEL_LIST_MAX_PAGES = 10
+"""A bound on paging through `model/list`, in case a cursor never runs out"""
 
 ToolHandler = Callable[[str, Any], Awaitable[tuple[bool, str]]]
 """Runs a tool Mealie offered the model: given the tool's name and arguments, returns whether it
@@ -370,6 +378,45 @@ def to_codex_history(role: str, text: str) -> dict[str, Any]:
     return {"type": "message", "role": "user", "content": [{"type": "input_text", "text": text}]}
 
 
+@contextlib.asynccontextmanager
+async def _signed_in_app_server(
+    credential: str,
+    save_credential: Callable[[str], None],
+    configure: Callable[[_AppServer], None] | None = None,
+) -> AsyncIterator[_AppServer]:
+    """
+    A throwaway app-server signed in with `credential`, in its own temporary CODEX_HOME that's deleted afterwards.
+
+    `save_credential` is called with Codex's auth.json afterwards if Codex changed it, which it does when it
+    refreshes the tokens. That happens even when the request itself fails, since the old refresh token stops
+    working as soon as it's been used. `configure` sets the server's handlers before it starts.
+    """
+    root = Path(tempfile.mkdtemp(prefix="mealie-chatgpt-"))
+    server = _AppServer(root)
+    auth_path = server.home / "auth.json"
+    try:
+        server.home.mkdir(parents=True)
+        _write_credential(auth_path, credential)
+        if configure:
+            configure(server)
+        await server.start()
+
+        account = (await server.request("account/read", {"refreshToken": False})).get("account")
+        if not isinstance(account, dict) or account.get("type") != "chatgpt":
+            raise ChatGPTAuthError("This provider's ChatGPT sign-in is no longer valid. Sign in to ChatGPT again.")
+
+        yield server
+    finally:
+        await server.close()
+        refreshed = _read_credential(auth_path)
+        if refreshed and _parse_credential(refreshed) != _parse_credential(credential):
+            try:
+                save_credential(refreshed)
+            except Exception:
+                logger.exception("Failed to save the refreshed ChatGPT credential")
+        shutil.rmtree(root, ignore_errors=True)
+
+
 async def run_chatgpt_turn(
     credential: str,
     *,
@@ -379,6 +426,7 @@ async def run_chatgpt_turn(
     model: str | None,
     timeout: float,
     save_credential: Callable[[str], None],
+    effort: str | None = None,
     tools: list[dict[str, Any]] | None = None,
     call_tool: ToolHandler | None = None,
     history: list[dict[str, Any]] | None = None,
@@ -387,22 +435,14 @@ async def run_chatgpt_turn(
     Run one request through a throwaway Codex thread, signed in with `credential`, and return the
     reply's text.
 
-    `tools` are offered to the model as Codex dynamic tools (`{"type": "function", "name": ...,
-    "description": ..., "inputSchema": ...}`), and each call the model makes is run with
-    `call_tool`. `history` is the conversation so far, from `to_codex_history`, put ahead of
-    `inputs`.
+    `effort` is the turn's reasoning effort, `REASONING_EFFORT` when it's None. `tools` are offered to the model
+    as Codex dynamic tools (`{"type": "function", "name": ..., "description": ..., "inputSchema": ...}`), and
+    each call the model makes is run with `call_tool`. `history` is the conversation so far, from
+    `to_codex_history`, put ahead of `inputs`.
 
-    `save_credential` is called with Codex's auth.json afterwards if Codex changed it, which it
-    does when it refreshes the tokens. That happens even when the request itself fails, since
-    the old refresh token stops working as soon as it's been used.
+    `save_credential` is called with Codex's auth.json afterwards if Codex changed it (see `_signed_in_app_server`).
     """
-    root = Path(tempfile.mkdtemp(prefix="mealie-chatgpt-"))
-    server = _AppServer(root)
-    auth_path = server.home / "auth.json"
-    server.home.mkdir(parents=True)
-    _write_credential(auth_path, credential)
-
-    turn_done = server.new_waiter()
+    turn_done: asyncio.Future[dict[str, Any]] | None = None
     agent_messages: list[dict[str, Any]] = []
 
     def on_notification(method: str, params: dict[str, Any]) -> None:
@@ -410,7 +450,7 @@ async def run_chatgpt_turn(
             item = params.get("item")
             if isinstance(item, dict) and item.get("type") == "agentMessage":
                 agent_messages.append(item)
-        elif method == "turn/completed" and not turn_done.done():
+        elif method == "turn/completed" and turn_done and not turn_done.done():
             turn_done.set_result(params)
 
     async def on_request(method: str, params: dict[str, Any]) -> dict[str, Any] | None:
@@ -423,15 +463,14 @@ async def run_chatgpt_turn(
             success, text = False, "That didn't work because of an error in Mealie."
         return {"contentItems": [{"type": "inputText", "text": text}], "success": success}
 
-    server.on_notification = on_notification
-    server.on_request = on_request
-    try:
-        await server.start()
+    def configure(server: _AppServer) -> None:
+        nonlocal turn_done
+        turn_done = server.new_waiter()
+        server.on_notification = on_notification
+        server.on_request = on_request
 
-        account = (await server.request("account/read", {"refreshToken": False})).get("account")
-        if not isinstance(account, dict) or account.get("type") != "chatgpt":
-            raise ChatGPTAuthError("This provider's ChatGPT sign-in is no longer valid. Sign in to ChatGPT again.")
-
+    async with _signed_in_app_server(credential, save_credential, configure) as server:
+        assert turn_done is not None
         thread_params: dict[str, Any] = {
             "cwd": str(server.cwd),
             "sandbox": "read-only",
@@ -452,7 +491,7 @@ async def run_chatgpt_turn(
         if history:
             await server.request("thread/inject_items", {"threadId": thread_id, "items": history})
 
-        turn_params: dict[str, Any] = {"threadId": thread_id, "input": inputs, "effort": REASONING_EFFORT}
+        turn_params: dict[str, Any] = {"threadId": thread_id, "input": inputs, "effort": effort or REASONING_EFFORT}
         if output_schema:
             turn_params["outputSchema"] = output_schema
         await server.request("turn/start", turn_params)
@@ -477,15 +516,80 @@ async def run_chatgpt_turn(
             raise ChatGPTError("ChatGPT finished without replying")
 
         return text
-    finally:
-        await server.close()
-        refreshed = _read_credential(auth_path)
-        if refreshed and _parse_credential(refreshed) != _parse_credential(credential):
-            try:
-                save_credential(refreshed)
-            except Exception:
-                logger.exception("Failed to save the refreshed ChatGPT credential")
-        shutil.rmtree(root, ignore_errors=True)
+
+
+def parse_model_option(item: Any) -> AIModelOption | None:
+    """One entry of Codex's `model/list`, or None if it isn't a usable model. Unknown fields are ignored."""
+    if not isinstance(item, dict) or item.get("hidden") is True:
+        return None
+
+    model = item.get("model") or item.get("id")
+    if not isinstance(model, str) or not model.strip():
+        return None
+
+    efforts: list[AIReasoningEffortOption] = []
+    for option in item.get("supportedReasoningEfforts") or []:
+        effort = option.get("reasoningEffort") if isinstance(option, dict) else None
+        if isinstance(effort, str) and effort:
+            description = option.get("description")
+            efforts.append(
+                AIReasoningEffortOption(
+                    effort=effort, description=description if isinstance(description, str) else None
+                )
+            )
+
+    default_effort = item.get("defaultReasoningEffort")
+    modalities = item.get("inputModalities")
+    display_name = item.get("displayName")
+    description = item.get("description")
+    return AIModelOption(
+        model=model.strip(),
+        display_name=display_name if isinstance(display_name, str) and display_name else model.strip(),
+        description=description if isinstance(description, str) and description else None,
+        is_default=item.get("isDefault") is True,
+        default_reasoning_effort=default_effort if isinstance(default_effort, str) and default_effort else None,
+        supported_reasoning_efforts=efforts,
+        # Codex documents a missing list as text and images
+        input_modalities=[m for m in modalities if isinstance(m, str)]
+        if isinstance(modalities, list)
+        else ["text", "image"],
+    )
+
+
+async def list_models_from(server: _AppServer) -> list[AIModelOption]:
+    """Every model a running app-server's `model/list` returns, following its cursor page by page"""
+    models: list[AIModelOption] = []
+    seen: set[str] = set()
+    cursor: str | None = None
+    for _ in range(MODEL_LIST_MAX_PAGES):
+        params: dict[str, Any] = {"limit": MODEL_LIST_PAGE_SIZE, "includeHidden": False}
+        if cursor:
+            params["cursor"] = cursor
+        page = await server.request("model/list", params)
+
+        for item in page.get("data") or []:
+            option = parse_model_option(item)
+            if option and option.model not in seen:
+                seen.add(option.model)
+                models.append(option)
+
+        next_cursor = page.get("nextCursor")
+        if not isinstance(next_cursor, str) or not next_cursor or next_cursor == cursor:
+            break
+        cursor = next_cursor
+    else:
+        logger.warning(f"Stopped listing ChatGPT models after {MODEL_LIST_MAX_PAGES} pages")
+
+    return models
+
+
+async def list_chatgpt_models(credential: str, *, save_credential: Callable[[str], None]) -> list[AIModelOption]:
+    """
+    The models Codex's catalog lists for a ChatGPT sign-in. It's a catalog, not a list of what the account is
+    entitled to: only a request that succeeds shows the account can use a model.
+    """
+    async with _signed_in_app_server(credential, save_credential) as server:
+        return await list_models_from(server)
 
 
 _credential_locks: dict[UUID, asyncio.Lock] = {}

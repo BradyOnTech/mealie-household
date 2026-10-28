@@ -475,8 +475,8 @@ class RecipeController(BaseRecipeController):
         add_organizers: Annotated[bool, Form(alias="addOrganizers")] = False,
     ) -> ScrapeRecipePdfStarted:
         """
-        Imports every recipe in a PDF cookbook using AI, tagging each with the cookbook's name. The import
-        runs in the background; the report this returns records each recipe as it's imported.
+        Imports every recipe in a cookbook PDF or EPUB using AI, tagging each with the cookbook's name. The
+        import runs in the background; the report this returns records each recipe as it's imported.
         """
 
         service = PdfRecipeImportService(self.repos, self.user, self.household, self.translator)

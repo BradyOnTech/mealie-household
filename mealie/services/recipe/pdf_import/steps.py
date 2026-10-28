@@ -1,6 +1,7 @@
 from collections.abc import Sequence
 from pathlib import Path
 
+from mealie.schema.group.ai_providers import AITask
 from mealie.schema.openai.compiled_source import OpenAICompiledSource
 from mealie.schema.openai.recipe import OpenAIRecipe
 from mealie.services.openai import OpenAILocalImage
@@ -52,6 +53,7 @@ class BuildRecipeFromPdfStep(WorkflowStep):
             f"Recipe: {self.recipe_name}\n\n{content}",
             response_schema=OpenAIRecipe,
             attachments=attachments or None,
+            task=AITask.cookbook_extraction,
         )
 
         if not response:

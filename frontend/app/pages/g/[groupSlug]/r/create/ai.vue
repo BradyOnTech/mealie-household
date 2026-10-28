@@ -192,7 +192,9 @@ const groupSlug = computed(() => route.params.groupSlug as string || auth.user.v
 const urlImporterTarget = computed(() => `/g/${groupSlug.value}/r/create/url`);
 const htmlOrJsonImporterTarget = computed(() => `/g/${groupSlug.value}/r/create/html`);
 const aiEnabled = computed(() => !!group.value?.aiProviderSettings?.aiEnabled);
-const imagesEnabled = computed(() => !!group.value?.aiProviderSettings?.imageProviderEnabled);
+const imagesEnabled = computed(
+  () => !!group.value?.aiProviderSettings?.imageReadingTasks?.includes("recipe_source_reading"),
+);
 
 const domUrlForm = ref<VForm | null>(null);
 const recipeUrl = ref<string | null>(null);

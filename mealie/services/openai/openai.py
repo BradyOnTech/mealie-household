@@ -5,6 +5,7 @@ import inspect
 import json
 import os
 import shutil
+import time
 from abc import ABC, abstractmethod
 from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass
@@ -21,18 +22,33 @@ from mealie.core import exceptions, root_logger
 from mealie.core.config import get_app_settings
 from mealie.pkgs import img
 from mealie.repos.repository_factory import AllRepositories
-from mealie.schema.group.ai_providers import AIProviderOut, AIProviderTestResult, AIProviderType
+from mealie.schema.group.ai_providers import (
+    AIModelCatalog,
+    AIProviderOut,
+    AIProviderTestResult,
+    AIProviderType,
+    AITask,
+)
 from mealie.schema.openai._base import OpenAIBase
 from mealie.schema.openai.general import OpenAIText
 
 from .._base_service import BaseService
 from . import chatgpt
+from .routing import AIRoute, AIRouteSource, apply_route, resolve_ai_route
 
 T = TypeVar("T", bound=OpenAIBase)
 logger = root_logger.get_logger(__name__)
 
 MAX_TOOL_ROUNDS = 8
 """How many times the model can go back to its tools before it has to answer (API-key providers)"""
+
+MODEL_CATALOG_TTL = 10 * 60
+MODEL_CATALOG_CACHE_SIZE = 32
+_model_catalogs: dict[tuple[Any, str | None], tuple[float, AIModelCatalog]] = {}
+"""
+Recently listed models, by provider and signed-in account, so opening the settings again doesn't start Codex
+again. Only successful listings are kept, and only a few, for a few minutes.
+"""
 
 
 class OpenAINotEnabledException(Exception):
@@ -186,11 +202,52 @@ class OpenAIService(BaseService):
             else None
         )
 
+        self._providers: dict[Any, AIProviderOut | None] = {
+            provider.id: provider
+            for provider in (self.default_provider, self.audio_provider, self.image_provider)
+            if provider
+        }
+
         # Build client
         settings = get_app_settings()
         self.custom_prompt_dir = settings.OPENAI_CUSTOM_PROMPT_DIR
 
         super().__init__()
+
+    def _load_provider(self, provider_id: Any) -> AIProviderOut | None:
+        # The repository is scoped to this group, so another group's provider is never found
+        if provider_id not in self._providers:
+            self._providers[provider_id] = self.repos.group_ai_providers.get_one(provider_id)
+        return self._providers[provider_id]
+
+    def route(self, task: AITask | None, *, images: bool = False) -> AIRoute | None:
+        """Which provider, model and reasoning effort a task runs on (see `routing`), or None if there's none"""
+        return resolve_ai_route(self.provider_settings, task, images=images)
+
+    def can_read_images(self, task: AITask) -> bool:
+        """Whether the task has a provider to read images with, so images can be sent to it at all"""
+        settings = self.provider_settings
+        if not (settings and settings.ai_enabled):
+            return False
+        route = self.route(task, images=True)
+        return bool(route and self._load_provider(route.provider_id))
+
+    def provider_for(self, task: AITask | None, *, images: bool = False) -> AIProviderOut:
+        """The provider a task's request runs on, with the model and reasoning effort chosen for it"""
+        route = self.route(task, images=images)
+        if route is None:
+            raise OpenAINotEnabledException("No image provider set" if images else "No default provider set")
+
+        provider = self._load_provider(route.provider_id)
+        if provider is None:
+            # Never quietly swap in another provider (or account) for the one that was chosen
+            what = (
+                "image provider"
+                if route.source in (AIRouteSource.task_images, AIRouteSource.group_images)
+                else "provider"
+            )
+            raise OpenAINotEnabledException(f"The {what} chosen for this task no longer exists")
+        return apply_route(provider, route)
 
     def get_client(self, provider: AIProviderOut) -> AsyncOpenAI:
         from openai import AsyncOpenAI
@@ -273,28 +330,22 @@ class OpenAIService(BaseService):
         keywords = json.loads((self.TESTING_DIR / "recipe.json").read_text())["test_keywords"]
         return any(keyword.lower() in response.text.lower() for keyword in keywords)
 
-    def _get_provider(self, attachments: list[OpenAIAttachment] | None = None) -> AIProviderOut:
-        """Select the appropriate provider based on attachment types, falling back to the default."""
+    def _get_provider(
+        self, attachments: list[OpenAIAttachment] | None = None, task: AITask | None = None
+    ) -> AIProviderOut:
+        """Select the provider for a task's request based on attachment types (see `routing`)."""
         has_image = any(isinstance(a, OpenAIImageBase) for a in (attachments or []))
         has_audio = any(isinstance(a, OpenAILocalAudio) for a in (attachments or []))
 
         if has_image and has_audio:
             raise ValueError("Cannot process both images and audio in one request")
 
-        if has_image:
-            if not self.image_provider:
-                raise OpenAINotEnabledException("No image provider set")
-            return self.image_provider
-
         if has_audio:
             if not self.audio_provider:
                 raise OpenAINotEnabledException("No audio provider set")
             return self.audio_provider
 
-        else:
-            if not self.default_provider:
-                raise OpenAINotEnabledException("No default provider set")
-            return self.default_provider
+        return self.provider_for(task, images=has_image)
 
     def _get_prompt_file_candidates(self, name: str) -> list[Path]:
         """
@@ -417,6 +468,7 @@ class OpenAIService(BaseService):
             ],
             model=provider.model,
             response_format=response_schema,
+            **self._reasoning_kwargs(provider),
         ) as response:
             completion = ChatCompletion.model_validate(json.loads(await response.text()))
 
@@ -430,6 +482,14 @@ class OpenAIService(BaseService):
             return None
 
         return response_schema.parse_openai_response(completion.choices[0].message.content)
+
+    @staticmethod
+    def _reasoning_kwargs(provider: AIProviderOut) -> dict[str, Any]:
+        """
+        Chat Completions' `reasoning_effort`, only when one was chosen: plenty of OpenAI-compatible endpoints and
+        models reject the parameter, so a provider nobody set it for sends exactly what it always has.
+        """
+        return {"reasoning_effort": provider.reasoning_effort} if provider.reasoning_effort else {}
 
     async def _get_chatgpt_response(
         self, prompt: str, content: list[dict], response_schema: type[T], provider: AIProviderOut
@@ -445,6 +505,7 @@ class OpenAIService(BaseService):
                 # The same strict schema the Chat Completions path sends as its response_format
                 output_schema=to_strict_json_schema(response_schema),
                 model=provider.model or None,
+                effort=provider.reasoning_effort,
                 timeout=provider.timeout,
                 save_credential=lambda credential: self._save_chatgpt_credential(provider, credential),
             )
@@ -479,12 +540,16 @@ class OpenAIService(BaseService):
         response_schema: type[T],
         attachments: list[OpenAIAttachment] | None = None,
         provider: AIProviderOut | None = None,
+        task: AITask | None = None,
     ) -> T | None:
-        """Send data to OpenAI and return the response message content"""
+        """
+        Send data to OpenAI and return the response message content. `task` picks the provider, model and
+        reasoning effort chosen for it; without one, the group's default (or image) provider is used.
+        """
         import openai
 
         try:
-            provider = provider or self._get_provider(attachments)
+            provider = provider or self._get_provider(attachments, task)
             user_messages: list[dict] = [{"type": "text", "text": message}]
             for attachment in attachments or []:
                 user_messages.append(attachment.build_message())
@@ -502,6 +567,7 @@ class OpenAIService(BaseService):
         tools: Sequence[OpenAITool],
         *,
         provider: AIProviderOut | None = None,
+        task: AITask | None = None,
     ) -> str:
         """
         Reply to the last of `messages`, a user's, with the rest as the conversation so far. The
@@ -512,7 +578,7 @@ class OpenAIService(BaseService):
         if not messages or messages[-1].role != "user":
             raise ValueError("A chat has to end with the user's message")
 
-        provider = provider or self._get_provider()
+        provider = provider or self._get_provider(task=task)
         by_name = {tool.name: tool for tool in tools}
 
         async def call_tool(name: str, arguments: Any) -> tuple[bool, str]:
@@ -554,7 +620,9 @@ class OpenAIService(BaseService):
         ]
 
         for _ in range(MAX_TOOL_ROUNDS):
-            completion = await client.chat.completions.create(model=provider.model, messages=conversation, tools=specs)
+            completion = await client.chat.completions.create(
+                model=provider.model, messages=conversation, tools=specs, **self._reasoning_kwargs(provider)
+            )
             if not completion.choices:
                 raise exceptions.OpenAIServiceError("The AI provider didn't reply")
 
@@ -597,12 +665,52 @@ class OpenAIService(BaseService):
                 inputs=[{"type": "text", "text": latest.content}],
                 output_schema=None,
                 model=provider.model or None,
+                effort=provider.reasoning_effort,
                 timeout=provider.timeout,
                 save_credential=lambda credential: self._save_chatgpt_credential(provider, credential),
                 tools=specs,
                 call_tool=call_tool,
                 history=[chatgpt.to_codex_history(message.role, message.content) for message in earlier],
             )
+
+    async def list_models(
+        self, provider: AIProviderOut, *, account: str | None = None, refresh: bool = False
+    ) -> AIModelCatalog:
+        """
+        The models a ChatGPT provider's catalog lists, for picking one. Never fails: when the models can't be
+        listed, the catalog says so and a model name can still be typed in. API-key providers aren't asked, since
+        their endpoints differ in what (if anything) they list, and Mealie doesn't call user-supplied URLs here.
+
+        `account` is the signed-in account, which keeps one account's catalog from being shown for another.
+        """
+        if provider.provider_type != AIProviderType.chatgpt:
+            return AIModelCatalog(discovered=False, message="Type the model name your provider's documentation gives.")
+
+        key = (provider.id, account or provider.chatgpt_account)
+        now = time.monotonic()
+        cached = _model_catalogs.get(key)
+        if cached and not refresh and now - cached[0] < MODEL_CATALOG_TTL:
+            return cached[1]
+
+        try:
+            async with chatgpt.credential_lock(provider.id):
+                models = await chatgpt.list_chatgpt_models(
+                    self._load_chatgpt_credential(provider),
+                    save_credential=lambda credential: self._save_chatgpt_credential(provider, credential),
+                )
+        except chatgpt.ChatGPTError as e:
+            return AIModelCatalog(discovered=False, message=str(e))
+        except Exception:
+            self.logger.exception("Failed to list ChatGPT models")
+            return AIModelCatalog(discovered=False, message="The models couldn't be listed.")
+
+        catalog = AIModelCatalog(discovered=True, models=models)
+        for stale in [k for k, (at, _) in _model_catalogs.items() if now - at >= MODEL_CATALOG_TTL]:
+            del _model_catalogs[stale]
+        _model_catalogs[key] = (now, catalog)
+        while len(_model_catalogs) > MODEL_CATALOG_CACHE_SIZE:
+            del _model_catalogs[next(iter(_model_catalogs))]
+        return catalog
 
     async def transcribe_audio(self, audio_file_path: Path) -> str | None:
         import openai
