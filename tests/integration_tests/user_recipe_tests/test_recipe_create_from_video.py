@@ -1,13 +1,17 @@
 import json
 from collections.abc import Generator
 from pathlib import Path
+from unittest.mock import AsyncMock
 
+import httpx
 import pytest
 from fastapi.testclient import TestClient
 
 import mealie.services.openai.transcription as transcription_module
+import mealie.services.recipe.import_workflow.compilers.transcription as compiler_module
 import mealie.services.scraper.recipe_scraper as recipe_scraper_module
 from mealie.core import exceptions
+from mealie.pkgs.safehttp import FetchResult
 from mealie.schema.group.ai_providers import AIProviderCreate, AIProviderSettingsUpdate
 from mealie.schema.openai.organizers import OpenAIOrganizers
 from mealie.schema.openai.recipe import OpenAIRecipe, OpenAIRecipeIngredient, OpenAIRecipeInstruction
@@ -52,6 +56,8 @@ def default_provider(unique_user: TestUser) -> Generator[None]:
 
 @pytest.fixture(autouse=True)
 def video_page(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(compiler_module, "resilient_fetch", AsyncMock(return_value=None))
+
     async def mock_safe_scrape_html(url: str) -> str:
         return VIDEO_PAGE
 
@@ -303,7 +309,7 @@ def test_a_video_post_is_never_saved_as_a_placeholder(
     assert r.status_code == 400
 
 
-def test_a_video_post_isnt_fetched_as_a_page(
+def test_video_import_does_not_use_placeholder_page_scraper(
     api_client: TestClient,
     unique_user: TestUser,
     monkeypatch: pytest.MonkeyPatch,
@@ -342,6 +348,74 @@ def test_instagram_import_saves_video_link_and_source_category(
         assert "Main Dish" in categories
     else:
         assert categories == ["Instagram"]
+
+
+def test_instagram_caption_amounts_and_sections_survive_import(
+    api_client: TestClient, unique_user: TestUser, video: VideoInfo, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    url = "https://www.instagram.com/p/DS66ymegPwK/"
+    page = Path("tests/data/html/instagram-recipe-caption.html").read_text()
+    monkeypatch.setattr(
+        compiler_module,
+        "resilient_fetch",
+        AsyncMock(return_value=FetchResult(page.encode(), 200, url, httpx.Headers(), "utf-8")),
+    )
+    video.description = ""
+    video.captions = "Add garlic and ginger, then the coconut milk. Brown the beef and cook the noodles."
+    # Expected lines include repeated ingredients in separate sections and unquantified toppings.
+    sections = {
+        "For the Miso Curry Broth:": [
+            "2 tbsp oil",
+            "6 cloves garlic, minced",
+            "2 tsp ginger, minced",
+            "1 tbsp lemongrass",
+            "2 tbsp curry paste",
+            "1 tbsp miso paste",
+            "1 can coconut milk (400 mL)",
+            "2 cups chicken broth",
+            "2 tbsp CHIN-SU fish sauce",
+            "1 tbsp or more of CHIN-SU hot sauce (adjust to your preference)",
+            "1 tbsp sugar",
+            "4 kaffir lime leaves",
+            "2 portions instant ramen noodles",
+        ],
+        "For the Beef Topping:": [
+            "500 g beef mince",
+            "1 tbsp oil for cooking",
+            "3 cloves garlic, minced",
+            "1/2 shallot, minced",
+            "2 tsp ginger, minced",
+            "2 tsp soy sauce",
+            "1 tsp dark soy sauce",
+            "1 tbsp CHIN-SU fish sauce",
+            "1 tsp sugar",
+        ],
+        "Toppings:": ["Soft-boiled egg", "Sliced green onions", "Sesame seeds", "CHIN-SU Hot sauce"],
+    }
+    ingredients = [
+        OpenAIRecipeIngredient(title=title if index == 0 else None, text=line)
+        for title, lines in sections.items()
+        for index, line in enumerate(lines)
+    ]
+
+    async def response(self, prompt, message, *args, response_schema=None, **kwargs):
+        assert response_schema is OpenAIRecipe
+        for title, lines in sections.items():
+            assert title in message
+            assert all(line in message for line in lines)
+        return OpenAIRecipe(name=random_string(), ingredients=ingredients)
+
+    monkeypatch.setattr(OpenAIService, "get_response", response)
+    result = api_client.post(
+        api_routes.recipes_create_url, json={"url": url, "organize": False}, headers=unique_user.token
+    )
+    assert result.status_code == 201
+    recipe = api_client.get(api_routes.recipes_slug(result.json()), headers=unique_user.token).json()
+    assert [(ing["title"], ing["note"]) for ing in recipe["recipeIngredient"]] == [
+        (ing.title, ing.text) for ing in ingredients
+    ]
+    assert recipe["orgURL"] == url
+    assert any(category["name"] == "Instagram" for category in recipe["recipeCategory"])
 
 
 def test_a_video_post_without_ai_says_it_needs_a_provider(

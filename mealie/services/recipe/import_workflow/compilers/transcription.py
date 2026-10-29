@@ -1,9 +1,17 @@
 import asyncio
+import re
+from urllib.parse import urlsplit
 
+from bs4 import BeautifulSoup
+
+from mealie.core import exceptions
 from mealie.core.dependencies.dependencies import get_temporary_path
+from mealie.pkgs.safehttp import resilient_fetch
 from mealie.schema.openai.compiled_source import OpenAICompiledSource
 from mealie.services.openai import transcription
+from mealie.services.openai.content import page_description
 from mealie.services.openai.transcription import VideoInfo
+from mealie.services.recipe.recipe_source import instagram_source_url
 
 from ..exceptions import NoRecipeDataError
 from .base import SourceCompiler, SourceType
@@ -22,12 +30,21 @@ RECOGNIZED_CAPTIONS_PREAMBLE = (
     'way a recipe would ("2 cups (280 g) flour", not "about two cups of flour which is about 280 grams").'
 )
 
+WRITTEN_CAPTION_PREAMBLE = (
+    "The video description is the creator's written post caption. When it contains a recipe, "
+    "use its complete ingredient lines, including every amount, unit, package size and section heading. "
+    "Prefer these written measurements over the spoken transcript, which may omit them. "
+    "Use the transcript to supplement the written recipe, not replace or summarize it."
+)
+
 
 class TranscriptionCompiler(SourceCompiler):
     """
     Compiles a video from what it says about itself: its title, its description, and its captions,
     along with the written recipe its description links to, if there is one. Only a video with no
     captions has its audio downloaded, and only if there's an audio provider to transcribe it.
+
+    Instagram's public page supplies the written post caption when video metadata omits it.
 
     Each of these is already a faithful record of the source, so no further AI call is made.
     """
@@ -43,9 +60,24 @@ class TranscriptionCompiler(SourceCompiler):
 
     async def compile(self) -> OpenAICompiledSource | None:
         url = self._url() or ""
-        video = await asyncio.to_thread(transcription.read_video, url)
+        instagram = bool(instagram_source_url(url))
+        try:
+            video = await asyncio.to_thread(transcription.read_video, url)
+        except exceptions.VideoDownloadError:
+            # A public written caption remains useful even if the video extractor cannot read the media.
+            description = await self._instagram_description(url) if instagram else ""
+            if not description:
+                raise
+            video = VideoInfo(description=description)
+        else:
+            if instagram:
+                description = await self._instagram_description(url)
+                if len(description) > len(video.description):
+                    video.description = description
 
-        if not (video.captions or video.can_download):
+        video.title = transcription.post_title(video.title, video.description)
+
+        if not (video.captions or video.can_download or (instagram and video.description.strip())):
             # yt-dlp knows the site, but there's no video on this page (most NYT Cooking recipes,
             # for one), so leave it to be read as a webpage
             return None
@@ -63,6 +95,35 @@ class TranscriptionCompiler(SourceCompiler):
             # a written recipe's photo is of the dish, where a thumbnail is often a face and a caption
             image_url=(linked.image_url if linked else None) or video.thumbnail_url,
         )
+
+    async def _instagram_description(self, url: str) -> str:
+        """Recover post captions omitted by yt-dlp without sending the whole Instagram page to AI."""
+        path = urlsplit(url).path
+        if not (post := re.fullmatch(r"/(p|reels?|tv)/([A-Za-z0-9_-]+)/?", path)):
+            return ""
+        post_url = f"https://www.instagram.com/{post[1]}/{post[2]}/"
+        description = ""
+        for source_url in (post_url, f"{post_url}embed/captioned/"):
+            try:
+                page = await resilient_fetch(source_url)
+                if not page:
+                    continue
+                soup = BeautifulSoup(page.text, "lxml")
+                if caption := soup.select_one(".Caption"):
+                    for extra in caption.select(".CaptionUsername, .CaptionComments"):
+                        extra.decompose()
+                    candidate = caption.get_text("\n", strip=True)
+                else:
+                    candidate = page_description(soup)
+                if len(candidate) > len(description):
+                    description = candidate
+                if description and not description.rstrip().endswith(("…", "...")):
+                    break
+            except Exception:
+                # Recovery is optional: keep the existing description and transcript if the page is blocked.
+                self.logger.warning("Could not recover the written Instagram caption")
+
+        return description
 
     def _audio_provider_enabled(self) -> bool:
         settings = self.ctx.ai.provider_settings
@@ -113,7 +174,7 @@ class TranscriptionCompiler(SourceCompiler):
 
         parts = [f"# {video.title}"] if video.title else []
         if description := video.description.strip():
-            parts.append(f"## Video description\n\n{description}")
+            parts.append(f"## Video description\n\n{WRITTEN_CAPTION_PREAMBLE}\n\n{description}")
         if linked:
             parts.append(f"## Written recipe\n\n{WRITTEN_RECIPE_PREAMBLE.format(url=linked.url)}\n\n{linked.content}")
         if transcript:

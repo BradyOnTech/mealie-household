@@ -55,6 +55,12 @@ def normalize(val: str) -> str:
         ),
         TestIngredient("2 teaspoons salt (to taste) ", 2, "teaspoon", "salt", "to taste"),
         TestIngredient("1/2 cup", 0.5, "cup", "", ""),
+        TestIngredient("2 tbsp oil", 2, "tablespoon", "oil", ""),
+        TestIngredient("6 cloves garlic, minced", 6, "cloves", "garlic", "minced"),
+        TestIngredient("500 g beef mince", 500, "gram", "beef mince", ""),
+        TestIngredient("1/2 shallot, minced", 0.5, "", "shallot", "minced"),
+        TestIngredient("4 kaffir lime leaves", 4, "", "kaffir lime leaves", ""),
+        TestIngredient("Soft-boiled egg", 0, "", "Soft-boiled egg", ""),
     ],
 )
 def test_nlp_parser(unique_local_group_id: UUID4, test_ingredient: TestIngredient):
@@ -88,11 +94,11 @@ def test_nlp_parser(unique_local_group_id: UUID4, test_ingredient: TestIngredien
         ),
         (
             "153 grams 00 flour (1 cup plus 1 tablespoon)",
-            "153 gram 00 flour or 1 cup and 1 tablespoon",
+            "153 gram 00 flour (1 cup, 1 tablespoon)",
         ),
         (
             "153 grams all-purpose flour (1 cup plus 1 tablespoon and 2 teaspoons)",
-            "153 gram all-purpose flour or 1 cup plus 1 tablespoon and 2 teaspoons",
+            "153 gram all-purpose flour (1 cup plus 1 tablespoon and 2 teaspoons)",
         ),
         (
             "2 cups chicken broth or beef broth",
@@ -100,7 +106,7 @@ def test_nlp_parser(unique_local_group_id: UUID4, test_ingredient: TestIngredien
         ),
         (
             "2 tablespoons (30ml) vegetable oil",
-            "2 tablespoon vegetable oil or 30 milliliter",
+            "2 tablespoon vegetable oil (30 ml)",
         ),
         (
             "1 cup fresh basil or 2 tablespoons dried basil",
@@ -168,3 +174,17 @@ def test_nlp_parser_converts_extra_ingredients(
     # the amount has nowhere to live on a substitution, so the whole thing stays as text
     assert substitutions[2].substitute_food_id is None
     assert substitutions[2].note and "onion" in substitutions[2].note
+
+
+@pytest.mark.asyncio
+async def test_package_size_stays_with_ingredient_instead_of_becoming_substitution(unique_local_group_id: UUID4):
+    with session_context() as session:
+        parser = get_parser(RegisteredParser.nlp, unique_local_group_id, session, get_locale_provider())
+        parsed = await parser.parse_one("1 can coconut milk (400 mL)")
+
+    ingredient = parsed.ingredient
+    assert ingredient.quantity == 1
+    assert ingredient.unit and ingredient.unit.name == "can"
+    assert ingredient.food and ingredient.food.name == "coconut milk"
+    assert ingredient.note and "400 mL" in ingredient.note
+    assert not ingredient.substitutions

@@ -23,8 +23,8 @@ logger = get_logger()
 
 VIDEO_SITES = {"youtube", "vimeo", "tiktok", "instagram", "facebook", "dailymotion"}
 """
-yt-dlp extractors for sites where the video is the whole post. Their pages carry little more than
-the video's title, and never a recipe as structured data, so there's no point fetching them.
+yt-dlp extractors for sites where the video is the whole post. Read their video metadata first;
+the import compiler also recovers written post captions that the extractor omits.
 """
 
 CAPTION_FORMATS = ("vtt", "srt")

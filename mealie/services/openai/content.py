@@ -139,6 +139,9 @@ def extract_page_content(html: str) -> tuple[str, str | None]:
     soup = bs4.BeautifulSoup(html, "lxml")
 
     text = soup.get_text(separator="\n", strip=True)
+    if description := page_description(soup):
+        if description not in text:
+            text += f"\n\nPage description:\n{description}"
     text += extract_json_ld_data_from_html(soup)
     if not text:
         raise ValueError("No text or ld+json data found in HTML")
@@ -149,3 +152,14 @@ def extract_page_content(html: str) -> tuple[str, str | None]:
         image = None
 
     return text, image
+
+
+def page_description(soup: bs4.BeautifulSoup) -> str:
+    """Social posts can publish their whole written recipe only in page metadata."""
+    descriptions = [
+        str(tag.get("content") or "").strip()
+        for tag in soup.select(
+            'meta[property="og:description"], meta[name="description"], meta[name="twitter:description"]'
+        )
+    ]
+    return max(descriptions, key=len, default="")

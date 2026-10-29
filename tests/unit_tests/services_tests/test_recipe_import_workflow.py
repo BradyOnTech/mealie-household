@@ -13,6 +13,7 @@ from mealie.schema.openai.compiled_source import OpenAICompiledSource
 from mealie.services.openai.content import (
     MAX_SOURCE_CONTENT_LENGTH,
     TRUNCATION_NOTICE,
+    extract_page_content,
     truncate_source_content,
     truncate_source_parts,
 )
@@ -93,6 +94,24 @@ def test_import_error_keys_are_translatable(key: str):
 def test_short_content_is_not_truncated():
     content = "a" * 100
     assert truncate_source_content(content) == content
+
+
+def test_page_metadata_keeps_recipe_amounts_not_present_in_visible_text():
+    text, _ = extract_page_content(
+        '<html><head><meta property="og:description" '
+        'content="Ingredients\n2 tbsp oil\n1 can coconut milk (400 mL)\n500 g beef mince"></head>'
+        "<body>Watch this recipe video</body></html>"
+    )
+    assert "2 tbsp oil\n1 can coconut milk (400 mL)\n500 g beef mince" in text
+    assert "Watch this recipe video" in text
+
+
+def test_page_description_does_not_duplicate_visible_recipe():
+    caption = "Ingredients: 1/2 shallot, minced"
+    text, _ = extract_page_content(
+        f'<html><head><meta name="description" content="{caption}"></head><body>{caption}</body></html>'
+    )
+    assert text.count(caption) == 1
 
 
 def test_content_at_the_limit_is_not_truncated():

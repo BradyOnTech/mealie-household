@@ -6,11 +6,13 @@ import httpx
 import pytest
 
 import mealie.services.recipe.import_workflow.compilers.linked_recipe as linked_recipe_module
+import mealie.services.recipe.import_workflow.compilers.transcription as compiler_module
 from mealie.pkgs.safehttp.fetch import FetchResult
 from mealie.services.openai import transcription
 from mealie.services.openai.transcription import VideoInfo
 from mealie.services.recipe.import_workflow.compilers.transcription import (
     RECOGNIZED_CAPTIONS_PREAMBLE,
+    WRITTEN_CAPTION_PREAMBLE,
     TranscriptionCompiler,
 )
 from mealie.services.recipe.import_workflow.context import WorkflowContext, WorkflowInput, WorkflowOptions
@@ -78,7 +80,8 @@ async def test_captions_are_read_without_an_audio_provider(video: VideoInfo, dow
     assert compiled is not None
     assert compiled.contains_recipe
     assert compiled.content == (
-        "# Foolproof Pan Pizza\n\n## Video description\n\nThe easiest pizza you'll ever make.\n\n"
+        f"# Foolproof Pan Pizza\n\n## Video description\n\n{WRITTEN_CAPTION_PREAMBLE}\n\n"
+        "The easiest pizza you'll ever make.\n\n"
         f"## Video transcript\n\n{CAPTIONS}"
     )
     assert compiled.image_url == "https://i.ytimg.test/pizza.jpg"
@@ -132,7 +135,10 @@ async def test_a_video_without_captions_or_audio_provider_is_read_from_its_descr
     compiled = await TranscriptionCompiler(_ctx(audio_provider=False)).compile()
 
     assert compiled is not None
-    assert compiled.content == "# Foolproof Pan Pizza\n\n## Video description\n\nThe easiest pizza you'll ever make."
+    assert compiled.content == (
+        f"# Foolproof Pan Pizza\n\n## Video description\n\n{WRITTEN_CAPTION_PREAMBLE}\n\n"
+        "The easiest pizza you'll ever make."
+    )
     assert downloads == []
 
 
@@ -231,3 +237,108 @@ async def test_a_written_recipe_that_cannot_be_read_is_left_out(video: VideoInfo
     assert compiled is not None
     assert "## Written recipe" not in compiled.content
     assert compiled.image_url == "https://i.ytimg.test/pizza.jpg"
+
+
+@pytest.mark.asyncio
+async def test_instagram_recovers_written_amounts_missing_from_video_metadata(
+    video: VideoInfo, monkeypatch: pytest.MonkeyPatch
+):
+    url = "https://www.instagram.com/p/DS66ymegPwK/?tracking=example"
+    video.description = ""
+    video.captions = "Add garlic, ginger and coconut milk. Brown the beef and cook your ramen."
+    caption = (
+        "Creamy Curry Ramen\nIngredients\nFor the Miso Curry Broth:\n"
+        "2 tbsp oil\n6 cloves garlic, minced\n1 can coconut milk (400 mL)\n"
+        "1 tbsp or more of CHIN-SU hot sauce (adjust to your preference)\n"
+        "For the Beef Topping:\n500 g beef mince\n1/2 shallot, minced\n"
+        "Toppings:\nSoft-boiled egg\nSesame seeds"
+    )
+    fetched: list[str] = []
+
+    async def mock_fetch(source_url: str) -> FetchResult:
+        fetched.append(source_url)
+        page = f'<html><head><meta property="og:description" content="{caption}"></head></html>'
+        return FetchResult(page.encode(), 200, source_url, httpx.Headers(), "utf-8")
+
+    monkeypatch.setattr(compiler_module, "resilient_fetch", mock_fetch, raising=False)
+    ctx = _ctx(audio_provider=False)
+    ctx.input.url = url
+
+    compiled = await TranscriptionCompiler(ctx).compile()
+
+    assert compiled is not None
+    assert caption in compiled.content
+    assert video.captions in compiled.content
+    assert fetched == ["https://www.instagram.com/p/DS66ymegPwK/"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("video_unreadable", [False, True])
+async def test_instagram_caption_can_supply_recipe_without_video_or_audio(
+    video: VideoInfo, monkeypatch: pytest.MonkeyPatch, video_unreadable: bool
+):
+    video.captions = ""
+    video.description = ""
+    video.can_download = False
+    if video_unreadable:
+
+        def fail_read(url: str) -> VideoInfo:
+            from mealie.core.exceptions import VideoDownloadError
+
+            raise VideoDownloadError("Video unavailable")
+
+        monkeypatch.setattr(transcription, "read_video", fail_read)
+
+    fetched: list[str] = []
+
+    async def mock_fetch(url: str) -> FetchResult:
+        fetched.append(url)
+        page = "<html><body>Login</body></html>"
+        if "embed/captioned" in url:
+            page = (
+                '<div class="Caption"><a class="CaptionUsername">cook</a><br>'
+                "Ingredients<br>1/2 shallot, minced<br>500 g beef mince"
+                '<div class="CaptionComments">View all 100 comments</div></div>'
+            )
+        return FetchResult(page.encode(), 200, url, httpx.Headers(), "utf-8")
+
+    monkeypatch.setattr(compiler_module, "resilient_fetch", mock_fetch)
+    ctx = _ctx(audio_provider=False)
+    ctx.input.url = "https://www.instagram.com/reel/recipe/"
+
+    compiled = await TranscriptionCompiler(ctx).compile()
+
+    assert compiled and "1/2 shallot, minced\n500 g beef mince" in compiled.content
+    assert "View all 100 comments" not in compiled.content
+    assert len(fetched) == 2
+    ctx.ai.transcribe_audio.assert_not_called()  # type: ignore[attr-defined]
+
+
+@pytest.mark.asyncio
+async def test_blocked_instagram_caption_preserves_existing_description_and_transcript(
+    video: VideoInfo, monkeypatch: pytest.MonkeyPatch
+):
+    fetch = AsyncMock(side_effect=RuntimeError("Blocked"))
+    monkeypatch.setattr(compiler_module, "resilient_fetch", fetch)
+    ctx = _ctx(audio_provider=False)
+    ctx.input.url = "https://www.instagram.com/p/recipe/"
+
+    compiled = await TranscriptionCompiler(ctx).compile()
+
+    assert compiled and video.description in compiled.content and CAPTIONS in compiled.content
+
+
+@pytest.mark.asyncio
+async def test_a_longer_written_description_is_not_replaced_by_truncated_metadata(
+    video: VideoInfo, monkeypatch: pytest.MonkeyPatch
+):
+    video.description = "Ingredients\n1 can coconut milk (400 mL)\n500 g beef mince"
+    page = '<meta property="og:description" content="Ingredients…">'
+    fetch = AsyncMock(return_value=FetchResult(page.encode(), 200, VIDEO_URL, httpx.Headers(), "utf-8"))
+    monkeypatch.setattr(compiler_module, "resilient_fetch", fetch)
+    ctx = _ctx(audio_provider=False)
+    ctx.input.url = "https://www.instagram.com/p/recipe/"
+
+    compiled = await TranscriptionCompiler(ctx).compile()
+
+    assert compiled and video.description in compiled.content

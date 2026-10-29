@@ -108,8 +108,8 @@ class CompileSourceStep(WorkflowStep):
         if not url:
             return await self._compile_content(ctx, ctx.input.page_content)
 
-        # On the big video sites the video is the whole post, and its page carries little more than
-        # a title, so compilers that read the URL themselves go first and the page is never fetched
+        # Video compilers read these posts directly, including written captions that may need their
+        # own page fetch. Avoid running the generic webpage compiler over the surrounding site.
         read_urls: set[str] = set()
         if transcription.is_video_site(url):
             read_urls.add(url)

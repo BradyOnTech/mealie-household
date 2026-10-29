@@ -1,6 +1,7 @@
 import json
 from collections.abc import Generator
 from pathlib import Path
+from unittest.mock import AsyncMock
 
 import httpx
 import pytest
@@ -8,6 +9,7 @@ from fastapi.testclient import TestClient
 from slugify import slugify
 
 import mealie.services.openai.transcription as transcription_module
+import mealie.services.recipe.import_workflow.compilers.transcription as compiler_module
 import mealie.services.recipe.import_workflow.steps.compile_source as compile_source_module
 from mealie.core import exceptions
 from mealie.lang import get_locale_provider
@@ -70,6 +72,8 @@ def ai_providers(unique_user: TestUser) -> Generator[None]:
 
 @pytest.fixture(autouse=True)
 def no_image_downloads(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(compiler_module, "resilient_fetch", AsyncMock(return_value=None))
+
     async def mock_scrape_image(*_, **__) -> str:
         return "TEST_IMAGE"
 

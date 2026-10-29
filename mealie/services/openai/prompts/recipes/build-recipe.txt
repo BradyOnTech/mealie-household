@@ -7,7 +7,8 @@ When converting:
 - If the source has a section of text supplied by the user, that section is authoritative. Where it disagrees with the rest of the source, follow it: if it names the recipe, use their name; if it corrects or adds a detail, use theirs.
 - Keep ingredients and instructions in their original order.
 - Preserve section headings by setting the title on the first ingredient or instruction of each section, and leaving it blank on the rest.
-- Keep each ingredient as a single line of text, exactly as written, e.g. "2 cups of onions, chopped".
+- Keep each ingredient as a single line of text, exactly as written, e.g. "2 cups of onions, chopped". Preserve all amounts, fractions, units, package sizes, ranges, and qualifiers such as "or more"; never reduce a measured ingredient to just its food name.
+- Prefer a creator's written recipe in the post caption, description, linked recipe, or visible recipe text over a spoken transcript that omits measurements. Keep ingredients repeated in different recipe sections separate. When no amount is stated (such as optional toppings), leave the ingredient unquantified.
 - When the source already presents its instructions as discrete steps, keep those steps as they are. Do not split or merge them.
 - When the source narrates cooking continuously, as a video transcript does, group the actions into steps a cook would recognize. Actions done back to back on the same thing belong together: "Drain the pasta, set it aside, and turn off the heat" is one step, not three.
 - Start a new step where the cook's attention shifts: a wait or a cooking time begins, a different component or pan is started, the temperature changes, or something goes into or comes out of the oven.

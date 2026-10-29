@@ -7,7 +7,7 @@ Capture at least the following, when the source contains them:
 - The description, introduction, or headnote
 - Yield or servings
 - Prep time, cook time, and total time
-- Every ingredient, in order, including any section headings such as "For the sauce"
+- Every ingredient, in order, including any section headings such as "For the sauce", and the complete amount, fraction, unit, package size, range, preparation and qualifier from each line
 - Every instruction step, in order, including any section headings
 - Notes, tips, variations, and substitutions
 - Storage, make-ahead, and reheating advice
@@ -19,7 +19,8 @@ Capture at least the following, when the source contains them:
 Rules:
 - Transcribe, do not summarize. If you are unsure whether something belongs, include it.
 - The list above is a minimum, not a limit. Transcribe anything else the source says about the recipe, even when it doesn't fit one of the categories above. Serving suggestions, drink pairings, difficulty, cost, allergen information, dietary labels, ingredient substitutions, temperature or measurement conversions, and cultural or historical notes all belong in the document.
-- Leave out anything on the page that isn't about the recipe, such as navigation, advertisements, cookie and subscription notices, reader comments, and links to other recipes.
+- Include recipe measurements wherever the creator provides them: post captions, page descriptions, visible recipe text, images, or the creator's own recipe comments included in the source. Prefer explicit written measurements over narration that omits them; do not invent amounts for unquantified ingredients.
+- Leave out anything on the page that isn't about the recipe, such as navigation, advertisements, cookie and subscription notices, unrelated reader comments, and links to other recipes.
 - Do not create, infer, or make up any information that is not in the source.
 - Do not translate. Preserve the original wording and language.
 - Preserve the original ordering of ingredients and steps.
