@@ -16,6 +16,8 @@
         class="recipe-hero__dek paper-dek"
       />
 
+      <RecipeSourceLink :url="recipe.orgURL" class="mt-4 d-print-none" />
+
       <dl class="recipe-hero__facts">
         <div v-if="recipe.totalTime" class="recipe-hero__fact">
           <dt>{{ $t("recipe.total-time") }}</dt>
@@ -71,6 +73,7 @@
 <script setup lang="ts">
 import { useLoggedInState } from "~/composables/use-logged-in-state";
 import RecipeRating from "~/components/Domain/Recipe/RecipeRating.vue";
+import RecipeSourceLink from "~/components/Domain/Recipe/RecipeSourceLink.vue";
 import RecipeLastMade from "~/components/Domain/Recipe/RecipeLastMade.vue";
 import RecipeYield from "~/components/Domain/Recipe/RecipeYield.vue";
 import RecipePageInfoCardImage from "~/components/Domain/Recipe/RecipePage/RecipePageParts/RecipePageInfoCardImage.vue";

@@ -324,6 +324,26 @@ def test_a_video_post_isnt_fetched_as_a_page(
     assert video.description in messages[0]
 
 
+@pytest.mark.parametrize("organize", [True, False])
+def test_instagram_import_saves_video_link_and_source_category(
+    api_client: TestClient, unique_user: TestUser, video: VideoInfo, messages: list[str], organize: bool
+) -> None:
+    response = api_client.post(
+        api_routes.recipes_create_url,
+        json={"url": INSTAGRAM_URL, "organize": organize},
+        headers=unique_user.token,
+    )
+    assert response.status_code == 201
+    recipe = api_client.get(api_routes.recipes_slug(response.json()), headers=unique_user.token).json()
+    assert recipe["orgURL"] == INSTAGRAM_URL
+    categories = [category["name"] for category in recipe["recipeCategory"]]
+    assert categories.count("Instagram") == 1
+    if organize:
+        assert "Main Dish" in categories
+    else:
+        assert categories == ["Instagram"]
+
+
 def test_a_video_post_without_ai_says_it_needs_a_provider(
     api_client: TestClient, unique_user: TestUser, video: VideoInfo
 ):

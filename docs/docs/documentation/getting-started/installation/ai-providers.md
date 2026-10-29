@@ -60,6 +60,10 @@ A few things to know:
 
 ## Recipe organization
 
+Instagram imports keep the original post or reel URL and show **Watch on Instagram** near the recipe
+title. They automatically receive the **Instagram** category, including when automatic AI organization
+is switched off. Organizing an existing Instagram recipe also suggests this source category for review.
+
 When AI is enabled, recipe imports can automatically choose categories, tags, and tools using the
 **Organizer matching** task. This works for ordinary website imports as well as AI, bulk URL, PDF,
 and EPUB imports. URL imports have an **Automatically organize this recipe** option; cookbook

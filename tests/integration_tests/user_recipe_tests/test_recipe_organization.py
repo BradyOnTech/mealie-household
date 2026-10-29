@@ -104,6 +104,28 @@ def test_existing_vocabulary_is_reused(api_client: TestClient, classifier_setup)
     assert not user.repos.tags.get_one("family-favorite", "slug")
 
 
+def test_existing_instagram_recipes_can_review_the_source_category(api_client: TestClient, classifier_setup) -> None:
+    user, _, _ = classifier_setup
+    recipe = create_recipe(user)
+    recipe.org_url = "https://www.instagram.com/reel/saved-video/"
+    user.repos.recipes.update(recipe.slug, recipe)
+    response = api_client.post(PREVIEW, json={"recipes": [recipe.slug]}, headers=user.token)
+    assert response.status_code == 200
+    suggestion = response.json()[0]
+    assert suggestion["categories"] == ["Main Dish", "Instagram"]
+    assert user.repos.categories.get_one("instagram", "slug") is None
+
+    # A removed source suggestion must stay removed when applying a preview.
+    suggestion["categories"].remove("Instagram")
+    assert api_client.post(APPLY, json={"recipes": [suggestion]}, headers=user.token).status_code == 200
+    assert user.repos.categories.get_one("instagram", "slug") is None
+
+    suggestion["categories"].append("Instagram")
+    assert api_client.post(APPLY, json={"recipes": [suggestion]}, headers=user.token).status_code == 200
+    updated = user.repos.recipes.get_one(recipe.slug)
+    assert [category.name for category in updated.recipe_category] == ["Main Dish", "Instagram"]
+
+
 def test_missing_recipe_preflights_the_entire_batch(api_client: TestClient, classifier_setup) -> None:
     user, _, calls = classifier_setup
     recipe = create_recipe(user)

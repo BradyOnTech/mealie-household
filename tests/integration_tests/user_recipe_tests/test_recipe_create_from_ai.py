@@ -299,12 +299,14 @@ def test_create_from_url(
     assert recipe["orgURL"] == url
 
 
+@pytest.mark.parametrize("source_url", [VIDEO_URL, "https://www.instagram.com/reel/C66-jHYy5_k/?igsh=shared"])
 def test_create_from_video_url(
     api_client: TestClient,
     unique_user: TestUser,
     monkeypatch: pytest.MonkeyPatch,
     openai_recipe: OpenAIRecipe,
     recipe_name: str,
+    source_url: str,
 ):
     ai = AIResponses(recipe=openai_recipe).install(monkeypatch)
     read = install_video(monkeypatch)
@@ -314,9 +316,9 @@ def test_create_from_video_url(
 
     monkeypatch.setattr(compile_source_module, "resilient_fetch", fail_if_fetched)
 
-    r = post_ai(api_client, unique_user, {"url": VIDEO_URL})
+    r = post_ai(api_client, unique_user, {"url": source_url})
     assert r.status_code == 201
-    assert read == [VIDEO_URL]
+    assert read == [source_url]
 
     # the captions are already a faithful record, so only the build step hits the provider
     assert "OpenAICompiledSource" not in ai.requested_schemas
@@ -324,7 +326,10 @@ def test_create_from_video_url(
     slug = json.loads(r.text)
     recipe = api_client.get(api_routes.recipes_slug(slug), headers=unique_user.token).json()
     assert recipe["name"] == recipe_name
-    assert recipe["orgURL"] == VIDEO_URL
+    assert recipe["orgURL"] == source_url
+    assert ("Instagram" in [category["name"] for category in recipe["recipeCategory"]]) == (
+        "instagram.com" in source_url
+    )
 
 
 def test_create_from_facebook_share_url_follows_redirect_to_video(
@@ -501,12 +506,20 @@ def test_create_from_video_url_that_cannot_be_read(
 
 def test_standard_organizers_bootstrap_an_empty_collection(
     api_client: TestClient,
-    unique_user: TestUser,
+    unique_user_fn_scoped: TestUser,
     monkeypatch: pytest.MonkeyPatch,
     openai_recipe: OpenAIRecipe,
 ):
     """An empty collection can acquire useful standard labels without enabling arbitrary creation."""
 
+    unique_user = unique_user_fn_scoped
+    provider = unique_user.repos.group_ai_providers.create(
+        AIProviderCreate(name=random_string(), model="gpt-4o", api_key="test-key")
+    )
+    unique_user.repos.group_ai_provider_settings.update(
+        unique_user.repos.group_id,
+        AIProviderSettingsUpdate(default_provider_id=provider.id, audio_provider_id=None, image_provider_id=None),
+    )
     assert not any(OrganizerResolver(unique_user.repos).existing_names().values()), (
         "this test needs a group that has no organizers yet"
     )

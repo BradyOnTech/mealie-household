@@ -37,7 +37,9 @@ from mealie.schema.user.user import PrivateUser, UserRatingCreate
 from mealie.services._base_service import BaseService
 from mealie.services.household_services.household_service import HouseholdService
 from mealie.services.parser_services._base import DataMatcher
+from mealie.services.recipe.organizer_resolver import OrganizerResolver
 from mealie.services.recipe.recipe_data_service import RecipeDataService
+from mealie.services.recipe.recipe_source import instagram_source_url
 
 from .template_service import TemplateService
 
@@ -242,6 +244,10 @@ class RecipeService(RecipeServiceBase):
 
         rating_input = data.rating
         data.last_made = None
+        if instagram_source_url(data.org_url):
+            source_category = OrganizerResolver(self.repos).resolve_categories(["Instagram"], create_missing=True)[0]
+            if source_category.id not in {category.id for category in data.recipe_category or []}:
+                data.recipe_category = [*(data.recipe_category or []), source_category]
         new_recipe = self.repos.recipes.create(data)
 
         # convert rating into user rating

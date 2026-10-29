@@ -9,6 +9,7 @@ from mealie.services.openai import OpenAIDataInjection, OpenAIService
 from mealie.services.openai.content import truncate_source_content
 
 from .organizer_resolver import ORGANIZER_FUZZY_MATCH_THRESHOLD, OrganizerResolver
+from .recipe_source import instagram_source_url
 
 # Only these names may be created automatically. Existing group vocabulary takes precedence.
 STANDARD_ORGANIZERS = {
@@ -86,13 +87,17 @@ class RecipeClassifier:
             parts.append("Source context (use only statements about this recipe):\n" + source)
         return truncate_source_content("\n\n".join(parts))
 
-    def normalize(self, names: OpenAIOrganizers, *, create_new: bool = False) -> OpenAIOrganizers:
+    def normalize(
+        self, names: OpenAIOrganizers, *, create_new: bool = False, source_url: str | None = None
+    ) -> OpenAIOrganizers:
         """Enforce the vocabulary on model output and accepted preview payloads alike."""
         resolver = OrganizerResolver(self.repos)
         stores = {"tags": resolver.tags, "categories": resolver.categories, "tools": resolver.tools}
         normalized: dict[str, list[str]] = {}
         for kind, store in stores.items():
             standard = {slugify(name): name for name in STANDARD_ORGANIZERS[kind]}
+            if kind == "categories" and instagram_source_url(source_url):
+                standard["instagram"] = "Instagram"
             result: dict[str, str] = {}
             for name in getattr(names, kind):
                 key = slugify(name)
@@ -133,7 +138,12 @@ class RecipeClassifier:
         )
         if response is None:
             raise ValueError("Recipe classification returned no response")
-        return self.normalize(response, create_new=create_new)
+        names = self.normalize(response, create_new=create_new, source_url=recipe.org_url)
+        if instagram_source_url(recipe.org_url) and "instagram" not in {slugify(name) for name in names.categories}:
+            # Provenance comes from the saved URL, not from an AI guess. Include it in the
+            # preview so the user can accept or remove it just like any other suggestion.
+            names.categories = [*names.categories[:2], "Instagram"]
+        return names
 
     @staticmethod
     def _merge[T: RecipeTag](existing: list[T] | None, additions: list[T]) -> list[T]:
@@ -143,7 +153,7 @@ class RecipeClassifier:
         return list(merged.values())
 
     def attach(self, recipe: Recipe, names: OpenAIOrganizers, *, create_new: bool = False) -> None:
-        names = self.normalize(names, create_new=create_new)
+        names = self.normalize(names, create_new=create_new, source_url=recipe.org_url)
         resolver = OrganizerResolver(self.repos)
         recipe.tags = self._merge(recipe.tags, resolver.resolve_tags(names.tags, create_missing=True))
         recipe.recipe_category = self._merge(
