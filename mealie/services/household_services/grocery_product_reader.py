@@ -84,6 +84,20 @@ class GroceryProductReader:
         return lookup
 
     async def scan_barcode(self, barcode: str) -> GroceryProductScan:
+        # Most scans are of something the household already buys, as it runs out. Its own product says all
+        # there is to know, so that's answered at once, without waiting on the database and the AI
+        if saved := self._saved_with(barcode, self._products()):
+            draft = GroceryProductLookup(
+                url=saved.url,
+                barcode=barcode,
+                name=saved.name,
+                store=saved.store,
+                package_quantity=saved.package_quantity,
+                package_unit=saved.package_unit,
+                food=saved.food,
+            )
+            return GroceryProductScan(barcode=barcode, identified=True, draft=draft, saved=saved)
+
         packaged = await look_up_barcode(barcode)
         if packaged is None:
             return self._scan(GroceryProductLookup(barcode=barcode), identified=False)
@@ -209,21 +223,23 @@ class GroceryProductReader:
     # =========================================================
     # What the household already has
 
-    def _scan(self, draft: GroceryProductLookup, identified: bool) -> GroceryProductScan:
-        products: list[GroceryProductOut] = self.repos.grocery_products.get_all(
-            order_by="priority", order_descending=False
+    def _products(self) -> list[GroceryProductOut]:
+        return self.repos.grocery_products.get_all(order_by="priority", order_descending=False)
+
+    @staticmethod
+    def _saved_with(barcode: str | None, products: list[GroceryProductOut]) -> GroceryProductOut | None:
+        """The household's product with a barcode: an enabled one first, and among those its first choice"""
+
+        if not barcode:
+            return None
+        return next(
+            (product for product in sorted(products, key=lambda p: not p.enabled) if product.barcode == barcode),
+            None,
         )
-        saved = None
-        if draft.barcode:
-            # an enabled product first, and among those the household's first choice
-            saved = next(
-                (
-                    product
-                    for product in sorted(products, key=lambda p: not p.enabled)
-                    if product.barcode == draft.barcode
-                ),
-                None,
-            )
+
+    def _scan(self, draft: GroceryProductLookup, identified: bool) -> GroceryProductScan:
+        products = self._products()
+        saved = self._saved_with(draft.barcode, products)
 
         likely = None
         if saved is None and draft.food and draft.name:

@@ -102,18 +102,32 @@ def test_a_new_barcode_fills_in_a_product(api_client: TestClient, unique_user_fn
     assert draft["food"]["id"] == milk["id"]
 
 
-def test_a_saved_products_barcode_finds_it(api_client: TestClient, unique_user_fn_scoped: TestUser, food_facts):
+def test_a_saved_products_barcode_finds_it_at_once(
+    api_client: TestClient, unique_user_fn_scoped: TestUser, monkeypatch: pytest.MonkeyPatch
+):
+    """Scanning what ran out is mostly scanning what the household already buys, which needs nothing looked up"""
+
     user = unique_user_fn_scoped
+    enable_ai(user, images=False)
     milk = add_food(api_client, user, "milk")
     product = add_product(
         api_client, user, foodId=milk["id"], name="Great Value Whole Milk, 1 gal", store="walmart", barcode=MILK_UPC
     )
     assert product["barcode"] == MILK_GTIN
+    looked_up: list[str] = []
+
+    async def look_up_barcode(barcode: str) -> None:
+        looked_up.append(barcode)
+
+    monkeypatch.setattr(reader_module, "look_up_barcode", look_up_barcode)
+    asked_ai = stub_ai(monkeypatch, OpenAIGroceryProduct(name="Whole Milk"))
 
     # read off the package as an EAN-13 this time, which is the same code
     data = scan(api_client, user, MILK_GTIN, "EAN-13").json()
 
     assert data["saved"]["id"] == product["id"]
+    assert data["draft"]["name"] == "Great Value Whole Milk, 1 gal"
+    assert (looked_up, asked_ai) == ([], [])
 
 
 def test_a_product_saved_without_its_barcode_is_recognized(
