@@ -13,6 +13,8 @@ class ScrapeRecipeBase(MealieModel):
     include_categories: bool = False
     organize: bool = True
     """Classify the imported recipe when the group has AI enabled"""
+    create_new_organizers: bool = False
+    """Whether organizing may create tags, categories, and tools beyond the group's own and the standard ones"""
 
 
 class ScrapeRecipe(ScrapeRecipeBase):
@@ -50,6 +52,9 @@ class ScrapeRecipeAI(MealieModel):
 
     create_new_organizers: bool = False
     """Whether to create tags, categories, and tools that don't already exist in the group"""
+
+    organize: bool = True
+    """Whether to give the recipe tags, categories, and tools, as `organize` does for URL imports"""
 
     model_config = ConfigDict(
         json_schema_extra={

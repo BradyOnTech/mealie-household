@@ -1,106 +1,45 @@
+import type { UserRecipeCreatePreferences } from "~/composables/use-users/preferences";
 import { useRecipeCreatePreferences } from "~/composables/use-users/preferences";
 
-export interface UseNewRecipeOptionsProps {
-  enableImportKeywords?: boolean;
-  enableImportCategories?: boolean;
-  enableStayInEditMode?: boolean;
-  enableParseRecipe?: boolean;
-  enableTranslateRecipe?: boolean;
-  enableCreateNewOrganizers?: boolean;
-}
-
-export function useNewRecipeOptions(props: UseNewRecipeOptionsProps = {}) {
-  const {
-    enableImportKeywords = true,
-    enableImportCategories = true,
-    enableStayInEditMode = true,
-    enableParseRecipe = true,
-    enableTranslateRecipe = false,
-    enableCreateNewOrganizers = false,
-  } = props;
-
+/** The import settings, remembered on this device, and where to go once a recipe is imported */
+export function useNewRecipeOptions() {
   const router = useRouter();
-  const recipeCreatePreferences = useRecipeCreatePreferences();
+  const preferences = useRecipeCreatePreferences();
 
-  const importKeywordsAsTags = computed({
-    get() {
-      if (!enableImportKeywords) return false;
-      return recipeCreatePreferences.value.importKeywordsAsTags;
-    },
-    set(v: boolean) {
-      if (!enableImportKeywords) return;
-      recipeCreatePreferences.value.importKeywordsAsTags = v;
-    },
-  });
+  function preference(key: keyof UserRecipeCreatePreferences) {
+    return computed({
+      get: () => preferences.value[key],
+      set: (value: boolean) => {
+        preferences.value[key] = value;
+      },
+    });
+  }
 
-  const importCategories = computed({
-    get() {
-      if (!enableImportCategories) return false;
-      return recipeCreatePreferences.value.importCategories;
-    },
-    set(v: boolean) {
-      if (!enableImportCategories) return;
-      recipeCreatePreferences.value.importCategories = v;
-    },
-  });
+  const organize = preference("organize");
+  const createNewOrganizers = preference("createNewOrganizers");
+  const translateRecipe = preference("translateRecipe");
+  const parseRecipe = preference("parseRecipe");
+  const stayInEditMode = preference("stayInEditMode");
 
-  const stayInEditMode = computed({
-    get() {
-      if (!enableStayInEditMode) return false;
-      return recipeCreatePreferences.value.stayInEditMode;
-    },
-    set(v: boolean) {
-      if (!enableStayInEditMode) return;
-      recipeCreatePreferences.value.stayInEditMode = v;
-    },
-  });
-
-  const parseRecipe = computed({
-    get() {
-      if (!enableParseRecipe) return false;
-      return recipeCreatePreferences.value.parseRecipe;
-    },
-    set(v: boolean) {
-      if (!enableParseRecipe) return;
-      recipeCreatePreferences.value.parseRecipe = v;
-    },
-  });
-
-  const translateRecipe = computed({
-    get() {
-      if (!enableTranslateRecipe) return false;
-      return recipeCreatePreferences.value.translateRecipe;
-    },
-    set(v: boolean) {
-      if (!enableTranslateRecipe) return;
-      recipeCreatePreferences.value.translateRecipe = v;
-    },
-  });
-
-  const createNewOrganizers = computed({
-    get() {
-      if (!enableCreateNewOrganizers) return false;
-      return recipeCreatePreferences.value.createNewOrganizers;
-    },
-    set(v: boolean) {
-      if (!enableCreateNewOrganizers) return;
-      recipeCreatePreferences.value.createNewOrganizers = v;
+  /** A site's own categories and keywords, kept as categories and tags. Once two settings, now one */
+  const keepSourceLabels = computed({
+    get: () => preferences.value.importKeywordsAsTags || preferences.value.importCategories,
+    set: (value: boolean) => {
+      preferences.value.importKeywordsAsTags = value;
+      preferences.value.importCategories = value;
     },
   });
 
   function navigateToRecipe(recipeSlug: string, groupSlug: string, createPagePath: string) {
-    const editParam = enableStayInEditMode ? stayInEditMode.value : false;
-    const parseParam = enableParseRecipe ? parseRecipe.value : false;
-
-    const queryParams = new URLSearchParams();
-    if (editParam) {
-      queryParams.set("edit", "true");
+    const query = new URLSearchParams();
+    if (stayInEditMode.value) {
+      query.set("edit", "true");
     }
-    if (parseParam) {
-      queryParams.set("parse", "true");
+    if (parseRecipe.value) {
+      query.set("parse", "true");
     }
 
-    const queryString = queryParams.toString();
+    const queryString = query.toString();
     const recipeUrl = `/g/${groupSlug}/r/${recipeSlug}${queryString ? `?${queryString}` : ""}`;
 
     // Replace current entry to prevent re-import on back navigation
@@ -108,23 +47,12 @@ export function useNewRecipeOptions(props: UseNewRecipeOptionsProps = {}) {
   }
 
   return {
-    // Computed properties for the checkboxes
-    importKeywordsAsTags,
-    importCategories,
-    stayInEditMode,
-    parseRecipe,
-    translateRecipe,
+    organize,
     createNewOrganizers,
-
-    // Helper functions
+    keepSourceLabels,
+    translateRecipe,
+    parseRecipe,
+    stayInEditMode,
     navigateToRecipe,
-
-    // Props for conditional rendering
-    enableImportKeywords,
-    enableImportCategories,
-    enableStayInEditMode,
-    enableParseRecipe,
-    enableTranslateRecipe,
-    enableCreateNewOrganizers,
   };
 }

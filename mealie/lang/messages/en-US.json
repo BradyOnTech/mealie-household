@@ -22,19 +22,26 @@
             "yields": "Yields"
         },
         "and-amount": "and {amount}",
+        "bulk-import": {
+            "failed": "Couldn't import {url}",
+            "imported": "Imported {name}",
+            "report-name": "Recipe links ({count})"
+        },
         "import-errors": {
             "ai-not-enabled": "AI services are not enabled",
             "ai-request-failed": "The AI provider was unable to complete the request. Please try again",
             "image-provider-not-enabled": "AI image services are not enabled",
             "no-recipe-found": "No recipe was found in the provided source",
+            "no-recipe-on-page": "No recipe was found on that page",
             "no-source": "No content, images, or URL were provided",
+            "page-unreachable": "Couldn't reach that page. Check the link, or try again later",
+            "post-has-no-recipe": "This post doesn't include the recipe in its caption. Creators often keep it behind the link in their bio, or send it when you comment. Import that recipe page's link instead, or paste the recipe's text",
             "provider-returned-nothing": "The AI provider did not return a recipe",
             "unknown-error": "Something went wrong while creating the recipe. Please try again",
             "unreadable-source": "Unable to read any content from the provided source",
             "video-download-failed": "Unable to read the video. It may be private, removed, or from an unsupported site",
             "video-has-no-captions": "This video has no captions or description to read a recipe from. Set up an audio provider in your group's AI settings to have videos like this one transcribed",
-            "video-needs-ai": "Importing from Instagram, TikTok, YouTube and other video posts needs an AI provider. Add one in your group settings, or paste the recipe into Import with AI",
-            "post-has-no-recipe": "This post doesn't include the recipe in its caption. Creators often keep it behind the link in their bio, or send it when you comment. Import that recipe page's link instead, or paste the recipe into Import with AI"
+            "video-needs-ai": "Importing from Instagram, TikTok, YouTube and other video posts needs an AI provider. Add one in your group's AI settings"
         },
         "pdf-import": {
             "already-importing": "This cookbook is already being imported",

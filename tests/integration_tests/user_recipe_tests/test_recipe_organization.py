@@ -1,3 +1,4 @@
+import asyncio
 import json
 from uuid import uuid4
 
@@ -277,3 +278,65 @@ def test_bulk_url_imports_preserve_automatic_and_manual_labels(
     }
     assert all("Chicken" in [tag.name for tag in recipe.tags] for recipe in recipes)
     assert len(calls) == 2
+
+
+@pytest.mark.parametrize("create_new", [True, False])
+def test_link_imports_create_new_labels_only_when_asked(
+    api_client: TestClient, classifier_setup, create_new: bool
+) -> None:
+    """The import page's "Let AI create new labels" setting reaches link imports as well as AI imports."""
+
+    user, respond, calls = classifier_setup
+    invented = f"Weeknight {random_string()}"
+    respond(OpenAIOrganizers(categories=["Main Dish"], tags=["Chicken", invented]))
+    response = api_client.post(
+        api_routes.recipes_create_html_or_json,
+        json={"data": json.dumps(structured_recipe()), "createNewOrganizers": create_new},
+        headers=user.token,
+    )
+    assert response.status_code == 201
+    recipe = user.repos.recipes.get_one(response.json())
+    assert {tag.name for tag in recipe.tags} == ({"Chicken", invented} if create_new else {"Chicken"})
+    assert calls[0]["prompt"]  # the classifier was asked, either way
+
+
+def test_bulk_url_imports_report_each_link_as_it_finishes(
+    api_client: TestClient, classifier_setup, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    user, _, _ = classifier_setup
+    source = structured_recipe()
+    entries_seen_while_running: list[str] = []
+
+    async def get_html(url: str) -> str | None:
+        if url.endswith("/slow"):
+            # by now the quick link has been imported, and should already be in the report
+            await asyncio.sleep(0.3)
+            reports = user.repos.group_reports.get_all()
+            entries_seen_while_running.extend(entry.message for report in reports for entry in report.entries or [])
+        return RecipeScraperPackage.ld_json_to_html(json.dumps(source)) if "missing" not in url else None
+
+    monkeypatch.setattr("mealie.services.scraper.recipe_scraper.safe_scrape_html", get_html)
+    response = api_client.post(
+        api_routes.recipes_create_url_bulk,
+        json={
+            "imports": [
+                {"url": "https://example.test/quick"},
+                {"url": "https://example.test/slow"},
+                {"url": "https://example.test/missing"},
+            ]
+        },
+        headers=user.token,
+    )
+    assert response.status_code == 202
+
+    report = user.repos.group_reports.get_one(response.json()["reportId"])
+    assert report is not None
+    assert report.name == "Recipe links (3)"
+    assert report.status == "partial"
+    assert f"Imported {source['name']}" in entries_seen_while_running
+
+    entries = {entry.message: entry for entry in report.entries}
+    failed = entries["Couldn't import https://example.test/missing"]
+    assert not failed.success
+    assert failed.exception == "No recipe was found on that page"
+    assert sum(entry.success for entry in report.entries) == 2

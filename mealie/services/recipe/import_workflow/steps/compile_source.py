@@ -113,8 +113,13 @@ class CompileSourceStep(WorkflowStep):
         read_urls: set[str] = set()
         if transcription.is_video_site(url):
             read_urls.add(url)
-            if compiled := await self._compile(ctx, SourceType.URL, final=True):
+            # Pasted text or photos can carry the import on their own, so a post that can't be read
+            # just drops out. Without them, the post's own error best explains what went wrong.
+            other_material = bool(ctx.input.content or ctx.input.images)
+            if compiled := await self._compile(ctx, SourceType.URL, final=not other_material):
                 return compiled
+            if other_material:
+                return None
 
         page_content = ctx.input.page_content
         if not page_content:

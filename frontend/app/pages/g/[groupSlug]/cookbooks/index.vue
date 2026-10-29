@@ -72,7 +72,7 @@
         <BaseButton create @click="createCookbook" />
         <BaseButton
           secondary
-          :to="`/g/${groupSlug}/r/create/pdf`"
+          :to="`/g/${groupSlug}/r/create/url?source=cookbook`"
           :icon="$globals.icons.upload"
           :text="$t('cookbook.import-from-file')"
         />

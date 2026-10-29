@@ -342,6 +342,7 @@ class RecipeController(BaseRecipeController):
                 include_tags=req.include_tags,
                 include_categories=req.include_categories,
                 organize=req.organize,
+                create_new_organizers=req.create_new_organizers,
             )
             return self._finish_recipe_from_web(req, recipe, extras)
 
@@ -390,6 +391,7 @@ class RecipeController(BaseRecipeController):
         url: Annotated[str | None, Form()] = None,
         translate_language: Annotated[str | None, Form(alias="translateLanguage")] = None,
         create_new_organizers: Annotated[bool, Form(alias="createNewOrganizers")] = False,
+        organize: Annotated[bool, Form()] = True,
         images: list[UploadFile] = File(default_factory=list),
     ) -> str:
         """
@@ -402,6 +404,7 @@ class RecipeController(BaseRecipeController):
             url=url,
             translate_language=translate_language,
             create_new_organizers=create_new_organizers,
+            organize=organize,
         )
         async for event in self._create_recipe_with_ai(req, images):
             if isinstance(event.data, SSEDataEventDone):
@@ -419,6 +422,7 @@ class RecipeController(BaseRecipeController):
         url: Annotated[str | None, Form()] = None,
         translate_language: Annotated[str | None, Form(alias="translateLanguage")] = None,
         create_new_organizers: Annotated[bool, Form(alias="createNewOrganizers")] = False,
+        organize: Annotated[bool, Form()] = True,
         images: list[UploadFile] = File(default_factory=list),
     ) -> AsyncIterable[ServerSentEvent]:
         """
@@ -431,6 +435,7 @@ class RecipeController(BaseRecipeController):
             url=url,
             translate_language=translate_language,
             create_new_organizers=create_new_organizers,
+            organize=organize,
         )
         async for event in self._create_recipe_with_ai(req, images):
             yield event
@@ -447,6 +452,7 @@ class RecipeController(BaseRecipeController):
                 url=req.url,
                 translate_language=req.translate_language,
                 create_new_organizers=req.create_new_organizers,
+                organize=req.organize,
                 on_progress=on_progress,
             )
             self._publish_recipe_created(recipe)
@@ -458,7 +464,7 @@ class RecipeController(BaseRecipeController):
     def parse_recipe_url_bulk(self, bulk: CreateRecipeByUrlBulk, bg_tasks: BackgroundTasks):
         """Takes in a URL and attempts to scrape data and load it into the database"""
         bulk_scraper = RecipeBulkScraperService(self.service, self.repos, self.group, self.translator)
-        report_id = bulk_scraper.get_report_id()
+        report_id = bulk_scraper.get_report_id(len(bulk.imports))
         bg_tasks.add_task(bulk_scraper.scrape, bulk)
 
         self.publish_event(

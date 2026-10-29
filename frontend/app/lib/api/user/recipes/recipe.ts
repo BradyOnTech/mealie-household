@@ -25,6 +25,18 @@ import { SSEDataEventStatus } from "~/lib/api/types/non-generated";
 
 export type Parser = "nlp" | "brute" | "openai";
 
+/** How an imported recipe is organized. Leaving one out uses the importer's default */
+export interface RecipeImportOptions {
+  /** Keep the site's own keywords as tags */
+  includeTags?: boolean;
+  /** Keep the site's own categories */
+  includeCategories?: boolean;
+  /** Give the recipe categories, tags and tools with AI */
+  organize?: boolean;
+  /** Let organizing create labels the group doesn't have yet */
+  createNewOrganizers?: boolean;
+}
+
 export interface CreateAsset {
   name: string;
   icon: string;
@@ -223,29 +235,34 @@ export class RecipeAPI extends BaseCRUDAPI<CreateRecipe, Recipe, Recipe> {
     });
   }
 
+  /** Imports a page's HTML, or schema.org Recipe JSON, as if it had been fetched from `url` */
   async createOneByHtmlOrJson(
     data: string,
-    includeTags: boolean,
-    includeCategories: boolean,
-    url: string | null = null,
+    url: string | null,
+    options: RecipeImportOptions = {},
     onProgress?: (message: string) => void,
-    organize = true,
   ): Promise<RequestResponse<string>> {
-    return this.streamRecipeCreate(routes.recipesCreateFromHtmlOrJson, { data, includeTags, includeCategories, url, organize }, onProgress);
+    return this.streamRecipeCreate(routes.recipesCreateFromHtmlOrJson, { data, url, ...options }, onProgress);
   }
 
   async createOneByUrl(
     url: string,
-    includeTags: boolean,
-    includeCategories: boolean,
+    options: RecipeImportOptions = {},
     onProgress?: (message: string) => void,
-    organize = true,
   ): Promise<RequestResponse<string>> {
-    return this.streamRecipeCreate(routes.recipesCreateUrl, { url, includeTags, includeCategories, organize }, onProgress);
+    return this.streamRecipeCreate(routes.recipesCreateUrl, { url, ...options }, onProgress);
   }
 
+  /** Imports several links in the background. Follow the returned report to see how it goes */
   async createManyByUrl(payload: CreateRecipeByUrlBulk) {
-    return await this.requests.post<string>(routes.recipesCreateUrlBulk, payload);
+    return await this.requests.post<{ reportId: string }>(routes.recipesCreateUrlBulk, payload);
+  }
+
+  /** Restores a recipe exported from Mealie as a .zip, returning its slug */
+  async createOneFromZip(archive: File) {
+    const formData = new FormData();
+    formData.append("archive", archive);
+    return await this.requests.post<string>(routes.recipesCreateFromZip, formData);
   }
 
   async createManyFromPdf(payload: { file: File; name: string; addCookbook: boolean; addOrganizers: boolean }) {
@@ -265,6 +282,7 @@ export class RecipeAPI extends BaseCRUDAPI<CreateRecipe, Recipe, Recipe> {
       images?: (Blob | File)[];
       translateLanguage?: string | null;
       createNewOrganizers?: boolean;
+      organize?: boolean;
     },
     onProgress?: (message: string) => void,
   ): Promise<RequestResponse<string>> {
@@ -281,6 +299,9 @@ export class RecipeAPI extends BaseCRUDAPI<CreateRecipe, Recipe, Recipe> {
     }
     if (payload.createNewOrganizers) {
       formData.append("createNewOrganizers", "true");
+    }
+    if (payload.organize === false) {
+      formData.append("organize", "false");
     }
 
     (payload.images || []).forEach((image, index) => {

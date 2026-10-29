@@ -10,6 +10,7 @@ from mealie.pkgs.safehttp.fetch import FetchResult
 from mealie.schema.openai.compiled_source import OpenAICompiledSource
 from mealie.services.openai import transcription
 from mealie.services.openai.transcription import VideoInfo
+from mealie.services.recipe.import_workflow.compilers import TranscriptionCompiler
 from mealie.services.recipe.import_workflow.compilers.base import SourceCompiler, SourceType
 from mealie.services.recipe.import_workflow.context import WorkflowContext, WorkflowInput, WorkflowOptions
 from mealie.services.recipe.import_workflow.exceptions import NoRecipeDataError
@@ -179,3 +180,37 @@ async def test_a_usage_limit_stops_the_import():
 
     with pytest.raises(exceptions.RateLimitError):
         await CompileSourceStep(compilers=[RateLimitedCompiler, UnreachableCompiler]).run(ctx)
+
+
+class EchoContentCompiler(SourceCompiler):
+    """Reads supplied content as it is, as a stand-in for the AI"""
+
+    source_type = SourceType.CONTENT
+
+    def can_compile(self) -> bool:
+        return bool(self.content)
+
+    async def compile(self) -> OpenAICompiledSource | None:
+        return OpenAICompiledSource(contains_recipe=True, content=self.content or "")
+
+
+@pytest.mark.asyncio
+async def test_pasted_text_carries_a_video_that_cannot_be_read(monkeypatch: pytest.MonkeyPatch, fetched: list[str]):
+    """
+    When a post can't be read, the import page offers to import the recipe's text instead, keeping
+    the post as its source. The post's own failure mustn't sink that.
+    """
+
+    def mock_read_video(url: str) -> VideoInfo:
+        raise exceptions.VideoDownloadError("Failed to read video: Private video")
+
+    monkeypatch.setattr(transcription, "read_video", mock_read_video)
+    ctx = _ctx(YOUTUBE_URL)
+    ctx.input = WorkflowInput(url=YOUTUBE_URL, content="2 cups flour, 1 cup water. Mix and bake.")
+
+    await CompileSourceStep(compilers=[TranscriptionCompiler, EchoContentCompiler]).run(ctx)
+
+    assert ctx.compiled_source is not None
+    assert "2 cups flour" in ctx.compiled_source.content
+    # nor is the post's page read instead, which holds no more than its title
+    assert fetched == []

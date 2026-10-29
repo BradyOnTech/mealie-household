@@ -86,40 +86,30 @@
           <v-icon :icon="$globals.icons.search" />
         </v-btn>
 
-        <v-menu v-if="createLinks.length" location="bottom end" :offset="8">
-          <template #activator="{ props: menuProps }">
-            <v-btn
-              v-if="mdAndUp"
-              v-bind="menuProps"
-              variant="outlined"
-              class="ml-3"
-              :prepend-icon="$globals.icons.createAlt"
-            >
-              {{ $t("navigation.add-recipe") }}
-            </v-btn>
-            <v-btn
-              v-else
-              v-bind="menuProps"
-              icon
-              variant="text"
-              size="small"
-              :aria-label="$t('navigation.add-recipe')"
-            >
-              <v-icon :icon="$globals.icons.createAlt" />
-            </v-btn>
-          </template>
-          <v-list density="comfortable" min-width="290" class="py-2">
-            <v-list-subheader>{{ $t("navigation.add-recipe") }}</v-list-subheader>
-            <v-list-item
-              v-for="link in createLinks"
-              :key="link.key"
-              :to="link.to"
-              :prepend-icon="link.icon"
-              :title="link.title"
-              :subtitle="link.subtitle"
-            />
-          </v-list>
-        </v-menu>
+        <!-- Every way to add a recipe starts on the import page, which also offers writing one -->
+        <template v-if="createLinks.length">
+          <v-btn
+            v-if="mdAndUp"
+            :to="createLinks[0]!.to"
+            :active="false"
+            variant="outlined"
+            class="ml-3"
+            :prepend-icon="$globals.icons.createAlt"
+          >
+            {{ $t("navigation.add-recipe") }}
+          </v-btn>
+          <v-btn
+            v-else
+            :to="createLinks[0]!.to"
+            :active="false"
+            icon
+            variant="text"
+            size="small"
+            :aria-label="$t('navigation.add-recipe')"
+          >
+            <v-icon :icon="$globals.icons.createAlt" />
+          </v-btn>
+        </template>
 
         <AppAccountMenu v-if="loggedIn && (mdAndUp || !isOwnGroup)" class="ml-3" />
         <v-btn

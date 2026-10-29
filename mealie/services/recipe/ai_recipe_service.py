@@ -38,6 +38,7 @@ class AIRecipeService(RecipeService):
         url: str | None = None,
         translate_language: str | None = None,
         create_new_organizers: bool = False,
+        organize: bool = True,
         on_progress: Callable[[str], Awaitable[None]] | None = None,
     ) -> Recipe:
         """
@@ -55,6 +56,7 @@ class AIRecipeService(RecipeService):
                 url=url,
                 translate_language=translate_language,
                 create_new_organizers=create_new_organizers,
+                organize=organize,
                 on_progress=on_progress,
             )
 
@@ -75,6 +77,7 @@ class AIRecipeService(RecipeService):
         url: str | None = None,
         translate_language: str | None = None,
         create_new_organizers: bool = False,
+        organize: bool = True,
         on_progress: Callable[[str], Awaitable[None]] | None = None,
     ) -> Recipe:
         """
@@ -94,6 +97,7 @@ class AIRecipeService(RecipeService):
             input=workflow_input,
             options=WorkflowOptions(
                 translate_language=translate_language,
+                resolve_organizers=organize,
                 create_new_organizers=create_new_organizers,
             ),
             repos=self.repos,

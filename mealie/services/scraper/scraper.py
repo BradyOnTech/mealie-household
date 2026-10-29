@@ -34,6 +34,7 @@ async def create_from_html(
     include_tags: bool = False,
     include_categories: bool = False,
     organize: bool = True,
+    create_new_organizers: bool = False,
 ) -> tuple[Recipe, ScrapedExtras | None]:
     """Main entry point for generating a recipe from a URL. Pass in a URL and
     a Recipe object will be returned if successful. Optionally pass in the HTML to skip fetching it.
@@ -75,10 +76,10 @@ async def create_from_html(
                 names = await classifier.suggest(
                     new_recipe,
                     source=extras.classification_source if extras else "",
-                    create_new=source_labels,
+                    create_new=source_labels or create_new_organizers,
                 )
                 if organize:
-                    classifier.attach(new_recipe, names)
+                    classifier.attach(new_recipe, names, create_new=create_new_organizers)
                 # Explicit source-metadata imports may retain additional names. Automatic
                 # classification above still only creates standard labels or reuses existing ones.
                 if source_labels and extras:

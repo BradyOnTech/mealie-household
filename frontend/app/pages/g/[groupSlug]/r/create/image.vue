@@ -3,14 +3,9 @@
 </template>
 
 <script setup lang="ts">
-const route = useRoute();
-const router = useRouter();
-const auth = useMealieAuth();
-
-// The image importer was folded into the AI importer, which takes images alongside other content.
+// Every kind of import now starts from the one import box, which works out what it's been given.
 // Kept as a redirect so existing links and bookmarks still land somewhere useful.
-onMounted(() => {
-  const groupSlug = route.params.groupSlug as string || auth.user.value?.groupSlug || "";
-  router.replace(`/g/${groupSlug}/r/create/ai`);
+definePageMeta({
+  redirect: to => ({ path: `/g/${to.params.groupSlug}/r/create/url`, query: to.query }),
 });
 </script>

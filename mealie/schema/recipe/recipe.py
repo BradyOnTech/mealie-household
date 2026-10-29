@@ -108,9 +108,10 @@ class CreateRecipeBulk(BaseModel):
     tags: list[RecipeTag] | None = None
 
 
-class CreateRecipeByUrlBulk(BaseModel):
+class CreateRecipeByUrlBulk(MealieModel):
     imports: list[CreateRecipeBulk]
     organize: bool = True
+    create_new_organizers: bool = False
 
 
 class CreateRecipe(MealieModel):

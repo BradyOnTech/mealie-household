@@ -590,6 +590,25 @@ def test_new_organizers_are_created_when_requested(
     assert [tool["name"] for tool in recipe["tools"]] == [tool_name]
 
 
+def test_organizing_can_be_switched_off(
+    api_client: TestClient,
+    unique_user: TestUser,
+    monkeypatch: pytest.MonkeyPatch,
+    openai_recipe: OpenAIRecipe,
+):
+    """The import page's "Organize with AI" setting reaches AI imports as well as link imports."""
+
+    existing_tag = unique_user.repos.tags.create(TagSave(name=random_string(), group_id=unique_user.repos.group_id))
+    ai = AIResponses(recipe=openai_recipe, organizers=OpenAIOrganizers(tags=[existing_tag.name])).install(monkeypatch)
+
+    r = post_ai(api_client, unique_user, {"content": random_string(), "organize": "false"})
+    assert r.status_code == 201
+    assert "OpenAIOrganizers" not in ai.requested_schemas
+
+    recipe = api_client.get(api_routes.recipes_slug(json.loads(r.text)), headers=unique_user.token).json()
+    assert recipe["tags"] == []
+
+
 def test_organizers_are_resolved_from_the_source_not_the_built_recipe(
     api_client: TestClient,
     unique_user: TestUser,

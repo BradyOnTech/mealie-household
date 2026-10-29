@@ -73,6 +73,8 @@ export interface UserRecipeCreatePreferences {
   parseRecipe: boolean;
   translateRecipe: boolean;
   createNewOrganizers: boolean;
+  /** Give imported recipes categories, tags and tools with AI */
+  organize: boolean;
 }
 
 export interface UserActivityPreferences {
@@ -243,6 +245,7 @@ export function useRecipeCreatePreferences(): Ref<UserRecipeCreatePreferences> {
       parseRecipe: true,
       translateRecipe: false,
       createNewOrganizers: false,
+      organize: true,
     },
     { mergeDefaults: true },
   );

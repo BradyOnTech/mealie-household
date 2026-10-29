@@ -241,37 +241,27 @@ export function useAppNavigation() {
     return sections.filter(section => section.links.length);
   });
 
-  /** Ways to add a recipe. */
+  /** Ways to add a recipe: the import page first, which takes links, text, photos and cookbooks alike. */
   const createLinks = computed<AppNavLink[]>(() => {
     if (!isOwnGroup.value) {
       return [];
     }
-    const links: AppNavLink[] = [
+    return [
       {
-        key: "import-url",
-        title: i18n.t("general.import"),
-        subtitle: i18n.t("new-recipe.import-by-url"),
+        key: "import",
+        title: i18n.t("recipe-import.nav-import"),
+        subtitle: i18n.t(group.value?.aiProviderSettings?.aiEnabled ? "recipe-import.nav-import-subtitle" : "recipe-import.nav-import-subtitle-without-ai"),
         icon: $globals.icons.link,
         to: `/g/${groupSlug.value}/r/create/url`,
       },
+      {
+        key: "write",
+        title: i18n.t("recipe-import.write-title"),
+        subtitle: i18n.t("recipe-import.way.write-text"),
+        icon: $globals.icons.edit,
+        to: `/g/${groupSlug.value}/r/create/new`,
+      },
     ];
-    if (group.value?.aiProviderSettings?.aiEnabled) {
-      links.push({
-        key: "import-ai",
-        title: i18n.t("recipe.import-with-ai"),
-        subtitle: i18n.t("recipe.import-with-ai-subtitle"),
-        icon: $globals.icons.autoFix,
-        to: `/g/${groupSlug.value}/r/create/ai`,
-      });
-    }
-    links.push({
-      key: "create-new",
-      title: i18n.t("general.create"),
-      subtitle: i18n.t("new-recipe.create-manually"),
-      icon: $globals.icons.edit,
-      to: `/g/${groupSlug.value}/r/create/new`,
-    });
-    return links;
   });
 
   /** Profile and settings destinations, filtered by the user's permissions. */

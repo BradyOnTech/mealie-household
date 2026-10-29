@@ -145,6 +145,7 @@ export interface RecipeTag {
 export interface CreateRecipeByUrlBulk {
   imports: CreateRecipeBulk[];
   organize?: boolean;
+  createNewOrganizers?: boolean;
 }
 export interface CreateRecipeIngredientSubstitution {
   substituteFoodId?: string | null;
@@ -633,6 +634,7 @@ export interface ScrapeRecipe {
   includeTags?: boolean;
   includeCategories?: boolean;
   organize?: boolean;
+  createNewOrganizers?: boolean;
   url: string;
 }
 export interface ScrapeRecipeAI {
@@ -640,16 +642,19 @@ export interface ScrapeRecipeAI {
   url?: string | null;
   translateLanguage?: string | null;
   createNewOrganizers?: boolean;
+  organize?: boolean;
 }
 export interface ScrapeRecipeBase {
   includeTags?: boolean;
   includeCategories?: boolean;
   organize?: boolean;
+  createNewOrganizers?: boolean;
 }
 export interface ScrapeRecipeData {
   includeTags?: boolean;
   includeCategories?: boolean;
   organize?: boolean;
+  createNewOrganizers?: boolean;
   data: string;
   url?: string | null;
 }
