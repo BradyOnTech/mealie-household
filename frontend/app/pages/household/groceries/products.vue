@@ -59,7 +59,7 @@
               {{ product.name }}
             </h2>
             <p v-if="product.packageQuantity" class="product-tile__size">
-              {{ product.packageQuantity }} {{ unitTitle(product.packageUnit) }} / {{ $t('groceries.packages') }}
+              {{ $t('groceries.per-package', { amount: `${product.packageQuantity} ${unitTitle(product.packageUnit)}` }) }}
             </p>
             <p v-if="product.notes" class="product-tile__notes">
               {{ product.notes }}

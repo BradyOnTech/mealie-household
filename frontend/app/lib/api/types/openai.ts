@@ -11,6 +11,12 @@ export interface OpenAICompiledSource {
   language?: string | null;
   image_url?: string | null;
 }
+export interface OpenAIGroceryProduct {
+  name?: string;
+  ingredient?: string;
+  package_quantity?: number | null;
+  package_unit?: string | null;
+}
 export interface OpenAIIngredient {
   quantity?: number | null;
   unit?: string | null;

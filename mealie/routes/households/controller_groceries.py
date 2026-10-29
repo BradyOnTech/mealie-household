@@ -17,6 +17,8 @@ from mealie.schema.grocery.grocery import (
     GroceryItemDelete,
     GroceryManualItemCreate,
     GroceryProductCreate,
+    GroceryProductLookup,
+    GroceryProductLookupRequest,
     GroceryProductOut,
     GroceryRestockBought,
     GroceryRestockCreate,
@@ -28,6 +30,7 @@ from mealie.schema.grocery.grocery import (
 from mealie.schema.response.responses import SuccessResponse
 from mealie.services.event_bus_service.event_types import EventOperation, EventShoppingListData, EventTypes
 from mealie.services.household_services.groceries import GroceryService
+from mealie.services.household_services.grocery_product_links import GroceryProductReader
 
 router = APIRouter(prefix="/households/groceries", tags=["Households: Groceries"])
 
@@ -105,6 +108,11 @@ class GroceryController(BaseCrudController):
     @router.post("/products", response_model=GroceryProductOut, status_code=201)
     def create_product(self, data: GroceryProductCreate) -> GroceryProductOut:
         return self.service.save_product(data)
+
+    @router.post("/products/lookup", response_model=GroceryProductLookup)
+    async def lookup_product(self, data: GroceryProductLookupRequest) -> GroceryProductLookup:
+        """Reads a product's store link into a draft product: its name, store, package size and ingredient"""
+        return await GroceryProductReader(self.repos).read(data.url)
 
     @router.put("/products/{product_id}", response_model=GroceryProductOut)
     def update_product(self, product_id: UUID4, data: GroceryProductCreate) -> GroceryProductOut:

@@ -1,7 +1,7 @@
 import { BaseAPI } from "../base/base-clients";
 import type {
   GroceryCommonItemList, GroceryFoodRuleCreate, GroceryFoodRuleOut, GroceryItemAssignment, GroceryItemCheck,
-  GroceryItemDelete, GroceryManualItemCreate, GroceryProductCreate, GroceryProductOut,
+  GroceryItemDelete, GroceryManualItemCreate, GroceryProductCreate, GroceryProductLookup, GroceryProductOut,
   GroceryRestockBought, GroceryRestockCreate, GroceryRestockList,
   GrocerySuggestionOut, GroceryWeekGenerate, GroceryWeekView,
 } from "~/lib/api/types/grocery";
@@ -16,6 +16,8 @@ export class GroceriesAPI extends BaseAPI {
   createProduct(data: GroceryProductCreate) { return this.requests.post<GroceryProductOut>(`${base}/products`, data); }
   updateProduct(id: string, data: GroceryProductCreate) { return this.requests.put<GroceryProductOut, GroceryProductCreate>(`${base}/products/${id}`, data); }
   deleteProduct(id: string) { return this.requests.delete(`${base}/products/${id}`); }
+  /** What a product's store link says about it: its name, store, package size and ingredient */
+  lookupProduct(url: string) { return this.requests.post<GroceryProductLookup>(`${base}/products/lookup`, { url }); }
   createRule(data: GroceryFoodRuleCreate) { return this.requests.post<GroceryFoodRuleOut>(`${base}/rules`, data); }
   updateRule(id: string, data: GroceryFoodRuleCreate) { return this.requests.put<GroceryFoodRuleOut, GroceryFoodRuleCreate>(`${base}/rules/${id}`, data); }
   deleteRule(id: string) { return this.requests.delete(`${base}/rules/${id}`); }

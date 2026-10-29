@@ -110,6 +110,19 @@ export interface GroceryProductCreate {
   packageUnit?: GroceryUnit | null;
   notes?: string;
 }
+export interface GroceryProductLookup {
+  url: string;
+  name?: string;
+  store?: GroceryStore | null;
+  packageQuantity?: number | null;
+  packageUnit?: GroceryUnit | null;
+  food?: IngredientFoodSummary | null;
+  newFoodName?: string | null;
+  readWithAi?: boolean;
+}
+export interface GroceryProductLookupRequest {
+  url: string;
+}
 export interface GroceryProductSave {
   foodId: string;
   name: string;

@@ -44,6 +44,15 @@ class GroceryRecurringMode(StrEnum):
     extra = "extra"
 
 
+def https_product_url(value: str | None) -> str | None:
+    if not value or not value.strip():
+        return None
+    url = TypeAdapter(HttpUrl).validate_python(value.strip())
+    if url.scheme != "https" or url.username or url.password:
+        raise ValueError("Use an HTTPS product link without embedded credentials")
+    return str(url)
+
+
 class GroceryProductCreate(MealieModel):
     food_id: UUID4
     name: str = Field(min_length=1, max_length=255)
@@ -65,18 +74,40 @@ class GroceryProductCreate(MealieModel):
     @field_validator("url")
     @classmethod
     def validate_product_url(cls, value: str | None) -> str | None:
-        if not value or not value.strip():
-            return None
-        url = TypeAdapter(HttpUrl).validate_python(value.strip())
-        if url.scheme != "https" or url.username or url.password:
-            raise ValueError("Use an HTTPS product link without embedded credentials")
-        return str(url)
+        return https_product_url(value)
 
     @model_validator(mode="after")
     def validate_package(self) -> Self:
         if (self.package_quantity is None) != (self.package_unit is None):
             raise ValueError("Set both package size and package unit, or leave both empty")
         return self
+
+
+class GroceryProductLookupRequest(MealieModel):
+    url: str = Field(min_length=1, max_length=4000)
+
+    @field_validator("url")
+    @classmethod
+    def validate_product_url(cls, value: str) -> str:
+        url = https_product_url(value)
+        if not url:
+            raise ValueError("Paste a product link")
+        return url
+
+
+class GroceryProductLookup(MealieModel):
+    """What a product's store link says about it, to fill in a new preferred product"""
+
+    url: str
+    name: str = ""
+    store: GroceryStore | None = None
+    package_quantity: float | None = None
+    package_unit: GroceryUnit | None = None
+    food: IngredientFoodSummary | None = None
+    """The household's ingredient the product is"""
+    new_food_name: str | None = None
+    """When none of the household's ingredients fits, the one to add for the product"""
+    read_with_ai: bool = False
 
 
 class GroceryProductSave(GroceryProductCreate):
