@@ -2,13 +2,15 @@ from datetime import date
 from functools import cached_property
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, File, Form, HTTPException, Query, UploadFile
 from pydantic import UUID4
 from starlette.responses import FileResponse
 
+from mealie.core.dependencies.dependencies import get_temporary_path
 from mealie.routes._base.base_controllers import BaseCrudController
 from mealie.routes._base.controller import controller
 from mealie.schema.grocery.grocery import (
+    GroceryBarcodeScanRequest,
     GroceryCommonItemList,
     GroceryFoodRuleCreate,
     GroceryFoodRuleOut,
@@ -20,6 +22,7 @@ from mealie.schema.grocery.grocery import (
     GroceryProductLookup,
     GroceryProductLookupRequest,
     GroceryProductOut,
+    GroceryProductScan,
     GroceryRestockBought,
     GroceryRestockCreate,
     GroceryRestockList,
@@ -27,12 +30,18 @@ from mealie.schema.grocery.grocery import (
     GroceryWeekGenerate,
     GroceryWeekView,
 )
-from mealie.schema.response.responses import SuccessResponse
+from mealie.schema.response.responses import ErrorResponse, SuccessResponse
 from mealie.services.event_bus_service.event_types import EventOperation, EventShoppingListData, EventTypes
 from mealie.services.household_services.groceries import GroceryService
-from mealie.services.household_services.grocery_product_links import GroceryProductReader
+from mealie.services.household_services.grocery_barcodes import normalize_barcode
+from mealie.services.household_services.grocery_product_reader import (
+    GroceryProductReader,
+    PhotoReadingUnavailableError,
+)
 
 router = APIRouter(prefix="/households/groceries", tags=["Households: Groceries"])
+
+MAX_PHOTO_BYTES = 20 * 1024 * 1024
 
 
 @controller(router)
@@ -112,7 +121,45 @@ class GroceryController(BaseCrudController):
     @router.post("/products/lookup", response_model=GroceryProductLookup)
     async def lookup_product(self, data: GroceryProductLookupRequest) -> GroceryProductLookup:
         """Reads a product's store link into a draft product: its name, store, package size and ingredient"""
-        return await GroceryProductReader(self.repos).read(data.url)
+        return await GroceryProductReader(self.repos).read_link(data.url)
+
+    @router.post("/products/scan/barcode", response_model=GroceryProductScan)
+    async def scan_barcode(self, data: GroceryBarcodeScanRequest) -> GroceryProductScan:
+        """
+        What a package's barcode is: the household's product with that barcode, if there is one, and the
+        product as Open Food Facts knows it, to save as a new one
+        """
+        barcode = normalize_barcode(data.barcode, data.format)
+        if barcode is None:
+            raise HTTPException(422, ErrorResponse.respond(message="That isn't a valid UPC or EAN barcode"))
+        return await GroceryProductReader(self.repos).scan_barcode(barcode)
+
+    @router.post("/products/scan/photo", response_model=GroceryProductScan)
+    async def scan_photo(
+        self,
+        image: UploadFile = File(...),
+        barcode: str | None = Form(None),
+        barcode_format: str | None = Form(None, alias="barcodeFormat"),
+    ) -> GroceryProductScan:
+        """Reads a photo of a package with AI, along with its barcode when the photo showed one"""
+        if not (image.content_type or "").startswith("image/"):
+            raise HTTPException(415, ErrorResponse.respond(message="Send a photo"))
+        code = normalize_barcode(barcode, barcode_format) if barcode else None
+        with get_temporary_path() as folder:
+            path = folder / "package.jpg"
+            size = 0
+            with path.open("wb") as file:
+                while chunk := await image.read(1024 * 1024):
+                    size += len(chunk)
+                    if size > MAX_PHOTO_BYTES:
+                        raise HTTPException(413, ErrorResponse.respond(message="That photo is too large"))
+                    file.write(chunk)
+            try:
+                return await GroceryProductReader(self.repos).scan_photo(path, code)
+            except PhotoReadingUnavailableError as e:
+                raise HTTPException(
+                    400, ErrorResponse.respond(message="Reading photos needs an AI provider that can read images")
+                ) from e
 
     @router.put("/products/{product_id}", response_model=GroceryProductOut)
     def update_product(self, product_id: UUID4, data: GroceryProductCreate) -> GroceryProductOut:

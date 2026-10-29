@@ -13,6 +13,10 @@ export type GroceryRecurringMode = "minimum" | "extra";
 export type GroceryRestockStatus = "waiting" | "listed" | "bought";
 export type PlanEntryType = "breakfast" | "lunch" | "dinner" | "side" | "snack" | "drink" | "dessert";
 
+export interface GroceryBarcodeScanRequest {
+  barcode: string;
+  format?: string | null;
+}
 export interface GroceryCommonItemList {
   items?: GroceryCommonItemOut[];
   nextListWeek?: string | null;
@@ -39,6 +43,7 @@ export interface GroceryProductOut {
   packageQuantity?: number | null;
   packageUnit?: GroceryUnit | null;
   notes?: string;
+  barcode?: string | null;
   groupId: string;
   householdId: string;
   id: string;
@@ -109,9 +114,11 @@ export interface GroceryProductCreate {
   packageQuantity?: number | null;
   packageUnit?: GroceryUnit | null;
   notes?: string;
+  barcode?: string | null;
 }
 export interface GroceryProductLookup {
-  url: string;
+  url?: string | null;
+  barcode?: string | null;
   name?: string;
   store?: GroceryStore | null;
   packageQuantity?: number | null;
@@ -133,8 +140,16 @@ export interface GroceryProductSave {
   packageQuantity?: number | null;
   packageUnit?: GroceryUnit | null;
   notes?: string;
+  barcode?: string | null;
   groupId: string;
   householdId: string;
+}
+export interface GroceryProductScan {
+  barcode?: string | null;
+  identified?: boolean;
+  draft: GroceryProductLookup;
+  saved?: GroceryProductOut | null;
+  likelySaved?: GroceryProductOut | null;
 }
 export interface GroceryPurchaseOut {
   key: string;

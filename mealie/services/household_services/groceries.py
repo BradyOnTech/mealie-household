@@ -162,10 +162,14 @@ class GroceryService(BaseService):
 
     def save_product(self, data: GroceryProductCreate, product_id: UUID | None = None) -> GroceryProductOut:
         self.validate_food(data.food_id)
-        if product_id and self.repos.grocery_products.get_one(product_id) is None:
+        existing = self.repos.grocery_products.get_one(product_id) if product_id else None
+        if product_id and existing is None:
             raise HTTPException(404, "Product not found")
         payload = data.cast(GroceryProductSave, group_id=self.repos.group_id, household_id=self.repos.household_id)
-        if product_id:
+        if product_id and existing:
+            # an update that doesn't mention the barcode, from a form without one, keeps the saved one
+            if "barcode" not in data.model_fields_set:
+                payload.barcode = existing.barcode
             return self.repos.grocery_products.update(product_id, payload)
         return self.repos.grocery_products.create(payload)
 

@@ -163,6 +163,11 @@ import {
   mdiContentPaste,
   mdiCheckCircle,
   mdiCloseCircle,
+  mdiBarcodeScan,
+  mdiFlashlight,
+  mdiFlashlightOff,
+  mdiKeyboardOutline,
+  mdiCameraOutline,
 } from "@mdi/js";
 
 export const icons = {
@@ -254,6 +259,11 @@ export const icons = {
   informationVariant: mdiInformationVariant,
   link: mdiLink,
   paperclip: mdiPaperclip,
+  barcodeScan: mdiBarcodeScan,
+  flashlight: mdiFlashlight,
+  flashlightOff: mdiFlashlightOff,
+  keyboard: mdiKeyboardOutline,
+  camera: mdiCameraOutline,
   photos: mdiImageMultipleOutline,
   bookOpen: mdiBookOpenVariant,
   listLinks: mdiFormatListBulleted,

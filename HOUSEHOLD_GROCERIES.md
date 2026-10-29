@@ -88,10 +88,10 @@ when updating, and do not use `docker compose down -v`, which deletes its data v
 1. Import or enter recipes in Mealie. Parse/link recipe ingredients to Foods in the recipe editor;
    preferred products are matched by Food ID, rather than by an approximate ingredient name.
 2. Open **Groceries → Preferred products**. Start with your most common products.
-3. Choose an ingredient, paste the product URL, enter its name, and choose its store.
-   The form suggests a store from a recognized retailer domain. You can override it.
+3. Paste the product's link from the store, or scan its barcode (**Scan a product**). The name, store,
+   package size and ingredient fill themselves in; check them over and save. See [Scanning](#scanning).
 4. Add alternatives for the same ingredient and mark them as backup choices.
-5. Optionally enter the amount in one package and its unit. A 1 lb pack uses quantity `1`, unit `lb`.
+5. The package size is optional. A 1 lb pack uses quantity `1`, unit `lb`; a gallon is `128` `fl oz`.
 6. Plan dinners and sides in Mealie's calendar. Open Groceries and choose the week and stores you will visit.
 7. Generate the list. Use store filters, open product links, and check off purchases.
 
@@ -108,6 +108,28 @@ product at an active store. Lower preference numbers win; equal priorities use t
 Changing a card's assignment applies only to that week's items. Edit the catalog to change future defaults.
 
 Links are saved bookmarks. This version does not fetch retailer prices, check stock, or fill carts.
+A pasted link is read from its own address, which names the product and usually its size: store pages
+turn automated readers away, so they're never fetched.
+
+### Scanning
+
+**Scan a product** on Preferred products, and the barcode button on the Out of list, open the phone's
+camera. Pointing it at a barcode reads it straight away; the shutter takes a photo of the front of the
+package instead. **Photo** reads a picture from the library, and **Type it** takes the numbers under the
+barcode, for when the camera isn't allowed.
+
+- A barcode is looked up in [Open Food Facts](https://world.openfoodfacts.org), a free product database
+  that knows the store brands here (Great Value, Cub, Friendly Farms, 365). Only the number is sent.
+- A barcode it doesn't know can be followed by a photo of the front, which the household's AI reads. That
+  needs an AI provider that reads images. Photos go to that provider, as recipe photos do.
+- Store brands set the store; other brands keep the store you'd chosen.
+- Products remember their barcode. Scanning one already saved finds it, and a product saved from a link
+  without one is recognized by its name ("This looks like your …") so its barcode can be remembered.
+
+On the Out of list, scanning a saved product adds its ingredient at once, at that product's store, with
+an Undo. Anything else asks first, and offers to save it as a preferred product, so the next scan is
+instant. Barcodes are read on the phone itself, with ZXing compiled to WebAssembly (Safari can't read
+barcodes on its own), served by Mealie rather than a CDN.
 
 ### Quantities and repeat updates
 
@@ -139,7 +161,8 @@ adds that amount to recipe requirements. Pantry is deducted once after combining
 ### Out of list
 
 The Out of list is for things the household has run out of, whether or not a recipe uses them. Type them
-into **We're out of…** on the This week or Groceries page, or tell the assistant. Each item goes on the
+into **We're out of…** on the This week or Groceries page, scan the empty package (see
+[Scanning](#scanning)), or tell the assistant. Each item goes on the
 newest grocery list for this week or later and stays there until someone checks it off. If there's no such
 list yet, it waits and joins the next list you make. A newer list picks up anything still not bought.
 

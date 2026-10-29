@@ -19,10 +19,21 @@
         maxlength="255"
         class="restock__input"
       />
+      <v-btn
+        icon
+        variant="text"
+        :disabled="busy"
+        :aria-label="$t('grocery-scan.scan-what-ran-out')"
+        :title="$t('grocery-scan.scan-what-ran-out')"
+        @click="scanOpen = true"
+      >
+        <v-icon :icon="$globals.icons.barcodeScan" />
+      </v-btn>
       <v-btn type="submit" variant="outlined" :loading="busy" :disabled="!name.trim()">
         {{ $t("restock.add") }}
       </v-btn>
     </form>
+    <GroceryRestockScan v-model="scanOpen" />
     <div class="restock__where-row">
       <p class="restock__where">
         {{ whereSentence }}
@@ -152,6 +163,7 @@
 <script setup lang="ts">
 import GroceryCommonItemsDialog from "./GroceryCommonItemsDialog.vue";
 import { formatWeek, groceryStores, groceryUnits, isoLocalDate, mondayFor, storeTitle, unitTitle } from "~/composables/groceries/grocery-utils";
+import GroceryRestockScan from "~/components/Domain/Grocery/GroceryRestockScan.vue";
 import { useGroceryRestock } from "~/composables/groceries/use-grocery-restock";
 import { alert } from "~/composables/use-toast";
 import type { GroceryRestockOut, GroceryStore, GroceryUnit } from "~/lib/api/types/grocery";
@@ -167,6 +179,7 @@ const { list, items, recentlyBought, busy, loading, error, load, add: addItem, u
 
 const name = ref("");
 const commonOpen = ref(false);
+const scanOpen = ref(false);
 const editing = ref<GroceryRestockOut | null>(null);
 const form = reactive<{ name: string; quantity: number | string; unit: GroceryUnit; store: GroceryStore | null; note: string }>({
   name: "", quantity: "", unit: "count", store: null, note: "",

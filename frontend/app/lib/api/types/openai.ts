@@ -13,6 +13,7 @@ export interface OpenAICompiledSource {
 }
 export interface OpenAIGroceryProduct {
   name?: string;
+  brand?: string;
   ingredient?: string;
   package_quantity?: number | null;
   package_unit?: string | null;

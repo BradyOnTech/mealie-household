@@ -1,7 +1,7 @@
 import { BaseAPI } from "../base/base-clients";
 import type {
   GroceryCommonItemList, GroceryFoodRuleCreate, GroceryFoodRuleOut, GroceryItemAssignment, GroceryItemCheck,
-  GroceryItemDelete, GroceryManualItemCreate, GroceryProductCreate, GroceryProductLookup, GroceryProductOut,
+  GroceryItemDelete, GroceryManualItemCreate, GroceryProductCreate, GroceryProductLookup, GroceryProductOut, GroceryProductScan,
   GroceryRestockBought, GroceryRestockCreate, GroceryRestockList,
   GrocerySuggestionOut, GroceryWeekGenerate, GroceryWeekView,
 } from "~/lib/api/types/grocery";
@@ -18,6 +18,22 @@ export class GroceriesAPI extends BaseAPI {
   deleteProduct(id: string) { return this.requests.delete(`${base}/products/${id}`); }
   /** What a product's store link says about it: its name, store, package size and ingredient */
   lookupProduct(url: string) { return this.requests.post<GroceryProductLookup>(`${base}/products/lookup`, { url }); }
+  /** What a package's barcode is: the household's product with it, or the product as the barcode database knows it */
+  scanBarcode(barcode: string, format?: string | null) {
+    return this.requests.post<GroceryProductScan>(`${base}/products/scan/barcode`, { barcode, format: format ?? null });
+  }
+
+  /** What a photo of a package shows, read by AI, along with the barcode it showed if it did */
+  scanPhoto(photo: Blob, barcode?: { text: string; format: string | null } | null) {
+    const form = new FormData();
+    form.append("image", photo, "package.jpg");
+    if (barcode) {
+      form.append("barcode", barcode.text);
+      if (barcode.format) form.append("barcodeFormat", barcode.format);
+    }
+    return this.requests.post<GroceryProductScan>(`${base}/products/scan/photo`, form);
+  }
+
   createRule(data: GroceryFoodRuleCreate) { return this.requests.post<GroceryFoodRuleOut>(`${base}/rules`, data); }
   updateRule(id: string, data: GroceryFoodRuleCreate) { return this.requests.put<GroceryFoodRuleOut, GroceryFoodRuleCreate>(`${base}/rules/${id}`, data); }
   deleteRule(id: string) { return this.requests.delete(`${base}/rules/${id}`); }

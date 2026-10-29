@@ -11,20 +11,15 @@ their links carry the product's name, and usually its size, in the address itsel
 
 So the name, store and package size come from the link, with no request to the store. Matching the
 product to one of the household's ingredients is done here by name, and better by AI where there is one
-(see `GroceryProductReader`).
+(see `grocery_product_reader`).
 """
 
 import re
 from dataclasses import dataclass
 from urllib.parse import unquote, urlsplit
 
-from mealie.core.root_logger import get_logger
-from mealie.repos.repository_factory import AllRepositories
-from mealie.schema.grocery.grocery import GroceryProductLookup, GroceryStore, GroceryUnit
-from mealie.schema.group.ai_providers import AITask
-from mealie.schema.openai.grocery_product import OpenAIGroceryProduct
-from mealie.schema.recipe.recipe_ingredient import IngredientFood, IngredientFoodSummary
-from mealie.services.openai import OpenAIDataInjection, OpenAIService
+from mealie.schema.grocery.grocery import GroceryStore, GroceryUnit
+from mealie.schema.recipe.recipe_ingredient import IngredientFood
 
 STORE_HOSTS: dict[GroceryStore, tuple[str, ...]] = {
     GroceryStore.walmart: ("walmart.com",),
@@ -199,81 +194,33 @@ def candidate_foods(text: str, foods: list[IngredientFood], limit: int = 60) -> 
     return candidates[:limit]
 
 
-class GroceryProductReader:
-    """Reads a product's store link into a draft preferred product, with AI picking its ingredient where there is AI"""
+# Words that say how much, not what: a product's name with them left out is what it is
+_SIZE_WORDS = _UNIT_WORDS | {
+    "gallon",
+    "gallons",
+    "ounce",
+    "ounces",
+    "pound",
+    "pounds",
+    "count",
+    "pack",
+    "packs",
+    "dozen",
+    "each",
+    "half",
+}
 
-    # Matching a product to an ingredient is the same kind of call as parsing an ingredient, so it runs on
-    # whatever provider and model the household chose for that
-    task = AITask.ingredient_parsing
 
-    def __init__(self, repos: AllRepositories, ai: OpenAIService | None = None) -> None:
-        self.repos = repos
-        self.ai = ai if ai is not None else OpenAIService(repos)
-        self.logger = get_logger()
+def _name_words(name: str) -> set[str]:
+    return {
+        _singular(word)
+        for word in _words(name)
+        if not any(char.isdigit() for char in word) and word not in _SIZE_WORDS and word not in _SMALL_WORDS
+    }
 
-    @property
-    def ai_enabled(self) -> bool:
-        settings = self.ai.provider_settings
-        return bool(settings and settings.ai_enabled and self.ai.route(self.task))
 
-    async def read(self, url: str) -> GroceryProductLookup:
-        text = product_text(url)
-        foods = self.repos.ingredient_foods.get_all()
-        size = package_size(text)
-        food = match_food(text, foods)
-        lookup = GroceryProductLookup(
-            url=url,
-            name=tidy_name(text),
-            store=store_for_url(url),
-            package_quantity=size.quantity if size else None,
-            package_unit=size.unit if size else None,
-            food=IngredientFoodSummary.model_validate(food) if food else None,
-        )
+def name_similarity(first: str, second: str) -> float:
+    """How alike two product names are, from 0 to 1, by the words they share, sizes aside"""
 
-        if text and self.ai_enabled:
-            try:
-                await self._read_with_ai(lookup, text, foods)
-            except Exception:
-                # the link's own reading still fills in the form, so a provider problem only costs the extras
-                self.logger.exception("Couldn't read a grocery product with AI; using what its link says")
-        return lookup
-
-    async def _read_with_ai(self, lookup: GroceryProductLookup, text: str, foods: list[IngredientFood]) -> None:
-        candidates = [food.name for food in candidate_foods(text, foods)]
-        injections = [
-            OpenAIDataInjection(
-                description="The household's ingredients that might be this product. Use an exact name when one fits",
-                value=candidates or "None of the household's ingredients share a word with this product",
-            ),
-            OpenAIDataInjection(description="Package units", value=[unit.value for unit in GroceryUnit]),
-        ]
-        store = lookup.store.value.replace("_", " ").title() if lookup.store else "Unknown"
-        response = await self.ai.get_response(
-            self.ai.get_prompt("household.read-grocery-product", data_injections=injections),
-            f"Store: {store}\nProduct name from its link: {text}",
-            response_schema=OpenAIGroceryProduct,
-            task=self.task,
-        )
-        if response is None:
-            return
-
-        lookup.read_with_ai = True
-        if name := response.name.strip():
-            lookup.name = name[:255]
-
-        if ingredient := response.ingredient.strip()[:100]:
-            key = ingredient.lower()
-            food = next((food for food in foods if key in {name.lower() for name in food_names(food)}), None)
-            lookup.food = IngredientFoodSummary.model_validate(food) if food else None
-            lookup.new_food_name = None if food else ingredient
-
-        # the link's own numbers are what the store printed, so they win over the AI's reading of them
-        units = {unit.value: unit for unit in GroceryUnit}
-        if (
-            lookup.package_quantity is None
-            and response.package_quantity
-            and response.package_quantity > 0
-            and response.package_unit in units
-        ):
-            lookup.package_quantity = round(response.package_quantity, 3)
-            lookup.package_unit = units[response.package_unit]
+    a, b = _name_words(first), _name_words(second)
+    return len(a & b) / len(a | b) if a and b else 0.0

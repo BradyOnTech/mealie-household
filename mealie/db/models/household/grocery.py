@@ -34,6 +34,8 @@ class GroceryProduct(SqlAlchemyBase, BaseMixins):
     package_quantity: Mapped[float | None] = mapped_column(Float)
     package_unit: Mapped[str | None] = mapped_column(String)
     notes: Mapped[str] = mapped_column(String, nullable=False, default="")
+    barcode: FilterableColumn[str | None] = mapped_column(String(14), index=True)
+    """The package's barcode as a GTIN, so scanning the package finds the product"""
 
     model_config = ConfigDict(exclude={"food", "household"})
 

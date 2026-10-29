@@ -44,6 +44,18 @@ class GroceryRecurringMode(StrEnum):
     extra = "extra"
 
 
+def package_barcode(value: str | None) -> str | None:
+    # imported here, since the barcode module's own imports include this one
+    from mealie.services.household_services.grocery_barcodes import normalize_barcode
+
+    if not value or not value.strip():
+        return None
+    barcode = normalize_barcode(value)
+    if barcode is None:
+        raise ValueError("That isn't a valid UPC or EAN barcode")
+    return barcode
+
+
 def https_product_url(value: str | None) -> str | None:
     if not value or not value.strip():
         return None
@@ -63,6 +75,8 @@ class GroceryProductCreate(MealieModel):
     package_quantity: float | None = Field(default=None, gt=0, allow_inf_nan=False)
     package_unit: GroceryUnit | None = None
     notes: str = Field(default="", max_length=2000)
+    barcode: str | None = Field(default=None, max_length=32)
+    """The package's barcode. Left out of an update, the saved one is kept."""
 
     @field_validator("name")
     @classmethod
@@ -75,6 +89,11 @@ class GroceryProductCreate(MealieModel):
     @classmethod
     def validate_product_url(cls, value: str | None) -> str | None:
         return https_product_url(value)
+
+    @field_validator("barcode")
+    @classmethod
+    def validate_barcode(cls, value: str | None) -> str | None:
+        return package_barcode(value)
 
     @model_validator(mode="after")
     def validate_package(self) -> Self:
@@ -96,9 +115,10 @@ class GroceryProductLookupRequest(MealieModel):
 
 
 class GroceryProductLookup(MealieModel):
-    """What a product's store link says about it, to fill in a new preferred product"""
+    """What a product's store link, barcode or photo says about it, to fill in a new preferred product"""
 
-    url: str
+    url: str | None = None
+    barcode: str | None = None
     name: str = ""
     store: GroceryStore | None = None
     package_quantity: float | None = None
@@ -108,6 +128,12 @@ class GroceryProductLookup(MealieModel):
     new_food_name: str | None = None
     """When none of the household's ingredients fits, the one to add for the product"""
     read_with_ai: bool = False
+
+
+class GroceryBarcodeScanRequest(MealieModel):
+    barcode: str = Field(min_length=1, max_length=32)
+    format: str | None = Field(default=None, max_length=32)
+    """The format the scanner read, which tells a UPC-E from an EAN-8"""
 
 
 class GroceryProductSave(GroceryProductCreate):
@@ -125,6 +151,20 @@ class GroceryProductOut(GroceryProductSave):
     @classmethod
     def loader_options(cls) -> list[LoaderOption]:
         return [selectinload(GroceryProduct.food)]
+
+
+class GroceryProductScan(MealieModel):
+    """What a scanned barcode or a photo of a package turned out to be"""
+
+    barcode: str | None = None
+    identified: bool = False
+    """Whether the product was recognized: by its barcode, or by AI from the photo"""
+    draft: GroceryProductLookup
+    """The product as read, to fill in a new preferred product"""
+    saved: GroceryProductOut | None = None
+    """The household's product with this barcode"""
+    likely_saved: GroceryProductOut | None = None
+    """A product the household saved without a barcode that this probably is, to remember the barcode for"""
 
 
 class GroceryFoodRuleCreate(MealieModel):

@@ -9,6 +9,8 @@ class OpenAIGroceryProduct(OpenAIBase):
         description="The product's name as a shopper knows it, with brand and size, e.g. 'Great Value Milk, 1 gal'.",
     )
 
+    brand: str = Field("", description="The product's brand, e.g. 'Great Value', or empty when it can't be told.")
+
     ingredient: str = Field(
         "",
         description="What a recipe would call this product, e.g. 'milk' or 'egg', using a supplied name when one fits.",

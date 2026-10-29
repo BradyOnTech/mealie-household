@@ -15,6 +15,17 @@ export const groceryUnits: { value: GroceryUnit; title: string }[] = [
   { value: "liter", title: "L" },
 ];
 
+/** A store's search for a product, to find its page and copy the link from */
+export function storeSearchUrl(store: GroceryStore, query: string): string {
+  const q = encodeURIComponent(query.trim());
+  switch (store) {
+    case "walmart": return `https://www.walmart.com/search?q=${q}`;
+    case "cub": return `https://www.cub.com/store/cub/s?k=${q}`;
+    case "aldi": return `https://www.aldi.us/store/aldi/s?k=${q}`;
+    case "whole_foods": return `https://www.wholefoodsmarket.com/search?text=${q}`;
+  }
+}
+
 export function storeTitle(store?: string | null) {
   return groceryStores.find(item => item.value === store)?.title ?? "Unassigned";
 }

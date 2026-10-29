@@ -10,9 +10,14 @@
           {{ $t('groceries.catalog-subtitle') }}
         </p>
       </div>
-      <v-btn color="primary" :prepend-icon="$globals.icons.createAlt" @click="openProduct()">
-        {{ $t('groceries.add-product') }}
-      </v-btn>
+      <div class="catalog-head__actions">
+        <v-btn variant="outlined" :prepend-icon="$globals.icons.barcodeScan" @click="openProduct(null, true)">
+          {{ $t('grocery-scan.scan-a-product') }}
+        </v-btn>
+        <v-btn color="primary" :prepend-icon="$globals.icons.createAlt" @click="openProduct()">
+          {{ $t('groceries.add-product') }}
+        </v-btn>
+      </div>
     </header>
     <v-alert v-if="error" type="error" closable class="mb-4" @click:close="error = ''">
       {{ error }}
@@ -128,7 +133,15 @@
         </v-col>
       </v-row>
     </template>
-    <GroceryProductDialog v-model="productDialog" :foods="foods" :product="editingProduct" :initial-food-id="initialFoodId" @saved="load" />
+    <GroceryProductDialog
+      v-model="productDialog"
+      :foods="foods"
+      :product="editingProduct"
+      :initial-food-id="initialFoodId"
+      :scan-on-open="scanOnOpen"
+      @saved="load"
+      @edit="editInstead"
+    />
     <GroceryRuleDialog v-model="ruleDialog" :foods="foods" :rule="editingRule" @saved="load" />
     <v-dialog :model-value="!!deleteTarget" max-width="440" @update:model-value="deleteTarget = null">
       <v-card :title="$t(deleteTarget?.kind === 'product' ? 'groceries.delete-confirm' : 'groceries.delete-rule-confirm')">
@@ -174,9 +187,18 @@ const visibleProducts = computed(() => products.value.filter((product) => {
   return `${product.food.name} ${product.name} ${storeTitle(product.store)}`.toLowerCase().includes(query);
 }));
 const storeColor = (store: string) => groceryStores.find(item => item.value === store)?.color;
-function openProduct(product: GroceryProductOut | null = null) {
+const scanOnOpen = ref(false);
+
+function openProduct(product: GroceryProductOut | null = null, scan = false) {
   editingProduct.value = product;
+  scanOnOpen.value = scan;
   productDialog.value = true;
+}
+
+/** A scan found a product the household already has: that one opens instead */
+function editInstead(product: GroceryProductOut) {
+  productDialog.value = false;
+  nextTick(() => openProduct(product));
 }
 function openRule(rule: GroceryFoodRuleOut | null = null) {
   editingRule.value = rule;
@@ -215,6 +237,12 @@ onMounted(async () => {
 
 .catalog-head__back {
   text-decoration: none;
+}
+
+.catalog-head__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
 }
 
 .catalog-head__title {
