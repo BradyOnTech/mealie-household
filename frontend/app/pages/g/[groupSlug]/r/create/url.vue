@@ -520,6 +520,10 @@ function failureActions(current: ImportPlan): FailureAction[] {
   if (current.kind === "markup" && aiEnabled.value) {
     actions.push({ label: i18n.t("recipe-import.read-with-ai"), icon: icons.autoFix, run: () => runSingle({ ...current, kind: "text" }) });
   }
+  if (!aiEnabled.value && (current.kind === "link" || current.kind === "markup")) {
+    // without AI to read the recipe some other way, typing it in is what's left
+    actions.push({ label: i18n.t("recipe-import.way.write"), icon: icons.pencil, run: () => router.push(`/g/${groupSlug.value}/r/create/new`) });
+  }
   actions.push(retry);
   return actions;
 }

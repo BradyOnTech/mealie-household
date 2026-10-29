@@ -67,7 +67,6 @@
         },
         "create-progress": {
             "creating-recipe": "Creating recipe...",
-            "creating-recipe-from-webpage-data": "Creating recipe from webpage data...",
             "downloading-audio": "Downloading audio...",
             "downloading-image": "Downloading image...",
             "extracting-recipe-data": "Extracting recipe data...",

@@ -1,5 +1,6 @@
 from collections.abc import Awaitable, Callable
 
+from mealie.core import exceptions
 from mealie.core.root_logger import get_logger
 from mealie.lang.providers import Translator
 from mealie.repos.repository_factory import AllRepositories
@@ -12,7 +13,6 @@ from mealie.services.scraper.scraped_extras import ScrapedExtras
 from .scraper_strategies import (
     ABCScraperStrategy,
     RecipeScraperOpenAI,
-    RecipeScraperOpenGraph,
     RecipeScraperPackage,
     safe_scrape_html,
 )
@@ -21,8 +21,11 @@ DEFAULT_SCRAPER_STRATEGIES: list[type[ABCScraperStrategy]] = [
     RecipeScraperPackage,
     # also reads videos, since the import workflow it runs does
     RecipeScraperOpenAI,
-    RecipeScraperOpenGraph,
 ]
+"""
+Tried in order until one finds a recipe. There's deliberately no last resort that saves a page's title and
+photo as a recipe: a page without one is reported as such, so the import page can offer other ways in.
+"""
 
 
 class RecipeScraper:
@@ -95,6 +98,9 @@ class RecipeScraper:
 
             try:
                 result = await scraper.parse(on_progress=on_progress)
+            except exceptions.RateLimitError, exceptions.OpenAIServiceError:
+                # the AI provider couldn't be used, which explains the failure better than "no recipe found"
+                raise
             except Exception:
                 if video_site:
                     raise
