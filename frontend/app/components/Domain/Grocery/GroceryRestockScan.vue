@@ -134,6 +134,9 @@ import type { GroceryProductOut, GroceryRestockCreate, GroceryStore } from "~/li
 /** Opens the scanner; what it scans goes on the Out of list */
 const scannerOpen = defineModel<boolean>({ default: false });
 
+/** A lookup quicker than this shows nothing, so a product the household saved goes on the list without the sheet flashing up */
+const SHOW_LOOKUP_AFTER = 400;
+
 const i18n = useI18n();
 const api = useUserApi();
 const auth = useMealieAuth();
@@ -171,8 +174,14 @@ async function onResult(result: ScannerResult) {
   scannerPrompt.value = "";
   scanHadPhoto.value = !!result.photo;
   error.value = "";
-  sheetOpen.value = true;
-  const found = await identify(result);
+  let shown = false;
+  const waiting = setTimeout(() => {
+    shown = true;
+    sheetOpen.value = true;
+  }, SHOW_LOOKUP_AFTER);
+  const found = await identify(result).finally(() => clearTimeout(waiting));
+  // closing the sheet while it was looking drops the scan
+  if (shown && !sheetOpen.value) return;
   if (!found) {
     sheetOpen.value = false;
     alert.error(i18n.t("grocery-scan.lookup-failed"));
@@ -186,7 +195,9 @@ async function onResult(result: ScannerResult) {
   if (found.saved) {
     sheetOpen.value = false;
     await addRestock(found.saved);
+    return;
   }
+  sheetOpen.value = true;
 }
 
 function snapFront() {
