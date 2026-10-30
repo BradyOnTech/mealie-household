@@ -193,6 +193,8 @@
     "filled-from-barcode": "Filled in from the barcode. Check it over, then save.",
     "filled-from-photo": "Filled in from the photo. Check it over, then save.",
     "find-at-store": "Find its link at {store}",
+    "finding-at-store": "Looking for it at {store}…",
+    "found-at-store": "Filled in from the barcode, and found at {store}. Check it over, then save.",
     "unknown-snap": "Mealie doesn't know this barcode. Snap the front of the package and AI will read it, or fill in the rest yourself.",
     "unknown-fill-in": "Mealie doesn't know this barcode. Fill in the rest below, and the barcode is saved with it.",
     "snap-front": "Snap the front",

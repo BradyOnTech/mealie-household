@@ -3,7 +3,7 @@ from datetime import date
 from functools import cached_property
 from pathlib import Path
 
-from fastapi import APIRouter, File, Form, HTTPException, Query, UploadFile
+from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, Query, UploadFile
 from pydantic import UUID4
 from starlette.responses import FileResponse
 
@@ -31,6 +31,8 @@ from mealie.schema.grocery.grocery import (
     GroceryRestockBought,
     GroceryRestockCreate,
     GroceryRestockList,
+    GroceryStorePage,
+    GroceryStorePageRequest,
     GrocerySuggestionOut,
     GroceryWeekGenerate,
     GroceryWeekView,
@@ -49,6 +51,7 @@ from mealie.services.household_services.grocery_product_reader import (
     GroceryProductReader,
     PhotoReadingUnavailableError,
 )
+from mealie.services.household_services.grocery_store_pages import StorePageFinder, fill_in_from_store
 
 router = APIRouter(prefix="/households/groceries", tags=["Households: Groceries"])
 
@@ -90,6 +93,11 @@ class GroceryController(BaseCrudController):
         if product is None:
             raise HTTPException(404, "Product not found")
         return product
+
+    def fill_in_later(self, product: GroceryProductOut, background_tasks: BackgroundTasks) -> None:
+        """A product saved with a barcode but no store link is looked for at its store once the reply's gone"""
+        if product.barcode and not product.url and self.repos.group_id and self.repos.household_id:
+            background_tasks.add_task(fill_in_from_store, self.repos.group_id, self.repos.household_id, product.id)
 
     def publish_week(self, view: GroceryWeekView) -> GroceryWeekView:
         if view.shopping_list:
@@ -149,8 +157,10 @@ class GroceryController(BaseCrudController):
         return self.repos.grocery_products.get_all(order_by="priority", order_descending=False)
 
     @router.post("/products", response_model=GroceryProductOut, status_code=201)
-    def create_product(self, data: GroceryProductCreate) -> GroceryProductOut:
-        return self.service.save_product(data)
+    def create_product(self, data: GroceryProductCreate, background_tasks: BackgroundTasks) -> GroceryProductOut:
+        product = self.service.save_product(data)
+        self.fill_in_later(product, background_tasks)
+        return product
 
     @router.post("/products/lookup", response_model=GroceryProductLookup)
     async def lookup_product(self, data: GroceryProductLookupRequest) -> GroceryProductLookup:
@@ -188,8 +198,28 @@ class GroceryController(BaseCrudController):
                 ) from e
 
     @router.put("/products/{product_id}", response_model=GroceryProductOut)
-    def update_product(self, product_id: UUID4, data: GroceryProductCreate) -> GroceryProductOut:
-        return self.service.save_product(data, product_id)
+    def update_product(
+        self, product_id: UUID4, data: GroceryProductCreate, background_tasks: BackgroundTasks
+    ) -> GroceryProductOut:
+        before = self.repos.grocery_products.get_one(product_id)
+        product = self.service.save_product(data, product_id)
+        # only a barcode that's new to the product: a link someone took off stays off
+        if before is None or before.barcode != product.barcode:
+            self.fill_in_later(product, background_tasks)
+        return product
+
+    @router.post("/products/find-at-store", response_model=GroceryStorePage | None)
+    async def find_at_store(self, data: GroceryStorePageRequest) -> GroceryStorePage | None:
+        """
+        Looks for a scanned product's own page at a store, which the household's AI finds on the web: its link,
+        and the store's photo as a draft to save with it. None when it isn't found, or the household's AI can't
+        search the web.
+        """
+        page = await StorePageFinder(self.repos).find(data.barcode, data.store, data.name)
+        if page is None:
+            return None
+        photo = await self.photos.draft_from_url(page.photo, GroceryPhotoSource.store)
+        return GroceryStorePage(url=page.url, photo=photo)
 
     @router.delete("/products/{product_id}", response_model=SuccessResponse)
     def delete_product(self, product_id: UUID4) -> SuccessResponse:

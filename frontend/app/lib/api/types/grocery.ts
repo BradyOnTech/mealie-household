@@ -469,6 +469,15 @@ export interface GroceryRestockOut {
   createdAt?: string | null;
   updatedAt?: string | null;
 }
+export interface GroceryStorePage {
+  url: string;
+  photo?: GroceryPhotoDraft | null;
+}
+export interface GroceryStorePageRequest {
+  barcode: string;
+  store: GroceryStore;
+  name?: string;
+}
 export interface GrocerySuggestionOut {
   recipe: RecipeSummary;
   score: number;

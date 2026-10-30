@@ -78,6 +78,9 @@ export interface OpenAIRecipeNutrition {
   trans_fat_content?: string | null;
   unsaturated_fat_content?: string | null;
 }
+export interface OpenAIStoreProductPages {
+  urls?: string[];
+}
 export interface OpenAIText {
   text: string;
 }

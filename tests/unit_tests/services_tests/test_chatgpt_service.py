@@ -467,6 +467,37 @@ async def test_openai_service_routes_chatgpt_providers_through_codex(fake_codex)
 
 
 @pytest.mark.asyncio
+async def test_run_chatgpt_turn_searches_the_web_only_when_asked(fake_codex):
+    record = fake_codex()
+
+    await _run()
+    assert _recorded(record, "thread")["config"]["web_search"] == "disabled"
+
+    await _run(web_search=True)
+    thread = _recorded(record, "thread")
+    assert thread["config"]["web_search"] == "live"
+    assert thread["developerInstructions"] == chatgpt.SEARCH_DEVELOPER_INSTRUCTIONS
+    # and nothing else comes on with it
+    assert thread["config"]["features"]["shell_tool"] is False
+    assert thread["sandbox"] == "read-only"
+
+
+@pytest.mark.asyncio
+async def test_only_chatgpt_providers_search_the_web(fake_codex):
+    record = fake_codex()
+    service, _ = _service()
+
+    await service.get_response(
+        "Prompt", "Hi", response_schema=OpenAIText, provider=_chatgpt_provider(), web_search=True
+    )
+    assert _recorded(record, "thread")["config"]["web_search"] == "live"
+
+    api_provider = AIProviderOut(id=uuid4(), name="API", provider_type=AIProviderType.openai, model="m", api_key="k")
+    with pytest.raises(Exception, match="can't search the web"):
+        await service.get_response("Prompt", "Hi", response_schema=OpenAIText, provider=api_provider, web_search=True)
+
+
+@pytest.mark.asyncio
 async def test_openai_service_prefers_the_stored_credential(fake_codex):
     """Another request may have refreshed the tokens since this provider was loaded"""
     fake_codex()

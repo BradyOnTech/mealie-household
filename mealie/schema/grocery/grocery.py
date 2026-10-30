@@ -116,6 +116,30 @@ class GroceryProductPhotoAttach(MealieModel):
     """A draft photo's token"""
 
 
+class GroceryStorePageRequest(MealieModel):
+    """A scanned product to look for at a store: its barcode, and its name as far as it's known"""
+
+    barcode: str = Field(min_length=1, max_length=32)
+    store: GroceryStore
+    name: str = Field(default="", max_length=255)
+
+    @field_validator("barcode")
+    @classmethod
+    def validate_barcode(cls, value: str) -> str:
+        barcode = package_barcode(value)
+        if barcode is None:
+            raise ValueError("That isn't a valid UPC or EAN barcode")
+        return barcode
+
+
+class GroceryStorePage(MealieModel):
+    """A product's own page at a store, found from its barcode"""
+
+    url: str
+    photo: GroceryPhotoDraft | None = None
+    """The store's photo of the product, to save with it"""
+
+
 class GroceryProductCreate(MealieModel):
     food_id: UUID4
     name: str = Field(min_length=1, max_length=255)

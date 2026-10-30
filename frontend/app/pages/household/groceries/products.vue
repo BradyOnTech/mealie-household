@@ -151,7 +151,7 @@
       :product="editingProduct"
       :initial-food-id="initialFoodId"
       :scan-on-open="scanOnOpen"
-      @saved="load"
+      @saved="onSaved"
       @edit="editInstead"
     />
     <GroceryRuleDialog v-model="ruleDialog" :foods="foods" :rule="editingRule" @saved="load" />
@@ -209,6 +209,16 @@ function openProduct(product: GroceryProductOut | null = null, scan = false) {
   scanOnOpen.value = scan;
   productDialog.value = true;
 }
+
+/** A product saved with a barcode but no link gets them from its store a little later, so the list looks again then */
+const refreshes: ReturnType<typeof setTimeout>[] = [];
+function onSaved(product?: GroceryProductOut) {
+  void load();
+  if (product?.barcode && !product.url) {
+    refreshes.push(setTimeout(load, 20000), setTimeout(load, 45000));
+  }
+}
+onBeforeUnmount(() => refreshes.forEach(clearTimeout));
 
 /** A scan found a product the household already has: that one opens instead */
 function editInstead(product: GroceryProductOut) {

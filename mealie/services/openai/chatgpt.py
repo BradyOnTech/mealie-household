@@ -86,6 +86,10 @@ TOOL_DEVELOPER_INSTRUCTIONS = (
     "The tools you're given are how you see and change the household's data, so use them rather than guessing. "
     "Don't run commands, read files, or browse the web."
 )
+SEARCH_DEVELOPER_INSTRUCTIONS = (
+    "Search the web for what you're asked to find, and answer only with what you found there. "
+    "Don't run commands or read files."
+)
 REASONING_EFFORT = "low"
 """
 The effort a ChatGPT provider uses when nobody chose one: Mealie's requests are mostly extraction and formatting,
@@ -430,10 +434,14 @@ async def run_chatgpt_turn(
     tools: list[dict[str, Any]] | None = None,
     call_tool: ToolHandler | None = None,
     history: list[dict[str, Any]] | None = None,
+    web_search: bool = False,
 ) -> str:
     """
     Run one request through a throwaway Codex thread, signed in with `credential`, and return the
     reply's text.
+
+    `web_search` lets the model search the web, with Codex's own search, for a request that's about
+    finding something online. Everything else stays off.
 
     `effort` is the turn's reasoning effort, `REASONING_EFFORT` when it's None. `tools` are offered to the model
     as Codex dynamic tools (`{"type": "function", "name": ..., "description": ..., "inputSchema": ...}`), and
@@ -471,14 +479,19 @@ async def run_chatgpt_turn(
 
     async with _signed_in_app_server(credential, save_credential, configure) as server:
         assert turn_done is not None
+        developer_instructions = DEVELOPER_INSTRUCTIONS
+        if web_search:
+            developer_instructions = SEARCH_DEVELOPER_INSTRUCTIONS
+        elif tools:
+            developer_instructions = TOOL_DEVELOPER_INSTRUCTIONS
         thread_params: dict[str, Any] = {
             "cwd": str(server.cwd),
             "sandbox": "read-only",
             "approvalPolicy": "never",
             "ephemeral": True,
             "baseInstructions": instructions,
-            "developerInstructions": TOOL_DEVELOPER_INSTRUCTIONS if tools else DEVELOPER_INSTRUCTIONS,
-            "config": CODEX_CONFIG,
+            "developerInstructions": developer_instructions,
+            "config": {**CODEX_CONFIG, "web_search": "live"} if web_search else CODEX_CONFIG,
         }
         if model:
             thread_params["model"] = model

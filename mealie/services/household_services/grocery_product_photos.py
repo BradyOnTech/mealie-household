@@ -21,6 +21,7 @@ import secrets
 import shutil
 import time
 from collections.abc import Iterator
+from dataclasses import dataclass
 from datetime import timedelta
 from enum import StrEnum
 from io import BytesIO
@@ -115,7 +116,7 @@ STORE_PHOTO_PLACES: dict[GroceryStore, tuple[_Place, ...]] = {
 _PLACEHOLDERS = ("missing-item", "placeholder", "no-image", "noimage", "image-not-available", "image_not_available")
 
 
-def _schema_products(data: Any) -> Iterator[dict]:
+def schema_products(data: Any) -> Iterator[dict]:
     """The schema.org Products in a page's structured data, wherever they're nested"""
     stack = [data]
     while stack:
@@ -149,7 +150,7 @@ def _candidates(soup: BeautifulSoup, place: _Place) -> Iterator[str]:
                 data = json.loads(script.get_text())
             except ValueError:
                 continue
-            for product in _schema_products(data):
+            for product in schema_products(data):
                 yield from _image_urls(product.get("image"))
     elif place is _Place.preloaded:
         for link in soup.find_all("link", rel="preload"):
@@ -175,12 +176,23 @@ def photo_in_page(html: str, page_url: str, store: GroceryStore) -> str | None:
     return None
 
 
-async def store_photo_url(url: str) -> str | None:
+@dataclass
+class ProductPage:
+    """A product's own page at a store"""
+
+    url: str
+    """Where the page ended up, after any redirects"""
+    html: str
+    photo: str
+    """The address of the product's photo on it"""
+
+
+async def fetch_product_page(url: str) -> ProductPage | None:
     """
-    The address of the store's photo of the product a link is for. Only the stores' own pages are
-    fetched. Stores' robot checks come and go: one can stall a request, or answer with an ordinary-looking
-    page that has no product in it, so a page without a photo is fetched again, with another browser's
-    fingerprint, while there's time.
+    A product's page at its store, or None when the page can't be had, or isn't one. Only the stores' own
+    pages are fetched. Stores' robot checks come and go: one can stall a request, or answer with an
+    ordinary-looking page that has no product in it, so a page without a product photo is fetched again,
+    with another browser's fingerprint, while there's time.
     """
 
     store = store_for_url(url)
@@ -198,14 +210,21 @@ async def store_photo_url(url: str) -> str | None:
                 timeout=min(STORE_PAGE_TRY, remaining),
             )
         except Exception as e:
-            logger.debug(f"A try at the store's page for its photo failed: {type(e).__name__}")
+            logger.debug(f"A try at a store's product page failed: {type(e).__name__}")
             continue
         if page is None or page.status_code != 200:
             # turned away by every fingerprint, or there's no such page
             return None
-        if photo := await asyncio.to_thread(photo_in_page, page.text, page.url, store):
-            return photo
+        html = page.text
+        if photo := await asyncio.to_thread(photo_in_page, html, page.url, store):
+            return ProductPage(url=page.url, html=html, photo=photo)
     return None
+
+
+async def store_photo_url(url: str) -> str | None:
+    """The address of the store's photo of the product a link is for"""
+    page = await fetch_product_page(url)
+    return page.photo if page else None
 
 
 async def download_image(url: str) -> bytes | None:
@@ -295,7 +314,7 @@ class GroceryProductPhotos:
             return None
         return path if path.is_file() else None
 
-    async def _draft_from(self, url: str, source: GroceryPhotoSource) -> GroceryPhotoDraft | None:
+    async def draft_from_url(self, url: str, source: GroceryPhotoSource) -> GroceryPhotoDraft | None:
         image = await download_image(url)
         if image is None:
             return None
@@ -312,7 +331,7 @@ class GroceryProductPhotos:
         """The store's photo of the product a link is for"""
         try:
             photo = await store_photo_url(url)
-            return await self._draft_from(photo, GroceryPhotoSource.store) if photo else None
+            return await self.draft_from_url(photo, GroceryPhotoSource.store) if photo else None
         except Exception:
             logger.exception("Couldn't get a store's photo of a product")
             return None
@@ -320,7 +339,7 @@ class GroceryProductPhotos:
     async def from_open_food_facts(self, image_url: str) -> GroceryPhotoDraft | None:
         """Open Food Facts' photo of the front of a package"""
         try:
-            return await self._draft_from(image_url, GroceryPhotoSource.open_food_facts)
+            return await self.draft_from_url(image_url, GroceryPhotoSource.open_food_facts)
         except Exception:
             logger.exception("Couldn't get a product photo from Open Food Facts")
             return None

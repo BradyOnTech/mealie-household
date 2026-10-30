@@ -146,6 +146,16 @@ gets the best photo there is, as soon as its link is pasted or its package scann
 - The photo snapped of the package, when a barcode nothing knew was identified from it.
 - Any photo taken or picked in the form, which nothing replaces on its own.
 
+A scanned product is also looked for at its store, so it gets the store's link and photo without
+anyone pasting one. Stores don't answer a server's searches (Walmart's search shows robots a check, and
+the others build their results in the browser), so the household's AI searches the web for the product's
+page, with Codex's own search; this needs the ChatGPT provider. Each page it names is opened and checked
+first: it has to carry the scanned barcode, as Walmart's and Cub's do, or name the same brand, product and
+size. The form shows "Looking for it at Walmart…" and fills in the link and photo when it's found, about
+10 to 20 seconds after the scan. A product saved before then, or saved from the Out of list, is filled in
+by the server afterwards; searches for the same product are shared, and kept for a day. A link someone
+gave or took off, and a photo someone chose, are never replaced.
+
 The store's photo replaces Open Food Facts' or a snapshot when a link is added later. Photos are copied
 to Mealie's data folder (`groceries/` under the data directory) at two sizes, served only to the
 household, and included in backups. A photo found for a product that's never saved is cleared away

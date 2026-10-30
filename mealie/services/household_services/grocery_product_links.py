@@ -211,7 +211,8 @@ _SIZE_WORDS = _UNIT_WORDS | {
 }
 
 
-def _name_words(name: str) -> set[str]:
+def name_words(name: str) -> set[str]:
+    """A product name's words that say what it is: no sizes, numbers or little words, and singular"""
     return {
         _singular(word)
         for word in _words(name)
@@ -222,5 +223,5 @@ def _name_words(name: str) -> set[str]:
 def name_similarity(first: str, second: str) -> float:
     """How alike two product names are, from 0 to 1, by the words they share, sizes aside"""
 
-    a, b = _name_words(first), _name_words(second)
+    a, b = name_words(first), name_words(second)
     return len(a & b) / len(a | b) if a and b else 0.0

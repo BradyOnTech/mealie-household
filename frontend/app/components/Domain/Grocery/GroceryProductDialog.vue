@@ -54,6 +54,10 @@
           <p class="product-dialog__notice-text">
             {{ scanNotice.text }}
           </p>
+          <p v-if="scanNotice.busy" class="product-dialog__notice-busy">
+            <v-progress-circular indeterminate size="14" width="2" />
+            {{ scanNotice.busy }}
+          </p>
           <div v-if="scanNotice.actions.length" class="product-dialog__notice-actions">
             <v-btn
               v-for="(action, index) in scanNotice.actions"
@@ -254,7 +258,7 @@ import { useDebounceFn } from "@vueuse/core";
 import { useDisplay } from "vuetify";
 import GroceryProductPhoto from "~/components/Domain/Grocery/GroceryProductPhoto.vue";
 import GroceryScanner, { type ScannerResult } from "~/components/Domain/Grocery/GroceryScanner.vue";
-import type { GroceryPhotoDraft, GroceryPhotoSource, GroceryProductCreate, GroceryProductLookup, GroceryProductOut } from "~/lib/api/types/grocery";
+import type { GroceryPhotoDraft, GroceryPhotoSource, GroceryProductCreate, GroceryProductLookup, GroceryProductOut, GroceryStore } from "~/lib/api/types/grocery";
 import type { IngredientFood } from "~/lib/api/types/recipe";
 import { useStaticRoutes, useUserApi } from "~/composables/api";
 import { detectGroceryStore, groceryError, groceryStores, groceryUnits, photoRank, storeSearchUrl, storeTitle } from "~/composables/groceries/grocery-utils";
@@ -271,7 +275,8 @@ const props = defineProps<{
 }>();
 const opened = defineModel<boolean>({ default: false });
 const emit = defineEmits<{
-  saved: [];
+  /** The product, when it was saved from here */
+  saved: [product?: GroceryProductOut];
   /** A scan found a product the household already has, to edit instead */
   edit: [GroceryProductOut];
 }>();
@@ -416,6 +421,40 @@ const scanHadPhoto = ref(false);
 const notTheLikelyOne = ref(false);
 const remembering = ref(false);
 const scanMessage = ref("");
+/** The store the scanned product is being looked for at, and the one it was found at */
+const findingAtStore = ref<GroceryStore | null>(null);
+const foundAtStore = ref<GroceryStore | null>(null);
+/** Counts searches at stores, so only the latest one's answer is used */
+let storeSearches = 0;
+
+/**
+ * Looks for the scanned product's own page at its store, which the household's AI finds on the web, for the
+ * product's link and the store's photo. Without an AI that searches the web, nothing is found.
+ */
+async function findAtStore() {
+  const barcode = form.barcode;
+  const store = form.store;
+  if (!barcode || form.url) return;
+  const current = ++storeSearches;
+  findingAtStore.value = store;
+  foundAtStore.value = null;
+  const { data } = await api.groceries.findAtStore({ barcode, store, name: form.name });
+  if (current !== storeSearches) return;
+  findingAtStore.value = null;
+  // a link someone typed in the meantime is theirs
+  if (!data || form.url || form.store !== store) return;
+  form.url = data.url;
+  lastUrl = data.url;
+  foundAtStore.value = store;
+  offerPhoto(data.photo);
+}
+
+// a scanned product moved to another store is looked for there instead
+watch(() => form.store, (store, previous) => {
+  if (opened.value && store !== previous && touched.store && scan.value?.identified && !form.url) {
+    void findAtStore();
+  }
+});
 
 function openScanner(prompt = "") {
   scannerPrompt.value = prompt;
@@ -441,6 +480,7 @@ async function onScanned(result: ScannerResult) {
       form.barcode = found.barcode;
       scanMessage.value = i18n.t("grocery-scan.barcode-added");
       offerPhoto(found.draft.photo);
+      if (found.identified) void findAtStore();
     }
     return;
   }
@@ -448,12 +488,16 @@ async function onScanned(result: ScannerResult) {
   const outcome = scanOutcome(found);
   if (outcome === "new" || outcome === "unknown") {
     fillFrom(found.draft);
+    if (found.identified) void findAtStore();
   }
 }
 
 function differentProduct() {
   notTheLikelyOne.value = true;
-  if (scan.value) fillFrom(scan.value.draft);
+  if (scan.value) {
+    fillFrom(scan.value.draft);
+    void findAtStore();
+  }
 }
 
 function productFields(product: GroceryProductOut): GroceryProductCreate {
@@ -484,6 +528,8 @@ interface ScanNotice {
   tone: "info" | "filled" | "warning";
   text: string;
   actions: { label: string; run?: () => void; href?: string; loading?: boolean }[];
+  /** Something still going on, said with a spinner */
+  busy?: string;
 }
 
 /** What the last scan found, and what can be done about it */
@@ -531,14 +577,19 @@ const scanNotice = computed<ScanNotice | null>(() => {
 });
 
 function filledNotice(): ScanNotice {
+  if (foundAtStore.value && form.url) {
+    return { tone: "filled", text: i18n.t("grocery-scan.found-at-store", { store: storeTitle(foundAtStore.value) }), actions: [] };
+  }
   const actions: ScanNotice["actions"] = [];
-  if (!form.url && form.name.trim()) {
+  // the store's search, for when its page can't be found by itself
+  if (!form.url && form.name.trim() && !findingAtStore.value) {
     actions.push({ label: i18n.t("grocery-scan.find-at-store", { store: storeTitle(form.store) }), href: storeSearchUrl(form.store, form.name) });
   }
   return {
     tone: "filled",
     text: scanHadPhoto.value ? i18n.t("grocery-scan.filled-from-photo") : i18n.t("grocery-scan.filled-from-barcode"),
     actions,
+    busy: findingAtStore.value ? i18n.t("grocery-scan.finding-at-store", { store: storeTitle(findingAtStore.value) }) : undefined,
   };
 }
 
@@ -723,6 +774,9 @@ watch(opened, (value) => {
   scanMessage.value = "";
   scanHadPhoto.value = false;
   notTheLikelyOne.value = false;
+  storeSearches++;
+  findingAtStore.value = null;
+  foundAtStore.value = null;
   resetPhoto();
   const product = props.product;
   Object.assign(form, product ? productFields(product) : emptyForm());
@@ -752,7 +806,10 @@ async function save() {
     const result = props.product ? await api.groceries.updateProduct(props.product.id, payload) : await api.groceries.createProduct(payload);
     if (!result.data) throw result.error;
     await savePhoto(result.data.id);
-    emit("saved");
+    // a product saved before its store page turned up gets it from the server instead
+    storeSearches++;
+    findingAtStore.value = null;
+    emit("saved", result.data);
     opened.value = false;
   }
   catch (cause) { error.value = groceryError(cause); }
@@ -853,6 +910,15 @@ async function save() {
   margin: 0;
   font-size: 0.9375rem;
   line-height: 1.45;
+}
+
+.product-dialog__notice-busy {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0 0;
+  font-size: 0.875rem;
+  color: rgb(var(--v-theme-ink-muted));
 }
 
 .product-dialog__notice-actions {

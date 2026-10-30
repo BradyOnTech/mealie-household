@@ -224,6 +224,18 @@ class OpenAIService(BaseService):
         """Which provider, model and reasoning effort a task runs on (see `routing`), or None if there's none"""
         return resolve_ai_route(self.provider_settings, task, images=images)
 
+    def can_search_web(self, task: AITask) -> bool:
+        """
+        Whether the task's provider can search the web. ChatGPT providers can, through Codex's own search;
+        API-key providers' endpoints differ too much to rely on.
+        """
+        settings = self.provider_settings
+        if not (settings and settings.ai_enabled):
+            return False
+        route = self.route(task)
+        provider = self._load_provider(route.provider_id) if route else None
+        return bool(provider and provider.provider_type == AIProviderType.chatgpt)
+
     def can_read_images(self, task: AITask) -> bool:
         """Whether the task has a provider to read images with, so images can be sent to it at all"""
         settings = self.provider_settings
@@ -442,13 +454,20 @@ class OpenAIService(BaseService):
         return "\n".join(content_parts)
 
     async def _get_raw_response(
-        self, prompt: str, content: list[dict], response_schema: type[T], provider: AIProviderOut
+        self,
+        prompt: str,
+        content: list[dict],
+        response_schema: type[T],
+        provider: AIProviderOut,
+        web_search: bool = False,
     ) -> T | None:
         import openai
         from openai.types.chat import ChatCompletion
 
         if provider.provider_type == AIProviderType.chatgpt:
-            return await self._get_chatgpt_response(prompt, content, response_schema, provider)
+            return await self._get_chatgpt_response(prompt, content, response_schema, provider, web_search)
+        if web_search:
+            raise exceptions.OpenAIServiceError("This AI provider can't search the web")
 
         client = self.get_client(provider)
         # parse() builds the same response_format payload create() would send, but its
@@ -492,7 +511,12 @@ class OpenAIService(BaseService):
         return {"reasoning_effort": provider.reasoning_effort} if provider.reasoning_effort else {}
 
     async def _get_chatgpt_response(
-        self, prompt: str, content: list[dict], response_schema: type[T], provider: AIProviderOut
+        self,
+        prompt: str,
+        content: list[dict],
+        response_schema: type[T],
+        provider: AIProviderOut,
+        web_search: bool = False,
     ) -> T | None:
         from openai.lib._pydantic import to_strict_json_schema
 
@@ -508,6 +532,7 @@ class OpenAIService(BaseService):
                 effort=provider.reasoning_effort,
                 timeout=provider.timeout,
                 save_credential=lambda credential: self._save_chatgpt_credential(provider, credential),
+                web_search=web_search,
             )
 
         return response_schema.parse_openai_response(text)
@@ -541,10 +566,12 @@ class OpenAIService(BaseService):
         attachments: list[OpenAIAttachment] | None = None,
         provider: AIProviderOut | None = None,
         task: AITask | None = None,
+        web_search: bool = False,
     ) -> T | None:
         """
         Send data to OpenAI and return the response message content. `task` picks the provider, model and
         reasoning effort chosen for it; without one, the group's default (or image) provider is used.
+        `web_search` lets the model search the web, which only ChatGPT providers can (see `can_search_web`).
         """
         import openai
 
@@ -554,7 +581,7 @@ class OpenAIService(BaseService):
             for attachment in attachments or []:
                 user_messages.append(attachment.build_message())
 
-            return await self._get_raw_response(prompt, user_messages, response_schema, provider)
+            return await self._get_raw_response(prompt, user_messages, response_schema, provider, web_search)
         except (openai.RateLimitError, chatgpt.ChatGPTUsageLimitError) as e:
             raise exceptions.RateLimitError(str(e)) from e
         except Exception as e:

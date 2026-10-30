@@ -2,7 +2,7 @@ import { BaseAPI } from "../base/base-clients";
 import type {
   GroceryCommonItemList, GroceryFoodRuleCreate, GroceryFoodRuleOut, GroceryItemAssignment, GroceryItemCheck,
   GroceryItemDelete, GroceryManualItemCreate, GroceryPhotoDraft, GroceryPhotoFindRequest, GroceryProductCreate, GroceryProductLookup,
-  GroceryProductOut, GroceryProductPhotoAttach, GroceryProductScan,
+  GroceryProductOut, GroceryProductPhotoAttach, GroceryProductScan, GroceryStorePage, GroceryStorePageRequest,
   GroceryRestockBought, GroceryRestockCreate, GroceryRestockList,
   GrocerySuggestionOut, GroceryWeekGenerate, GroceryWeekView,
 } from "~/lib/api/types/grocery";
@@ -50,6 +50,9 @@ export class GroceriesAPI extends BaseAPI {
   }
 
   removePhoto(productId: string) { return this.requests.delete<GroceryProductOut>(`${base}/products/${productId}/photo`); }
+
+  /** A scanned product's own page at a store, as the household's AI finds it: its link, and the store's photo. Null when it isn't found. */
+  findAtStore(product: GroceryStorePageRequest) { return this.requests.post<GroceryStorePage | null>(`${base}/products/find-at-store`, product); }
 
   createRule(data: GroceryFoodRuleCreate) { return this.requests.post<GroceryFoodRuleOut>(`${base}/rules`, data); }
   updateRule(id: string, data: GroceryFoodRuleCreate) { return this.requests.put<GroceryFoodRuleOut, GroceryFoodRuleCreate>(`${base}/rules/${id}`, data); }
