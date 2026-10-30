@@ -141,22 +141,32 @@ RUN apt-get update \
 # Codex CLI, which ChatGPT subscription AI providers run their requests through. Its app-server
 # protocol is still experimental, so it's pinned to the version Mealie was tested against.
 # Build with --build-arg CODEX_VERSION= to leave it out.
+#
+# Codex runs its tools through codex-code-mode-host, beside it. Without the host, the model is never
+# offered a tool: asked to search the web, it answers without searching.
 ARG TARGETARCH
 ARG CODEX_VERSION=0.166.0
 ARG CODEX_SHA256_AMD64=a0bf572d2f93f056c6712a6da348e96078dc84f3885fd7be67807ef389cb3978
 ARG CODEX_SHA256_ARM64=94eb707605ec2646b2e05b7edf7c4e7b3ccf02b16237c34ae9beb8cfb7f810a9
+ARG CODEX_HOST_SHA256_AMD64=7588334fd47bc4003d970b70dfd4d1e4578491b1e9baa72976a4c2d7e97590da
+ARG CODEX_HOST_SHA256_ARM64=ac98d1f878e353a16cba711fd47bfef2f6c814109bdd819ee2b6b6d6a19701e7
 RUN if [ -n "$CODEX_VERSION" ]; then \
         case "$TARGETARCH" in \
-            amd64) arch=x86_64; sha256=$CODEX_SHA256_AMD64 ;; \
-            arm64) arch=aarch64; sha256=$CODEX_SHA256_ARM64 ;; \
+            amd64) arch=x86_64; sha256=$CODEX_SHA256_AMD64; host_sha256=$CODEX_HOST_SHA256_AMD64 ;; \
+            arm64) arch=aarch64; sha256=$CODEX_SHA256_ARM64; host_sha256=$CODEX_HOST_SHA256_ARM64 ;; \
             *) echo "No Codex build for $TARGETARCH" >&2; exit 1 ;; \
         esac \
-        && curl -fsSL -o /tmp/codex.tar.gz \
-            "https://github.com/openai/codex/releases/download/rust-v${CODEX_VERSION}/codex-${arch}-unknown-linux-musl.tar.gz" \
+        && release="https://github.com/openai/codex/releases/download/rust-v${CODEX_VERSION}" \
+        && curl -fsSL -o /tmp/codex.tar.gz "$release/codex-${arch}-unknown-linux-musl.tar.gz" \
         && echo "$sha256  /tmp/codex.tar.gz" | sha256sum -c - \
+        && curl -fsSL -o /tmp/codex-host.tar.gz "$release/codex-code-mode-host-${arch}-unknown-linux-musl.tar.gz" \
+        && echo "$host_sha256  /tmp/codex-host.tar.gz" | sha256sum -c - \
         && tar -xzf /tmp/codex.tar.gz -C /tmp \
+        && tar -xzf /tmp/codex-host.tar.gz -C /tmp \
         && install -m 0755 "/tmp/codex-${arch}-unknown-linux-musl" /usr/local/bin/codex \
-        && rm -f /tmp/codex.tar.gz "/tmp/codex-${arch}-unknown-linux-musl"; \
+        && install -m 0755 "/tmp/codex-code-mode-host-${arch}-unknown-linux-musl" /usr/local/bin/codex-code-mode-host \
+        && rm -f /tmp/codex.tar.gz /tmp/codex-host.tar.gz \
+            "/tmp/codex-${arch}-unknown-linux-musl" "/tmp/codex-code-mode-host-${arch}-unknown-linux-musl"; \
     fi
 
 # Deno, which yt-dlp runs YouTube's player code in to read its videos. Without a JavaScript
