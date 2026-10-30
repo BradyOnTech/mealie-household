@@ -64,7 +64,7 @@ Instagram imports keep the original post or reel URL and show **Watch on Instagr
 title. They automatically receive the **Instagram** category, including when automatic AI organization
 is switched off. Organizing an existing Instagram recipe also suggests this source category for review.
 
-When AI is enabled, recipe imports can automatically choose categories, tags, and tools using the
+When AI is enabled, recipe imports can automatically choose categories, cuisines, tags, and tools using the
 **Organizer matching** task. This works for ordinary website imports as well as AI, bulk URL, PDF,
 and EPUB imports. URL imports have an **Automatically organize this recipe** option; cookbook
 imports have an **Add tags, categories, and tools to each recipe** option. Both default to enabled.
@@ -72,9 +72,16 @@ Classification uses one additional AI request per recipe. If it fails, the recip
 
 The classifier prefers your group's existing labels and can create a small set of standard labels,
 such as **Main Dish**, **Dessert**, **Chicken**, **Pasta**, and **Oven**. It can infer an obvious course,
-main ingredient, or cooking method from the recipe. Dietary and cuisine labels require explicit
+main ingredient, cooking method, or cuisine from the recipe. Dietary labels require explicit
 support, and **Quick** requires a total time of 30 minutes or less. The AI import page's
 **Create new organizers** option allows additional names outside the standard vocabulary.
+
+Cuisines are saved as tags, so they work in search filters, cookbooks, and meal plan rules. They come
+from a fixed list, such as **Italian**, **Mexican**, **Indian**, **Thai**, and **Middle Eastern**. A recipe
+usually gets one cuisine, two for a fusion dish, and none when the dish isn't tied to one, like roast
+chicken or chocolate chip cookies. When a website states a recipe's cuisine, that cuisine is used.
+Chinese, Japanese, Korean, Thai, Vietnamese, Filipino, Indonesian, and Malaysian recipes also get the
+**Asian** tag, so one filter finds them all. Indian recipes don't.
 
 Importing a website's original categories or keywords remains a separate option. Those options
 retain source labels, including names outside the standard vocabulary. Cookbook source notes and
@@ -118,11 +125,11 @@ Recipe sites that also publish videos, like NYT Cooking, are read from the recip
 
 ### Organizers
 
-Mealie asks AI which tags, categories, and tools the recipe refers to, and always matches what comes back against the organizers you already have, so an import doesn't create a near-duplicate of a tag you're already using.
+Mealie asks AI which tags, categories, cuisines, and tools fit the recipe, and always matches what comes back against the organizers you already have, so an import doesn't create a near-duplicate of a tag you're already using.
 
 Organizers that don't match anything you have are discarded, unless you check **Create new organizers**, in which case they're created for you.
 
-Mealie only assigns an organizer that the recipe itself refers to. It won't guess a cuisine from the ingredients or a course from the kind of dish, so a bare list of ingredients and steps usually imports with no organizers at all.
+What it infers, and what needs the recipe to say so, is described in [Recipe organization](#recipe-organization).
 
 ### Which provider is used
 

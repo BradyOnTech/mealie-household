@@ -17,7 +17,7 @@ const recipe = { id: "recipe-1", name: "Chicken", slug: "chicken" } as Recipe;
 function suggestion(overrides = {}) {
   return {
     recipeId: "recipe-1", name: "Chicken", slug: "chicken", tags: ["Chicken", "Baked"],
-    categories: ["Main Dish"], tools: ["Oven"], error: false, ...overrides,
+    categories: ["Main Dish"], cuisines: ["Thai", "Asian"], tools: ["Oven"], error: false, ...overrides,
   };
 }
 
@@ -69,12 +69,14 @@ test("previews without applying, then applies exactly the reviewed labels", asyn
   await flushPromises();
   expect(api.previewOrganization).toHaveBeenCalledWith(["chicken"]);
   expect(api.applyOrganization).not.toHaveBeenCalled();
-  const baked = wrapper.findAll(".label").find(chip => chip.text() === "Baked")!;
-  await baked.trigger("click");
+  expect(wrapper.text()).toContain("Cuisines");
+  for (const name of ["Baked", "Asian"]) {
+    await wrapper.findAll(".label").find(chip => chip.text() === name)!.trigger("click");
+  }
   await wrapper.get(".apply").trigger("click");
   await flushPromises();
   expect(api.applyOrganization).toHaveBeenCalledWith([{
-    recipeId: "recipe-1", tags: ["Chicken"], categories: ["Main Dish"], tools: ["Oven"],
+    recipeId: "recipe-1", tags: ["Chicken"], categories: ["Main Dish"], cuisines: ["Thai"], tools: ["Oven"],
   }]);
   expect(api.previewOrganization).toHaveBeenCalledTimes(1);
   expect(wrapper.emitted("applied")).toHaveLength(1);

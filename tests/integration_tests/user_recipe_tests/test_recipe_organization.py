@@ -127,6 +127,64 @@ def test_existing_instagram_recipes_can_review_the_source_category(api_client: T
     assert [category.name for category in updated.recipe_category] == ["Main Dish", "Instagram"]
 
 
+@pytest.mark.parametrize(
+    ("cuisines", "expected"),
+    [
+        (["thai"], ["Thai", "Asian"]),
+        (["Indian"], ["Indian"]),
+        (["Asian"], ["Asian"]),
+        (["Thai", "Asian"], ["Thai", "Asian"]),
+        (["Korean", "Mexican", "Italian"], ["Korean", "Mexican", "Asian"]),
+        (["Sichuan", "Chicken", "Weeknight"], []),
+    ],
+)
+def test_cuisines_come_from_the_list_and_asian_ones_are_also_asian(
+    api_client: TestClient, classifier_setup, cuisines: list[str], expected: list[str]
+) -> None:
+    user, respond, _ = classifier_setup
+    recipe = create_recipe(user)
+    respond(OpenAIOrganizers(categories=["Main Dish"], tags=["Chicken"], cuisines=cuisines))
+    response = api_client.post(PREVIEW, json={"recipes": [recipe.slug]}, headers=user.token)
+    assert response.status_code == 200
+    assert response.json()[0]["cuisines"] == expected
+    assert response.json()[0]["tags"] == ["Chicken"]
+
+
+def test_cuisines_are_saved_as_tags_and_removing_asian_sticks(api_client: TestClient, classifier_setup) -> None:
+    user, respond, calls = classifier_setup
+    user.repos.tags.create(TagSave(name="Thai", group_id=user._group_id))
+    recipe = create_recipe(user)
+    # Once cuisine tags exist, the model may give one as a tag. It still belongs with the cuisines.
+    respond(OpenAIOrganizers(categories=["Main Dish"], tags=["Chicken", "Thai"]))
+    response = api_client.post(PREVIEW, json={"recipes": [recipe.slug]}, headers=user.token)
+    assert response.status_code == 200
+    suggestion = response.json()[0]
+    assert suggestion["tags"] == ["Chicken"]
+    assert suggestion["cuisines"] == ["Thai", "Asian"]
+    assert '"tags":[],"categories":[],"tools":[],"cuisines":["Thai"]' in calls[0]["prompt"]
+    assert user.repos.tags.get_one("asian", "slug") is None
+
+    suggestion["cuisines"].remove("Asian")
+    assert api_client.post(APPLY, json={"recipes": [suggestion]}, headers=user.token).status_code == 200
+    updated = user.repos.recipes.get_one(recipe.slug)
+    assert {tag.name for tag in updated.tags} == {"Chicken", "Thai"}
+    assert user.repos.tags.get_one("asian", "slug") is None
+
+    suggestion["cuisines"].append("Asian")
+    assert api_client.post(APPLY, json={"recipes": [suggestion]}, headers=user.token).status_code == 200
+    updated = user.repos.recipes.get_one(recipe.slug)
+    assert {tag.name for tag in updated.tags} == {"Chicken", "Thai", "Asian"}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("create_new", [True, False])
+async def test_unlisted_cuisines_need_create_new(classifier_setup, create_new: bool) -> None:
+    user, respond, _ = classifier_setup
+    respond(OpenAIOrganizers(cuisines=["Peruvian"]))
+    names = await RecipeClassifier(user.repos).suggest(create_recipe(user), create_new=create_new)
+    assert names.cuisines == (["Peruvian"] if create_new else [])
+
+
 def test_missing_recipe_preflights_the_entire_batch(api_client: TestClient, classifier_setup) -> None:
     user, _, calls = classifier_setup
     recipe = create_recipe(user)
@@ -218,6 +276,20 @@ def test_structured_imports_classify_independently_of_source_options(
     assert len(calls) == int(organize)
     if organize:
         assert "Sunday Lunch" in calls[0]["message"]
+
+
+def test_structured_imports_get_cuisine_tags_using_the_stated_cuisine(api_client: TestClient, classifier_setup) -> None:
+    user, respond, calls = classifier_setup
+    respond(OpenAIOrganizers(categories=["Main Dish"], tags=["Chicken"], cuisines=["Thai"]))
+    response = api_client.post(
+        api_routes.recipes_create_html_or_json,
+        json={"data": json.dumps({**structured_recipe(), "recipeCuisine": "Thai"})},
+        headers=user.token,
+    )
+    assert response.status_code == 201
+    recipe = user.repos.recipes.get_one(response.json())
+    assert {tag.name for tag in recipe.tags} == {"Chicken", "Thai", "Asian"}
+    assert '"recipeCuisine": "Thai"' in calls[0]["message"]
 
 
 def test_source_metadata_and_classification_are_merged(api_client: TestClient, classifier_setup) -> None:

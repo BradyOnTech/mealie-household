@@ -83,7 +83,7 @@ async def create_from_html(
                 # Explicit source-metadata imports may retain additional names. Automatic
                 # classification above still only creates standard labels or reuses existing ones.
                 if source_labels and extras:
-                    extras.set_tags(clean_tags(names.tags))
+                    extras.set_tags(clean_tags([*names.tags, *names.cuisines]))
                     extras.set_categories(clean_categories(names.categories))
             except Exception:
                 get_logger().exception("Recipe classification failed; keeping the imported recipe")

@@ -10,6 +10,7 @@ class RecipeOrganizationPreviewIn(MealieModel):
 class RecipeOrganizationIn(MealieModel):
     recipe_id: UUID4
     categories: list[str] = Field(default_factory=list, max_length=3)
+    cuisines: list[str] = Field(default_factory=list, max_length=3)
     tags: list[str] = Field(default_factory=list, max_length=8)
     tools: list[str] = Field(default_factory=list, max_length=8)
 

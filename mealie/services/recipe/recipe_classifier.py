@@ -11,6 +11,10 @@ from mealie.services.openai.content import truncate_source_content
 from .organizer_resolver import ORGANIZER_FUZZY_MATCH_THRESHOLD, OrganizerResolver
 from .recipe_source import instagram_source_url
 
+ASIAN = "Asian"
+ASIAN_CUISINES = ("Chinese", "Japanese", "Korean", "Thai", "Vietnamese", "Filipino", "Indonesian", "Malaysian")
+"""East and Southeast Asian cuisines, which are also labeled Asian so one filter finds them all"""
+
 # Only these names may be created automatically. Existing group vocabulary takes precedence.
 STANDARD_ORGANIZERS = {
     "categories": ("Breakfast", "Main Dish", "Side Dish", "Appetizer", "Dessert", "Snack", "Drink", "Sauce"),
@@ -60,7 +64,38 @@ STANDARD_ORGANIZERS = {
         "Stand Mixer",
         "Air Fryer",
     ),
+    # Saved as tags, like any other tag
+    "cuisines": (
+        "American",
+        "Southern",
+        "Cajun",
+        "Tex-Mex",
+        "Mexican",
+        "Latin American",
+        "Caribbean",
+        "Hawaiian",
+        "Italian",
+        "French",
+        "Spanish",
+        "Greek",
+        "Mediterranean",
+        "German",
+        "British",
+        "Irish",
+        "Scandinavian",
+        "Eastern European",
+        "Middle Eastern",
+        "Moroccan",
+        "African",
+        "Indian",
+        *ASIAN_CUISINES,
+        ASIAN,
+    ),
 }
+CUISINE_KEYS = {slugify(name) for name in STANDARD_ORGANIZERS["cuisines"]}
+ASIAN_KEYS = {slugify(name) for name in ASIAN_CUISINES}
+LIMITS = {"categories": 3, "tags": 8, "tools": 8, "cuisines": 3}
+"""Most of each kind a recipe is given. Cuisines are two at most (a fusion), plus Asian."""
 
 
 class RecipeClassifier:
@@ -92,16 +127,23 @@ class RecipeClassifier:
     ) -> OpenAIOrganizers:
         """Enforce the vocabulary on model output and accepted preview payloads alike."""
         resolver = OrganizerResolver(self.repos)
-        stores = {"tags": resolver.tags, "categories": resolver.categories, "tools": resolver.tools}
+        # Cuisines are saved as tags, so a cuisine given as a tag still goes with the cuisines.
+        requested = {
+            "tags": (resolver.tags, [name for name in names.tags if slugify(name) not in CUISINE_KEYS]),
+            "categories": (resolver.categories, names.categories),
+            "tools": (resolver.tools, names.tools),
+            "cuisines": (resolver.tags, [*names.cuisines, *(n for n in names.tags if slugify(n) in CUISINE_KEYS)]),
+        }
         normalized: dict[str, list[str]] = {}
-        for kind, store in stores.items():
+        for kind, (store, kind_names) in requested.items():
             standard = {slugify(name): name for name in STANDARD_ORGANIZERS[kind]}
             if kind == "categories" and instagram_source_url(source_url):
                 standard["instagram"] = "Instagram"
             result: dict[str, str] = {}
-            for name in getattr(names, kind):
+            for name in kind_names:
                 key = slugify(name)
-                if not key:
+                # Any existing tag would match below, but only a cuisine belongs with the cuisines.
+                if not key or (kind == "cuisines" and key not in standard and not create_new):
                     continue
                 match = find_match(key, store_map=store, fuzzy_match_threshold=ORGANIZER_FUZZY_MATCH_THRESHOLD)
                 canonical = match.name if match else standard.get(key)
@@ -109,13 +151,30 @@ class RecipeClassifier:
                     canonical = name.strip()[:100]
                 if canonical:
                     result.setdefault(slugify(canonical), canonical)
-            normalized[kind] = list(result.values())[: (3 if kind == "categories" else 8)]
+            normalized[kind] = list(result.values())[: LIMITS[kind]]
         return OpenAIOrganizers(**normalized)
+
+    @staticmethod
+    def _with_family(cuisines: list[str]) -> list[str]:
+        """
+        Two cuisines at most, and Asian with any East or Southeast Asian one. The family label comes from a
+        fixed map rather than the model, so it's always consistent, and it's only added to fresh suggestions,
+        so removing it during review sticks.
+        """
+        family = slugify(ASIAN)
+        specific = [name for name in cuisines if slugify(name) != family][:2]
+        named = [name for name in cuisines if slugify(name) == family]
+        if named or any(slugify(name) in ASIAN_KEYS for name in specific):
+            return [*specific, named[0] if named else ASIAN]
+        return specific
 
     async def suggest(self, recipe: Recipe, *, source: str = "", create_new: bool = False) -> OpenAIOrganizers:
         if not self.enabled:
             return OpenAIOrganizers()
         existing = OrganizerResolver(self.repos).existing_names()
+        # Cuisines are saved as tags, but the model should see them as cuisines.
+        existing["cuisines"] = [name for name in existing["tags"] if slugify(name) in CUISINE_KEYS]
+        existing["tags"] = [name for name in existing["tags"] if slugify(name) not in CUISINE_KEYS]
         injections = [
             OpenAIDataInjection(
                 description="Existing group labels. Prefer these exact names over synonyms or standard labels.",
@@ -139,6 +198,7 @@ class RecipeClassifier:
         if response is None:
             raise ValueError("Recipe classification returned no response")
         names = self.normalize(response, create_new=create_new, source_url=recipe.org_url)
+        names.cuisines = self._with_family(names.cuisines)
         if instagram_source_url(recipe.org_url) and "instagram" not in {slugify(name) for name in names.categories}:
             # Provenance comes from the saved URL, not from an AI guess. Include it in the
             # preview so the user can accept or remove it just like any other suggestion.
@@ -155,7 +215,9 @@ class RecipeClassifier:
     def attach(self, recipe: Recipe, names: OpenAIOrganizers, *, create_new: bool = False) -> None:
         names = self.normalize(names, create_new=create_new, source_url=recipe.org_url)
         resolver = OrganizerResolver(self.repos)
-        recipe.tags = self._merge(recipe.tags, resolver.resolve_tags(names.tags, create_missing=True))
+        recipe.tags = self._merge(
+            recipe.tags, resolver.resolve_tags([*names.tags, *names.cuisines], create_missing=True)
+        )
         recipe.recipe_category = self._merge(
             recipe.recipe_category, resolver.resolve_categories(names.categories, create_missing=True)
         )

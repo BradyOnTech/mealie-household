@@ -216,6 +216,28 @@ def test_tags_are_imported_when_requested(
     assert [tag["name"] for tag in recipe["tags"]] == [tag_name.title()]
 
 
+def test_cuisines_are_imported_with_requested_tags(
+    api_client: TestClient,
+    unique_user: TestUser,
+    monkeypatch: pytest.MonkeyPatch,
+    openai_recipe: OpenAIRecipe,
+    recipe_url: str,
+):
+    tag_name = random_string()
+    mock_ai(monkeypatch, openai_recipe, OpenAIOrganizers(tags=[tag_name], cuisines=["Peruvian"]))
+
+    response = api_client.post(
+        api_routes.recipes_create_url,
+        json={"url": recipe_url, "include_tags": True, "organize": False},
+        headers=unique_user.token,
+    )
+
+    assert response.status_code == 201
+    slug = json.loads(response.text)
+    recipe = api_client.get(api_routes.recipes_slug(slug), headers=unique_user.token).json()
+    assert {tag["name"] for tag in recipe["tags"]} == {tag_name.title(), "Peruvian"}
+
+
 def test_create_stream_via_openai_emits_progress(
     api_client: TestClient,
     unique_user: TestUser,

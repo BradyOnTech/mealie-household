@@ -70,6 +70,7 @@ const tools = useToolStore();
 
 const kinds = [
   { key: "categories", label: "recipe.categories" },
+  { key: "cuisines", label: "recipe.cuisines" },
   { key: "tags", label: "tag.tags" },
   { key: "tools", label: "tool.tools" },
 ] as const;
@@ -127,7 +128,7 @@ async function apply() {
   try {
     const recipes = suggestions.value
       .filter(item => accepted.value.includes(item.recipeId) && !item.error)
-      .map(({ recipeId, tags, categories, tools }) => ({ recipeId, tags, categories, tools }));
+      .map(({ recipeId, tags, categories, cuisines, tools }) => ({ recipeId, tags, categories, cuisines, tools }));
     const { response } = await api.bulk.applyOrganization(recipes);
     if (response?.status !== 200) throw new Error("apply failed");
     await Promise.all([tags.actions.refresh(), categories.actions.refresh(), tools.actions.refresh()]);

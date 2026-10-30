@@ -427,6 +427,7 @@ export interface RecipeOrganizationApplyIn {
 export interface RecipeOrganizationIn {
   recipeId: string;
   categories?: [] | [string] | [string, string] | [string, string, string];
+  cuisines?: [] | [string] | [string, string] | [string, string, string];
   tags?:
     | []
     | [string]
@@ -451,6 +452,7 @@ export interface RecipeOrganizationIn {
 export interface RecipeOrganizationOut {
   recipeId: string;
   categories?: [] | [string] | [string, string] | [string, string, string];
+  cuisines?: [] | [string] | [string, string] | [string, string, string];
   tags?:
     | []
     | [string]

@@ -31,6 +31,7 @@ export interface OpenAIIngredients {
 export interface OpenAIOrganizers {
   tags?: string[];
   categories?: string[];
+  cuisines?: string[];
   tools?: string[];
 }
 export interface OpenAIPdfRecipeLocation {
