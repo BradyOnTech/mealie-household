@@ -9,13 +9,23 @@ oat milk.
 
 Scans go one step further and say what the household already has: the product saved with that barcode,
 or one saved without a barcode that this is probably the same as, so its barcode can be remembered.
+They also come with a photo of the package to save with the product: the front of the package as Open
+Food Facts has it, or the photo that was snapped. (A link's photo comes from the store's page, which can
+be slow, so it's found separately; see `grocery_product_photos`.)
 """
 
+import asyncio
 from pathlib import Path
 
 from mealie.core.root_logger import get_logger
 from mealie.repos.repository_factory import AllRepositories
-from mealie.schema.grocery.grocery import GroceryProductLookup, GroceryProductOut, GroceryProductScan, GroceryUnit
+from mealie.schema.grocery.grocery import (
+    GroceryPhotoSource,
+    GroceryProductLookup,
+    GroceryProductOut,
+    GroceryProductScan,
+    GroceryUnit,
+)
 from mealie.schema.group.ai_providers import AITask
 from mealie.schema.openai.grocery_product import OpenAIGroceryProduct
 from mealie.schema.recipe.recipe_ingredient import IngredientFood, IngredientFoodSummary
@@ -33,6 +43,7 @@ from .grocery_product_links import (
     store_for_url,
     tidy_name,
 )
+from .grocery_product_photos import GroceryProductPhotos, PhotoError
 
 LIKELY_SAME_PRODUCT = 0.5
 """How alike a saved product's name must be to a scan's to be offered as the same product"""
@@ -49,9 +60,12 @@ class GroceryProductReader:
     # whatever provider and model the household chose for that
     task = AITask.ingredient_parsing
 
-    def __init__(self, repos: AllRepositories, ai: OpenAIService | None = None) -> None:
+    def __init__(
+        self, repos: AllRepositories, ai: OpenAIService | None = None, photos: GroceryProductPhotos | None = None
+    ) -> None:
         self.repos = repos
         self.ai = ai if ai is not None else OpenAIService(repos)
+        self.photos = photos if photos is not None else GroceryProductPhotos(repos)
         self.logger = get_logger()
 
     @property
@@ -122,7 +136,11 @@ class GroceryProductReader:
                 f"Categories: {', '.join(packaged.categories) or 'unknown'}",
             ]
         )
-        await self._ask_ai(lookup, source, text, foods)
+        reading = self._ask_ai(lookup, source, text, foods)
+        if packaged.image_url:
+            _, lookup.photo = await asyncio.gather(reading, self.photos.from_open_food_facts(packaged.image_url))
+        else:
+            await reading
         return self._scan(lookup, identified=True)
 
     async def scan_photo(self, image: Path, barcode: str | None = None) -> GroceryProductScan:
@@ -138,6 +156,11 @@ class GroceryProductReader:
             foods,
             attachments=[OpenAILocalImage(filename=image.name, path=image)],
         )
+        # the photo of the package is the product's photo too, until there's a better one
+        try:
+            lookup.photo = await asyncio.to_thread(self.photos.draft, image, GroceryPhotoSource.scan)
+        except PhotoError:
+            self.logger.warning("A photo of a package was read, but couldn't be kept as the product's photo")
         return self._scan(lookup, identified=bool(lookup.name))
 
     # =========================================================

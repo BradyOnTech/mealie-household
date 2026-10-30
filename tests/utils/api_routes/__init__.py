@@ -95,6 +95,10 @@ households_events_notifications = "/api/households/events/notifications"
 """`/api/households/events/notifications`"""
 households_groceries_common_items = "/api/households/groceries/common-items"
 """`/api/households/groceries/common-items`"""
+households_groceries_photos = "/api/households/groceries/photos"
+"""`/api/households/groceries/photos`"""
+households_groceries_photos_find = "/api/households/groceries/photos/find"
+"""`/api/households/groceries/photos/find`"""
 households_groceries_products = "/api/households/groceries/products"
 """`/api/households/groceries/products`"""
 households_groceries_products_lookup = "/api/households/groceries/products/lookup"
@@ -432,9 +436,24 @@ def households_events_notifications_item_id_test(item_id):
     return f"{prefix}/households/events/notifications/{item_id}/test"
 
 
+def households_groceries_photos_token_size(token, size):
+    """`/api/households/groceries/photos/{token}/{size}`"""
+    return f"{prefix}/households/groceries/photos/{token}/{size}"
+
+
 def households_groceries_products_product_id(product_id):
     """`/api/households/groceries/products/{product_id}`"""
     return f"{prefix}/households/groceries/products/{product_id}"
+
+
+def households_groceries_products_product_id_photo(product_id):
+    """`/api/households/groceries/products/{product_id}/photo`"""
+    return f"{prefix}/households/groceries/products/{product_id}/photo"
+
+
+def households_groceries_products_product_id_photo_size(product_id, size):
+    """`/api/households/groceries/products/{product_id}/photo/{size}`"""
+    return f"{prefix}/households/groceries/products/{product_id}/photo/{size}"
 
 
 def households_groceries_restock_item_id(item_id):

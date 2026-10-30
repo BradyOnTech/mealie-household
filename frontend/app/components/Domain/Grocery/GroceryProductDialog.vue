@@ -73,6 +73,52 @@
           </div>
         </div>
 
+        <div class="product-dialog__photo">
+          <div class="product-dialog__photo-frame">
+            <GroceryProductPhoto
+              :src="photoUrl"
+              :large="photoLargeUrl"
+              :name="form.name.trim() || $t('grocery-photos.this-product')"
+              :size="88"
+              zoomable
+              placeholder
+            />
+            <div v-if="photoBusy" class="product-dialog__photo-busy">
+              <v-progress-circular indeterminate size="24" width="2" color="primary" />
+            </div>
+          </div>
+          <div class="product-dialog__photo-text">
+            <p class="product-dialog__photo-caption" role="status">
+              {{ photoCaption }}
+            </p>
+            <div class="product-dialog__photo-actions">
+              <v-btn
+                size="small"
+                variant="tonal"
+                :prepend-icon="$globals.icons.camera"
+                :disabled="uploadingPhoto"
+                @click="photoInput?.click()"
+              >
+                {{ hasPhoto ? $t('grocery-photos.change') : $t('grocery-photos.add') }}
+              </v-btn>
+              <v-btn v-if="photoFinder" size="small" variant="text" :disabled="photoBusy" @click="lookForPhoto(true)">
+                {{ photoFinder }}
+              </v-btn>
+              <v-btn v-if="hasPhoto" size="small" variant="text" :disabled="uploadingPhoto" @click="removePhoto">
+                {{ $t('grocery-photos.remove') }}
+              </v-btn>
+            </div>
+          </div>
+          <input
+            ref="photoInput"
+            type="file"
+            accept="image/*"
+            class="d-none"
+            :aria-label="$t('grocery-photos.add')"
+            @change="onPhotoPicked"
+          >
+        </div>
+
         <v-text-field
           v-model="form.name"
           :label="$t('groceries.product-name')"
@@ -185,7 +231,7 @@
           color="primary"
           variant="flat"
           :loading="saving"
-          :disabled="!selectedFood || !form.name.trim() || requiresPermission"
+          :disabled="!selectedFood || !form.name.trim() || requiresPermission || uploadingPhoto"
           @click="save"
         >
           {{ $t('groceries.save') }}
@@ -206,11 +252,13 @@
 <script setup lang="ts">
 import { useDebounceFn } from "@vueuse/core";
 import { useDisplay } from "vuetify";
+import GroceryProductPhoto from "~/components/Domain/Grocery/GroceryProductPhoto.vue";
 import GroceryScanner, { type ScannerResult } from "~/components/Domain/Grocery/GroceryScanner.vue";
-import type { GroceryProductCreate, GroceryProductLookup, GroceryProductOut } from "~/lib/api/types/grocery";
+import type { GroceryPhotoDraft, GroceryPhotoSource, GroceryProductCreate, GroceryProductLookup, GroceryProductOut } from "~/lib/api/types/grocery";
 import type { IngredientFood } from "~/lib/api/types/recipe";
-import { useUserApi } from "~/composables/api";
-import { detectGroceryStore, groceryError, groceryStores, groceryUnits, storeSearchUrl, storeTitle } from "~/composables/groceries/grocery-utils";
+import { useStaticRoutes, useUserApi } from "~/composables/api";
+import { detectGroceryStore, groceryError, groceryStores, groceryUnits, photoRank, storeSearchUrl, storeTitle } from "~/composables/groceries/grocery-utils";
+import { shrinkPhoto } from "~/composables/groceries/use-barcodes";
 import { foodIdFor, scanOutcome, useGroceryScan } from "~/composables/groceries/use-grocery-scan";
 import { alert } from "~/composables/use-toast";
 
@@ -287,9 +335,16 @@ function isProductLink(value: string) {
 const lookupSoon = useDebounceFn((url: string) => readLink(url), 350);
 
 function onUrlInput(value: string | null) {
-  // an existing product's details are the household's own, so changing its link doesn't replace them
   const url = (value ?? "").trim();
-  if (props.product || url === lastUrl) {
+  if (props.product) {
+    // an existing product's details are the household's own, so changing its link doesn't replace them,
+    // though the new link may bring a better photo
+    if (url !== (props.product.url ?? "") && isProductLink(url)) {
+      lookForPhotoSoon();
+    }
+    return;
+  }
+  if (url === lastUrl) {
     return;
   }
   if (!isProductLink(url)) {
@@ -314,6 +369,8 @@ async function readLink(url: string) {
   const current = ++lookups;
   lastUrl = url;
   lookingUp.value = true;
+  // the store's page can be slow, so its photo comes separately, and shows when it comes
+  void lookForPhoto();
   const { data } = await api.groceries.lookupProduct(url);
   if (current !== lookups) {
     return;
@@ -344,6 +401,7 @@ function fillFrom(data: GroceryProductLookup) {
   if (data.barcode) {
     form.barcode = data.barcode;
   }
+  offerPhoto(data.photo);
 }
 
 // =========================================================
@@ -382,6 +440,7 @@ async function onScanned(result: ScannerResult) {
     else if (found.barcode) {
       form.barcode = found.barcode;
       scanMessage.value = i18n.t("grocery-scan.barcode-added");
+      offerPhoto(found.draft.photo);
     }
     return;
   }
@@ -410,6 +469,9 @@ async function rememberBarcode() {
   try {
     const result = await api.groceries.updateProduct(likely.id, { ...productFields(likely), barcode: scan.value.barcode });
     if (!result.data) throw result.error;
+    // and one without a photo gets the package's
+    const photo = scan.value.draft.photo;
+    if (photo && !likely.photo) await api.groceries.attachPhoto(likely.id, photo.token);
     alert.success(i18n.t("grocery-scan.barcode-remembered", { name: likely.name }));
     emit("saved");
     opened.value = false;
@@ -481,6 +543,172 @@ function filledNotice(): ScanNotice {
 }
 
 // =========================================================
+// The product's photo
+
+const { groceryProductPhoto, groceryDraftPhoto } = useStaticRoutes();
+/** A photo to save with the product: found, snapped or picked since the form opened */
+const draftPhoto = ref<GroceryPhotoDraft | null>(null);
+/** Whether the product's saved photo is to go */
+const photoRemoved = ref(false);
+/** Someone removed the photo, so none comes back by itself */
+const photoDismissed = ref(false);
+const findingPhoto = ref(false);
+const uploadingPhoto = ref(false);
+const photoMessage = ref("");
+const photoInput = ref<HTMLInputElement | null>(null);
+
+/** A look for a photo. Saving the product while it's under way has it save the photo it finds. */
+interface PhotoLookup { savedAs?: { productId: string; source: GroceryPhotoSource | null; dismissed: boolean } }
+/** The latest look for a photo, the only one whose answer the form takes */
+let photoLookup: PhotoLookup | null = null;
+
+const savedPhoto = computed(() => (props.product?.photo && !photoRemoved.value ? props.product : null));
+const photoSource = computed(() => draftPhoto.value?.source ?? savedPhoto.value?.photoSource ?? null);
+const photoUrl = computed(() => {
+  if (draftPhoto.value) return groceryDraftPhoto(draftPhoto.value.token);
+  return savedPhoto.value ? groceryProductPhoto(savedPhoto.value) : null;
+});
+const photoLargeUrl = computed(() => {
+  if (draftPhoto.value) return groceryDraftPhoto(draftPhoto.value.token, "photo");
+  return savedPhoto.value ? groceryProductPhoto(savedPhoto.value, "photo") : null;
+});
+const hasPhoto = computed(() => !!photoUrl.value);
+const photoBusy = computed(() => findingPhoto.value || uploadingPhoto.value);
+const linkStore = computed(() => (form.url ? detectGroceryStore(form.url) : null));
+
+const photoCaption = computed(() => {
+  if (uploadingPhoto.value) return i18n.t("grocery-photos.preparing");
+  if (findingPhoto.value) {
+    return linkStore.value
+      ? i18n.t("grocery-photos.finding-store", { store: storeTitle(linkStore.value) })
+      : i18n.t("grocery-photos.finding");
+  }
+  if (photoMessage.value) return photoMessage.value;
+  switch (photoSource.value) {
+    case "store": return i18n.t("grocery-photos.from-store", { store: storeTitle(linkStore.value ?? form.store) });
+    case "open_food_facts": return i18n.t("grocery-photos.from-open-food-facts");
+    case "scan": return i18n.t("grocery-photos.from-scan");
+    case "chosen": return i18n.t("grocery-photos.chosen");
+    default: return i18n.t("grocery-photos.none");
+  }
+});
+
+/** Where a look for a photo would look, offered when it could do better than the photo there is */
+const photoFinder = computed(() => {
+  if (linkStore.value && photoSource.value !== "store") {
+    return i18n.t("grocery-photos.get-store-photo", { store: storeTitle(linkStore.value) });
+  }
+  if (!linkStore.value && form.barcode && !hasPhoto.value) {
+    return i18n.t("grocery-photos.find-photo");
+  }
+  return null;
+});
+
+/** Takes a photo that turned up by itself, unless the one there is better, or someone removed theirs */
+function offerPhoto(photo?: GroceryPhotoDraft | null) {
+  if (!photo || photoDismissed.value || photoRank(photo.source) < photoRank(photoSource.value)) return;
+  draftPhoto.value = photo;
+  photoMessage.value = "";
+}
+
+/** Looks for a photo of the product: the store's, for its link, or Open Food Facts', for its barcode */
+async function lookForPhoto(asked = false) {
+  const url = linkStore.value ? form.url : null;
+  const barcode = form.barcode || null;
+  if (!url && !barcode) return;
+  const lookup: PhotoLookup = {};
+  photoLookup = lookup;
+  findingPhoto.value = true;
+  photoMessage.value = "";
+  const { data } = await api.groceries.findPhoto({ url, barcode });
+
+  if (lookup.savedAs) {
+    // the product was saved while this looked, so what it found is saved with it now
+    const saved = lookup.savedAs;
+    if (data && (asked || (!saved.dismissed && photoRank(data.source) >= photoRank(saved.source)))) {
+      const result = await api.groceries.attachPhoto(saved.productId, data.token);
+      if (result.data) emit("saved");
+    }
+    return;
+  }
+  if (lookup !== photoLookup) return;
+  photoLookup = null;
+  findingPhoto.value = false;
+  if (data && asked) {
+    draftPhoto.value = data;
+    photoDismissed.value = false;
+  }
+  else if (data) {
+    offerPhoto(data);
+  }
+  else if (asked || !hasPhoto.value) {
+    photoMessage.value = url
+      ? i18n.t("grocery-photos.store-had-none", { store: storeTitle(linkStore.value) })
+      : i18n.t("grocery-photos.none-found");
+  }
+}
+
+const lookForPhotoSoon = useDebounceFn(() => lookForPhoto(), 350);
+
+async function onPhotoPicked(event: Event) {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0];
+  // so picking the same photo again still counts
+  input.value = "";
+  if (!file) return;
+  // a photo someone picked beats whatever was still being looked for
+  photoLookup = null;
+  findingPhoto.value = false;
+  uploadingPhoto.value = true;
+  photoMessage.value = "";
+  try {
+    const { data, error } = await api.groceries.uploadPhoto(await shrinkPhoto(file));
+    if (!data) throw error;
+    draftPhoto.value = data;
+    photoDismissed.value = false;
+  }
+  catch (cause) {
+    photoMessage.value = groceryError(cause);
+  }
+  finally {
+    uploadingPhoto.value = false;
+  }
+}
+
+function removePhoto() {
+  photoLookup = null;
+  findingPhoto.value = false;
+  draftPhoto.value = null;
+  photoRemoved.value = !!props.product?.photo;
+  photoDismissed.value = true;
+  photoMessage.value = "";
+}
+
+function resetPhoto() {
+  photoLookup = null;
+  findingPhoto.value = false;
+  uploadingPhoto.value = false;
+  draftPhoto.value = null;
+  photoRemoved.value = false;
+  photoDismissed.value = false;
+  photoMessage.value = "";
+}
+
+/** Saves the photo with the product: a new one, or none. One still being looked for is saved when it's found. */
+async function savePhoto(productId: string) {
+  if (draftPhoto.value) {
+    const { data } = await api.groceries.attachPhoto(productId, draftPhoto.value.token);
+    if (!data) alert.error(i18n.t("grocery-photos.attach-failed"));
+  }
+  else if (photoRemoved.value) {
+    await api.groceries.removePhoto(productId);
+  }
+  if (photoLookup && findingPhoto.value) {
+    photoLookup.savedAs = { productId, source: photoSource.value, dismissed: photoDismissed.value };
+  }
+}
+
+// =========================================================
 // Opening and saving
 
 watch(opened, (value) => {
@@ -495,6 +723,7 @@ watch(opened, (value) => {
   scanMessage.value = "";
   scanHadPhoto.value = false;
   notTheLikelyOne.value = false;
+  resetPhoto();
   const product = props.product;
   Object.assign(form, product ? productFields(product) : emptyForm());
   selectedFood.value = product?.food ?? props.foods.find(food => food.id === props.initialFoodId) ?? null;
@@ -522,6 +751,7 @@ async function save() {
     const payload: GroceryProductCreate = { foodId, name: form.name.trim(), store: form.store, url: form.url || null, priority: form.priority, enabled: form.enabled, packageQuantity: quantity, packageUnit: quantity == null ? null : form.packageUnit, notes: form.notes, barcode: form.barcode || null };
     const result = props.product ? await api.groceries.updateProduct(props.product.id, payload) : await api.groceries.createProduct(payload);
     if (!result.data) throw result.error;
+    await savePhoto(result.data.id);
     emit("saved");
     opened.value = false;
   }
@@ -630,6 +860,45 @@ async function save() {
   flex-wrap: wrap;
   gap: 6px;
   margin-top: 10px;
+}
+
+.product-dialog__photo {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 0 0 18px;
+}
+
+.product-dialog__photo-frame {
+  position: relative;
+  flex: none;
+}
+
+.product-dialog__photo-busy {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.product-dialog__photo-text {
+  min-width: 0;
+}
+
+.product-dialog__photo-caption {
+  margin: 0 0 6px;
+  font-size: 0.875rem;
+  line-height: 1.4;
+  color: rgb(var(--v-theme-ink-muted));
+}
+
+.product-dialog__photo-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 6px;
 }
 
 .product-dialog__barcode {

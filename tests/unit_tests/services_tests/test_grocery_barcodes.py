@@ -78,6 +78,7 @@ GREAT_VALUE_MILK = {
         "product_quantity": 3785.41,
         "product_quantity_unit": "ml",
         "quantity": "1 gallon",
+        "image_front_url": "https://images.openfoodfacts.org/images/products/007/874/235/1865/front_en.3.400.jpg",
     },
 }
 
@@ -92,8 +93,17 @@ def test_an_open_food_facts_listing_is_read():
         quantity="1 gallon",
         categories=["dairies", "milks", "whole milks"],
         size=PackageSize(128, GroceryUnit.fluid_ounce),
+        image_url="https://images.openfoodfacts.org/images/products/007/874/235/1865/front_en.3.400.jpg",
     )
     assert product.listing == "Great Value Whole Milk 1 gallon"
+
+
+@pytest.mark.parametrize("image", [None, "", "http://images.openfoodfacts.org/front.jpg", 42])
+def test_only_an_https_photo_of_the_package_is_kept(image: object):
+    data = {"status": 1, "product": {"product_name": "Penne", "image_front_url": image}}
+    product = parse_food_facts("0076808280739", data)
+    assert product is not None
+    assert product.image_url is None
 
 
 def test_a_listing_without_a_printed_size_uses_its_measured_one():

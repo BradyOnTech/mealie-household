@@ -17,13 +17,18 @@
         </div>
 
         <template v-else-if="scan && outcome === 'likely'">
-          <span class="paper-kicker">{{ $t('grocery-scan.ran-out-of', { food: scan.likelySaved!.food.name }) }}</span>
-          <h2 class="restock-scan__name">
-            {{ scan.likelySaved!.name }}
-          </h2>
-          <p class="restock-scan__meta">
-            {{ storeTitle(scan.likelySaved!.store) }}
-          </p>
+          <div class="restock-scan__head">
+            <div class="restock-scan__title">
+              <span class="paper-kicker">{{ $t('grocery-scan.ran-out-of', { food: scan.likelySaved!.food.name }) }}</span>
+              <h2 class="restock-scan__name">
+                {{ scan.likelySaved!.name }}
+              </h2>
+              <p class="restock-scan__meta">
+                {{ storeTitle(scan.likelySaved!.store) }}
+              </p>
+            </div>
+            <GroceryProductPhoto :src="sheetPhoto" :large="sheetPhotoLarge" :name="scan.likelySaved!.name" :size="64" zoomable />
+          </div>
           <v-checkbox
             v-model="rememberBarcode"
             color="primary"
@@ -34,10 +39,15 @@
         </template>
 
         <template v-else-if="scan && outcome === 'new'">
-          <span class="paper-kicker">{{ ingredientName ? $t('grocery-scan.ran-out-of', { food: ingredientName }) : $t('grocery-scan.scanned') }}</span>
-          <h2 class="restock-scan__name">
-            {{ scan.draft.name }}
-          </h2>
+          <div class="restock-scan__head">
+            <div class="restock-scan__title">
+              <span class="paper-kicker">{{ ingredientName ? $t('grocery-scan.ran-out-of', { food: ingredientName }) : $t('grocery-scan.scanned') }}</span>
+              <h2 class="restock-scan__name">
+                {{ scan.draft.name }}
+              </h2>
+            </div>
+            <GroceryProductPhoto :src="sheetPhoto" :large="sheetPhotoLarge" :name="scan.draft.name ?? ''" :size="64" zoomable />
+          </div>
           <v-checkbox
             v-model="saveProduct"
             color="primary"
@@ -64,10 +74,15 @@
         </template>
 
         <template v-else-if="scan && outcome === 'unknown'">
-          <span class="paper-kicker">{{ $t('grocery-scan.scanned') }}</span>
-          <h2 class="restock-scan__name">
-            {{ $t('grocery-scan.unknown-title') }}
-          </h2>
+          <div class="restock-scan__head">
+            <div class="restock-scan__title">
+              <span class="paper-kicker">{{ $t('grocery-scan.scanned') }}</span>
+              <h2 class="restock-scan__name">
+                {{ $t('grocery-scan.unknown-title') }}
+              </h2>
+            </div>
+            <GroceryProductPhoto :src="sheetPhoto" :large="sheetPhotoLarge" :name="typedName.trim() || $t('grocery-photos.this-product')" :size="64" zoomable />
+          </div>
           <p v-if="canReadPhotos && !scanHadPhoto" class="restock-scan__hint">
             {{ $t('grocery-scan.unknown-restock-snap') }}
           </p>
@@ -123,8 +138,10 @@
 </template>
 
 <script setup lang="ts">
+import GroceryProductPhoto from "~/components/Domain/Grocery/GroceryProductPhoto.vue";
 import GroceryScanner, { type ScannerResult } from "~/components/Domain/Grocery/GroceryScanner.vue";
-import { useUserApi } from "~/composables/api";
+import { useStaticRoutes, useUserApi } from "~/composables/api";
+import type { GroceryPhotoSize } from "~/composables/api/static-routes";
 import { groceryError, groceryStores, storeTitle } from "~/composables/groceries/grocery-utils";
 import { useGroceryRestock } from "~/composables/groceries/use-grocery-restock";
 import { foodIdFor, scanOutcome, useGroceryScan } from "~/composables/groceries/use-grocery-scan";
@@ -154,6 +171,17 @@ const store = ref<GroceryStore>("walmart");
 const typedName = ref("");
 
 const outcome = computed(() => (scan.value ? scanOutcome(scan.value) : null));
+
+const { groceryProductPhoto, groceryDraftPhoto } = useStaticRoutes();
+/** The photo the sheet shows: the household's own product's, or the one that came with the scan */
+function sheetPhotoUrl(size: GroceryPhotoSize) {
+  const found = scan.value;
+  if (!found) return null;
+  if (outcome.value === "likely" && found.likelySaved?.photo) return groceryProductPhoto(found.likelySaved, size);
+  return found.draft.photo ? groceryDraftPhoto(found.draft.photo.token, size) : null;
+}
+const sheetPhoto = computed(() => sheetPhotoUrl("thumb"));
+const sheetPhotoLarge = computed(() => sheetPhotoUrl("photo"));
 const ingredientName = computed(() => scan.value?.draft.food?.name ?? scan.value?.draft.newFoodName ?? "");
 const canSaveProduct = computed(() => {
   const draft = scan.value?.draft;
@@ -243,6 +271,8 @@ async function addToList() {
         const { foodId, name, store, url, priority, enabled, packageQuantity, packageUnit, notes } = likely;
         const result = await api.groceries.updateProduct(likely.id, { foodId, name, store, url, priority, enabled, packageQuantity, packageUnit, notes, barcode: found.barcode });
         if (!result.data) throw result.error;
+        // and one without a photo gets the package's
+        if (found.draft.photo && !likely.photo) await api.groceries.attachPhoto(likely.id, found.draft.photo.token);
       }
       if (await addRestock(likely)) close();
       return;
@@ -262,6 +292,7 @@ async function addToList() {
           barcode: found.barcode ?? null,
         });
         if (!result.data) throw result.error;
+        if (draft.photo) await api.groceries.attachPhoto(result.data.id, draft.photo.token);
         if (await addRestock(result.data)) close();
         return;
       }
@@ -294,6 +325,17 @@ async function addToList() {
   gap: 12px;
   padding: 8px 0;
   font-weight: 600;
+}
+
+.restock-scan__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.restock-scan__title {
+  min-width: 0;
 }
 
 .restock-scan__name {

@@ -89,7 +89,8 @@ when updating, and do not use `docker compose down -v`, which deletes its data v
    preferred products are matched by Food ID, rather than by an approximate ingredient name.
 2. Open **Groceries → Preferred products**. Start with your most common products.
 3. Paste the product's link from the store, or scan its barcode (**Scan a product**). The name, store,
-   package size and ingredient fill themselves in; check them over and save. See [Scanning](#scanning).
+   package size, ingredient and a photo fill themselves in; check them over and save. See
+   [Scanning](#scanning) and [Product photos](#product-photos).
 4. Add alternatives for the same ingredient and mark them as backup choices.
 5. The package size is optional. A 1 lb pack uses quantity `1`, unit `lb`; a gallon is `128` `fl oz`.
 6. Plan dinners and sides in Mealie's calendar. Open Groceries and choose the week and stores you will visit.
@@ -130,6 +131,25 @@ On the Out of list, scanning a saved product adds its ingredient at once, at tha
 an Undo. Anything else asks first, and offers to save it as a preferred product, so the next scan is
 instant. Barcodes are read on the phone itself, with ZXing compiled to WebAssembly (Safari can't read
 barcodes on its own), served by Mealie rather than a CDN.
+
+### Product photos
+
+Preferred products have a photo of the package, shown on the products page and beside the item on the
+shopping list, so the right one is easy to spot on the shelf. Tapping a photo shows it large. A product
+gets the best photo there is, as soon as its link is pasted or its package scanned:
+
+- The store's own photo, from the product's page, for a product with a store link. Each store keeps it
+  somewhere else (Walmart in its link preview, Cub and Whole Foods in the page's product data, Aldi in
+  the image its page loads first). Stores turn robots away now and then, so a page that comes back
+  without a photo is fetched again, and a link that still gives none can be tried later from the form.
+- The front of the package from Open Food Facts, for a scanned product. These are shoppers' photos.
+- The photo snapped of the package, when a barcode nothing knew was identified from it.
+- Any photo taken or picked in the form, which nothing replaces on its own.
+
+The store's photo replaces Open Food Facts' or a snapshot when a link is added later. Photos are copied
+to Mealie's data folder (`groceries/` under the data directory) at two sizes, served only to the
+household, and included in backups. A photo found for a product that's never saved is cleared away
+after a day, and a deleted product's photo with it.
 
 ### Quantities and repeat updates
 

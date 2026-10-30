@@ -36,6 +36,9 @@ class GroceryProduct(SqlAlchemyBase, BaseMixins):
     notes: Mapped[str] = mapped_column(String, nullable=False, default="")
     barcode: FilterableColumn[str | None] = mapped_column(String(14), index=True)
     """The package's barcode as a GTIN, so scanning the package finds the product"""
+    photo: Mapped[str | None] = mapped_column(String(16))
+    """Changes whenever the product's photo does. None when it has no photo."""
+    photo_source: Mapped[str | None] = mapped_column(String)
 
     model_config = ConfigDict(exclude={"food", "household"})
 

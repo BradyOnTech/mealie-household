@@ -217,6 +217,27 @@
     "added-product": "Added {food} to your list: {name}",
     "add-failed": "Couldn't add that to your list. Try again."
   },
+  "grocery-photos": {
+    "this-product": "this product",
+    "add": "Add a photo",
+    "change": "Change photo",
+    "remove": "Remove",
+    "none": "No photo yet",
+    "preparing": "Getting the photo ready…",
+    "finding": "Looking for a photo…",
+    "finding-store": "Getting the photo from {store}…",
+    "from-store": "Photo from {store}",
+    "from-open-food-facts": "Photo from Open Food Facts",
+    "from-scan": "Your photo of the package",
+    "chosen": "Your photo",
+    "get-store-photo": "Get the photo from {store}",
+    "find-photo": "Find a photo",
+    "store-had-none": "{store} didn't send a photo just now. Try again in a bit, or add your own.",
+    "none-found": "No photo found. Add your own.",
+    "attach-failed": "Saved, but the photo couldn't be added. Open the product to add it again.",
+    "view": "See the photo of {name}",
+    "photo-of": "Photo of {name}"
+  },
   "assistant": {
     "nav": "Ask",
     "kicker": "Kitchen helper",

@@ -1,4 +1,4 @@
-import type { GroceryCommonItemOut, GroceryProductOut, GroceryStore, GroceryUnit } from "~/lib/api/types/grocery";
+import type { GroceryCommonItemOut, GroceryPhotoSource, GroceryProductOut, GroceryStore, GroceryUnit } from "~/lib/api/types/grocery";
 
 export const groceryStores: { value: GroceryStore; title: string; color: string }[] = [
   { value: "walmart", title: "Walmart", color: "#0071CE" },
@@ -23,6 +23,20 @@ export function storeSearchUrl(store: GroceryStore, query: string): string {
     case "cub": return `https://www.cub.com/store/cub/s?k=${q}`;
     case "aldi": return `https://www.aldi.us/store/aldi/s?k=${q}`;
     case "whole_foods": return `https://www.wholefoodsmarket.com/search?text=${q}`;
+  }
+}
+
+/**
+ * How good a product photo is: a photo found by itself replaces only a worse one. Someone's own choice
+ * beats the store's photo, which beats the shoppers' photos on Open Food Facts and a snapshot from a scan.
+ */
+export function photoRank(source?: GroceryPhotoSource | null): number {
+  switch (source) {
+    case "chosen": return 3;
+    case "store": return 2;
+    case "open_food_facts":
+    case "scan": return 1;
+    default: return 0;
   }
 }
 

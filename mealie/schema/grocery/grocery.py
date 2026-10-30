@@ -65,6 +65,57 @@ def https_product_url(value: str | None) -> str | None:
     return str(url)
 
 
+class GroceryPhotoSource(StrEnum):
+    """Where a product's photo came from, which decides what may replace it"""
+
+    store = "store"
+    """The store's own photo, from the product's page"""
+    open_food_facts = "open_food_facts"
+    """The front of the package, from Open Food Facts"""
+    scan = "scan"
+    """Snapped while scanning the package"""
+    chosen = "chosen"
+    """Taken or picked for the product by someone, which nothing replaces on its own"""
+
+
+PHOTO_TOKEN_PATTERN = r"^[0-9a-f]{32}$"
+
+
+class GroceryPhotoDraft(MealieModel):
+    """A photo found or taken for a product, kept until the product is saved with it"""
+
+    token: str
+    source: GroceryPhotoSource
+
+
+class GroceryPhotoFindRequest(MealieModel):
+    """Where to look for a product's photo: on the store's page for its link, or in Open Food Facts for its barcode"""
+
+    url: str | None = Field(default=None, max_length=4000)
+    barcode: str | None = Field(default=None, max_length=32)
+
+    @field_validator("url")
+    @classmethod
+    def validate_product_url(cls, value: str | None) -> str | None:
+        return https_product_url(value)
+
+    @field_validator("barcode")
+    @classmethod
+    def validate_barcode(cls, value: str | None) -> str | None:
+        return package_barcode(value)
+
+    @model_validator(mode="after")
+    def validate_somewhere_to_look(self) -> Self:
+        if not self.url and not self.barcode:
+            raise ValueError("Give a product link or a barcode")
+        return self
+
+
+class GroceryProductPhotoAttach(MealieModel):
+    token: str = Field(pattern=PHOTO_TOKEN_PATTERN)
+    """A draft photo's token"""
+
+
 class GroceryProductCreate(MealieModel):
     food_id: UUID4
     name: str = Field(min_length=1, max_length=255)
@@ -128,6 +179,8 @@ class GroceryProductLookup(MealieModel):
     new_food_name: str | None = None
     """When none of the household's ingredients fits, the one to add for the product"""
     read_with_ai: bool = False
+    photo: GroceryPhotoDraft | None = None
+    """A photo of the product, to save with it"""
 
 
 class GroceryBarcodeScanRequest(MealieModel):
@@ -144,6 +197,9 @@ class GroceryProductSave(GroceryProductCreate):
 class GroceryProductOut(GroceryProductSave):
     id: UUID4
     food: IngredientFoodSummary
+    photo: str | None = None
+    """Changes whenever the photo does, so the photo's address does too. None when there's no photo."""
+    photo_source: GroceryPhotoSource | None = None
     created_at: datetime | None = None
     updated_at: datetime | None = UpdatedAtField(None)
     model_config = ConfigDict(from_attributes=True)

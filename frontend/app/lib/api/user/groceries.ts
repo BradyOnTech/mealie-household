@@ -1,7 +1,8 @@
 import { BaseAPI } from "../base/base-clients";
 import type {
   GroceryCommonItemList, GroceryFoodRuleCreate, GroceryFoodRuleOut, GroceryItemAssignment, GroceryItemCheck,
-  GroceryItemDelete, GroceryManualItemCreate, GroceryProductCreate, GroceryProductLookup, GroceryProductOut, GroceryProductScan,
+  GroceryItemDelete, GroceryManualItemCreate, GroceryPhotoDraft, GroceryPhotoFindRequest, GroceryProductCreate, GroceryProductLookup,
+  GroceryProductOut, GroceryProductPhotoAttach, GroceryProductScan,
   GroceryRestockBought, GroceryRestockCreate, GroceryRestockList,
   GrocerySuggestionOut, GroceryWeekGenerate, GroceryWeekView,
 } from "~/lib/api/types/grocery";
@@ -33,6 +34,22 @@ export class GroceriesAPI extends BaseAPI {
     }
     return this.requests.post<GroceryProductScan>(`${base}/products/scan/photo`, form);
   }
+
+  /** Keeps a photo someone took or picked for a product, as a draft to save with it */
+  uploadPhoto(photo: Blob) {
+    const form = new FormData();
+    form.append("image", photo, "photo.jpg");
+    return this.requests.post<GroceryPhotoDraft>(`${base}/photos`, form);
+  }
+
+  /** Looks for a product's photo: the store's for a store link, or Open Food Facts' for a barcode. Null when there's none. */
+  findPhoto(where: GroceryPhotoFindRequest) { return this.requests.post<GroceryPhotoDraft | null>(`${base}/photos/find`, where); }
+  /** Makes a draft photo the product's photo */
+  attachPhoto(productId: string, token: string) {
+    return this.requests.put<GroceryProductOut, GroceryProductPhotoAttach>(`${base}/products/${productId}/photo`, { token });
+  }
+
+  removePhoto(productId: string) { return this.requests.delete<GroceryProductOut>(`${base}/products/${productId}/photo`); }
 
   createRule(data: GroceryFoodRuleCreate) { return this.requests.post<GroceryFoodRuleOut>(`${base}/rules`, data); }
   updateRule(id: string, data: GroceryFoodRuleCreate) { return this.requests.put<GroceryFoodRuleOut, GroceryFoodRuleCreate>(`${base}/rules/${id}`, data); }

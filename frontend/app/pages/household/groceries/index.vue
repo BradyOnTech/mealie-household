@@ -272,6 +272,15 @@
                 {{ purchase.product.notes }}
               </div>
             </div>
+            <GroceryProductPhoto
+              v-if="purchase.product?.photo"
+              class="purchase__photo"
+              :src="groceryProductPhoto(purchase.product)"
+              :large="groceryProductPhoto(purchase.product, 'photo')"
+              :name="purchase.product.name"
+              :size="52"
+              zoomable
+            />
             <v-menu location="bottom end" :offset="4">
               <template #activator="{ props: menuProps }">
                 <v-btn
@@ -395,7 +404,9 @@
 <script setup lang="ts">
 import { useIntervalFn } from "@vueuse/core";
 import { getISOWeek } from "date-fns";
+import GroceryProductPhoto from "~/components/Domain/Grocery/GroceryProductPhoto.vue";
 import GroceryRestockPanel from "~/components/Domain/Grocery/GroceryRestockPanel.vue";
+import { useStaticRoutes } from "~/composables/api";
 import { useGroceryWeek } from "~/composables/groceries/use-grocery-week";
 import { useGroceryCatalog } from "~/composables/groceries/use-grocery-catalog";
 import { useGroceryRestock } from "~/composables/groceries/use-grocery-restock";
@@ -412,6 +423,7 @@ const dateInput = ref(weekStart.value);
 const { api, view, suggestions, busy, loading, error, load, loadSuggestions, mutate } = useGroceryWeek(weekStart);
 const { products, foods, error: catalogError, load: loadCatalog } = useGroceryCatalog();
 const { version: restockVersion, load: loadRestock } = useGroceryRestock();
+const { groceryProductPhoto } = useStaticRoutes();
 // Out of items go straight onto the newest list, so show them as they're added
 watch(restockVersion, () => { void load(); });
 const selectedStores = ref<GroceryStore[]>(groceryStores.map(store => store.value));
@@ -1007,7 +1019,7 @@ a.meal-row__title:hover {
 
 .purchase {
   display: grid;
-  grid-template-columns: 40px minmax(0, 1fr) auto;
+  grid-template-columns: 40px minmax(0, 1fr) auto auto;
   align-items: start;
   gap: 6px;
   padding: 8px 0;
@@ -1078,8 +1090,13 @@ a.meal-row__title:hover {
   color: rgb(var(--v-theme-warning));
 }
 
-.purchase__more {
+.purchase__photo {
   grid-column: 3;
+  grid-row: 1;
+}
+
+.purchase__more {
+  grid-column: 4;
   grid-row: 1;
   color: rgb(var(--v-theme-ink-muted));
 }
@@ -1090,6 +1107,7 @@ a.meal-row__title:hover {
   text-decoration-thickness: 1px;
 }
 
+.purchase--done .purchase__photo,
 .purchase--done .purchase__product,
 .purchase--done .purchase__buy,
 .purchase--done .purchase__needs,

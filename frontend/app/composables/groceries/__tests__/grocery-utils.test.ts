@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { commonItemAisles, commonItemStore, detectGroceryStore, groceryError, mondayFor } from "../grocery-utils";
+import { commonItemAisles, commonItemStore, detectGroceryStore, groceryError, mondayFor, photoRank } from "../grocery-utils";
 import type { CommonItemAisle } from "../grocery-utils";
 import type { GroceryCommonItemOut, GroceryProductOut, GroceryStore } from "~/lib/api/types/grocery";
 
@@ -88,5 +88,14 @@ describe("request errors", () => {
     expect(groceryError({ response: { data: { detail: [{ msg: "Name what you're out of" }] } } })).toBe("Name what you're out of");
     expect(groceryError({ response: { data: { detail: { message: "Set up an AI provider", error: true } } } })).toBe("Set up an AI provider");
     expect(groceryError({ message: "Network Error" })).toBe("Network Error");
+  });
+});
+
+describe("product photos", () => {
+  it("ranks someone's own photo over the store's, and the store's over shoppers' photos and snapshots", () => {
+    expect(photoRank("chosen")).toBeGreaterThan(photoRank("store"));
+    expect(photoRank("store")).toBeGreaterThan(photoRank("open_food_facts"));
+    expect(photoRank("open_food_facts")).toBe(photoRank("scan"));
+    expect(photoRank("scan")).toBeGreaterThan(photoRank(null));
   });
 });

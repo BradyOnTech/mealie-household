@@ -25,7 +25,7 @@ logger = get_logger()
 OPEN_FOOD_FACTS_URL = (
     "https://world.openfoodfacts.org/api/v2/product/{barcode}.json"
     "?fields=code,product_name,product_name_en,generic_name_en,brands,quantity,product_quantity,"
-    "product_quantity_unit,categories_tags"
+    "product_quantity_unit,categories_tags,image_front_url"
 )
 LOOKUP_TIMEOUT_SECONDS = 8
 
@@ -162,6 +162,8 @@ class PackagedProduct:
     categories: list[str] = field(default_factory=list)
     """Most general first, e.g. ["dairies", "milks", "whole milks"]"""
     size: PackageSize | None = None
+    image_url: str | None = None
+    """A photo of the front of the package"""
 
     @property
     def listing(self) -> str:
@@ -179,6 +181,10 @@ def _food_facts_size(product: dict) -> PackageSize | None:
     except TypeError, ValueError:
         return None
     return PackageSize(round(amount, 3), unit) if unit and amount > 0 else None
+
+
+def _https_url(value: object) -> str | None:
+    return value if isinstance(value, str) and value.startswith("https://") else None
 
 
 def parse_food_facts(barcode: str, data: dict) -> PackagedProduct | None:
@@ -209,6 +215,7 @@ def parse_food_facts(barcode: str, data: dict) -> PackagedProduct | None:
         quantity=str(product.get("quantity") or "").strip(),
         categories=categories,
         size=_food_facts_size(product),
+        image_url=_https_url(product.get("image_front_url")),
     )
 
 

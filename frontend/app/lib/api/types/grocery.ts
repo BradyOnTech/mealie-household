@@ -8,6 +8,7 @@
 export type GroceryStore = "walmart" | "cub" | "aldi" | "whole_foods";
 export type GroceryUnit =
   "count" | "gram" | "kilogram" | "ounce" | "pound" | "milliliter" | "liter" | "fluid_ounce" | "cup";
+export type GroceryPhotoSource = "store" | "open_food_facts" | "scan" | "chosen";
 export type GroceryRuleKind = "pantry" | "recurring";
 export type GroceryRecurringMode = "minimum" | "extra";
 export type GroceryRestockStatus = "waiting" | "listed" | "bought";
@@ -48,6 +49,8 @@ export interface GroceryProductOut {
   householdId: string;
   id: string;
   food: IngredientFoodSummary;
+  photo?: string | null;
+  photoSource?: GroceryPhotoSource | null;
   createdAt?: string | null;
   updatedAt?: string | null;
 }
@@ -104,6 +107,14 @@ export interface GroceryManualItemCreate {
   store?: GroceryStore | null;
   expectedRevision: number;
 }
+export interface GroceryPhotoDraft {
+  token: string;
+  source: GroceryPhotoSource;
+}
+export interface GroceryPhotoFindRequest {
+  url?: string | null;
+  barcode?: string | null;
+}
 export interface GroceryProductCreate {
   foodId: string;
   name: string;
@@ -126,9 +137,13 @@ export interface GroceryProductLookup {
   food?: IngredientFoodSummary | null;
   newFoodName?: string | null;
   readWithAi?: boolean;
+  photo?: GroceryPhotoDraft | null;
 }
 export interface GroceryProductLookupRequest {
   url: string;
+}
+export interface GroceryProductPhotoAttach {
+  token: string;
 }
 export interface GroceryProductSave {
   foodId: string;

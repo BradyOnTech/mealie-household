@@ -143,6 +143,9 @@ async function drawImage(photo: Blob, maxSide: number): Promise<{ pixels: ImageD
     canvas.height = Math.max(1, Math.round(decoded.height * scale));
     const context = canvas.getContext("2d", { willReadFrequently: true });
     if (!context) return null;
+    // on white, as a JPEG would show any transparency in it
+    context.fillStyle = "#fff";
+    context.fillRect(0, 0, canvas.width, canvas.height);
     context.drawImage(decoded.image, 0, 0, canvas.width, canvas.height);
     return { pixels: context.getImageData(0, 0, canvas.width, canvas.height), canvas };
   }
@@ -162,7 +165,11 @@ function toJpeg(canvas: HTMLCanvasElement, quality = 0.85): Promise<Blob | null>
 export async function preparePhoto(photo: Blob): Promise<{ photo: Blob; barcode: ScannedBarcode | null }> {
   const large = await drawImage(photo, 2400);
   const barcode = large ? await readBarcode(large.pixels).catch(() => null) : null;
+  return { photo: await shrinkPhoto(photo), barcode };
+}
+
+/** A photo no more than 1600 pixels a side, as a JPEG, so it uploads quickly from a phone */
+export async function shrinkPhoto(photo: Blob): Promise<Blob> {
   const small = await drawImage(photo, 1600);
-  const jpeg = small ? await toJpeg(small.canvas) : null;
-  return { photo: jpeg ?? photo, barcode };
+  return (small ? await toJpeg(small.canvas) : null) ?? photo;
 }

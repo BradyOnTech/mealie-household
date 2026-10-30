@@ -59,16 +59,28 @@
               <span class="product-tile__store" :style="{ '--store-color': storeColor(product.store) }"><i />{{ storeTitle(product.store) }}</span>
               <span class="product-tile__rank">{{ $t((product.priority ?? 0) === 0 ? 'groceries.first-choice' : 'groceries.backup-choice') }}</span>
             </div>
-            <span class="paper-kicker">{{ product.food.name }}</span>
-            <h2 class="product-tile__name">
-              {{ product.name }}
-            </h2>
-            <p v-if="product.packageQuantity" class="product-tile__size">
-              {{ $t('groceries.per-package', { amount: `${product.packageQuantity} ${unitTitle(product.packageUnit)}` }) }}
-            </p>
-            <p v-if="product.notes" class="product-tile__notes">
-              {{ product.notes }}
-            </p>
+            <div class="product-tile__main">
+              <GroceryProductPhoto
+                v-if="product.photo"
+                :src="groceryProductPhoto(product)"
+                :large="groceryProductPhoto(product, 'photo')"
+                :name="product.name"
+                :size="76"
+                zoomable
+              />
+              <div class="product-tile__text">
+                <span class="paper-kicker">{{ product.food.name }}</span>
+                <h2 class="product-tile__name">
+                  {{ product.name }}
+                </h2>
+                <p v-if="product.packageQuantity" class="product-tile__size">
+                  {{ $t('groceries.per-package', { amount: `${product.packageQuantity} ${unitTitle(product.packageUnit)}` }) }}
+                </p>
+                <p v-if="product.notes" class="product-tile__notes">
+                  {{ product.notes }}
+                </p>
+              </div>
+            </div>
             <div class="product-tile__actions">
               <v-btn
                 v-if="product.url"
@@ -160,16 +172,19 @@
 
 <script setup lang="ts">
 import GroceryProductDialog from "~/components/Domain/Grocery/GroceryProductDialog.vue";
+import GroceryProductPhoto from "~/components/Domain/Grocery/GroceryProductPhoto.vue";
 import GroceryRuleDialog from "~/components/Domain/Grocery/GroceryRuleDialog.vue";
 import { useGroceryCatalog } from "~/composables/groceries/use-grocery-catalog";
 import { groceryError, groceryStores, storeTitle, unitTitle } from "~/composables/groceries/grocery-utils";
 import type { GroceryFoodRuleOut, GroceryProductOut } from "~/lib/api/types/grocery";
+import { useStaticRoutes } from "~/composables/api";
 
 definePageMeta({ middleware: ["household-only"] });
 const route = useRoute();
 // On phones the two tabs share the width, so neither label runs off the edge
 const { xs } = useDisplay();
 const { api, products, rules, foods, error, loading, load } = useGroceryCatalog();
+const { groceryProductPhoto } = useStaticRoutes();
 const tab = ref("products");
 const search = ref("");
 const productDialog = ref(false);
@@ -307,6 +322,16 @@ onMounted(async () => {
 
 .product-tile__rank {
   color: rgb(var(--v-theme-ink-muted));
+}
+
+.product-tile__main {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.product-tile__text {
+  min-width: 0;
 }
 
 .product-tile__name {
