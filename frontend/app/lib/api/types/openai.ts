@@ -34,6 +34,10 @@ export interface OpenAIOrganizers {
   cuisines?: string[];
   tools?: string[];
 }
+export interface OpenAIPackagePhotoCheck {
+  brand?: string;
+  same_product?: boolean;
+}
 export interface OpenAIPdfRecipeLocation {
   name: string;
   first_page: number;

@@ -16,6 +16,7 @@ from mealie.services.household_services.grocery_store_pages import (
     ScannedProduct,
     StorePage,
     StorePageFinder,
+    address_names_brand,
     carries_barcode,
     is_product_page,
     page_is_product,
@@ -255,3 +256,71 @@ async def test_a_failed_search_is_none_and_kept_only_briefly(monkeypatch: pytest
     assert await finder().find(GRANOLA.barcode, GroceryStore.aldi) is None
     _, task = store_pages._searches[(GRANOLA.barcode, GroceryStore.aldi)]
     assert store_pages._lifetime(task) == store_pages.FAILED_LIFETIME
+
+
+# =========================================================
+# Photos of renamed products
+
+
+@pytest.mark.parametrize(
+    ("url", "brand", "named"),
+    [
+        ("https://www.walmart.com/ip/Great-Value-Whole-Vitamin-D-Milk-Gallon/10450114", "Great Value", True),
+        ("https://www.cub.com/store/cub/products/2793610-cub-milk-whole-1-gl", "Cub Foods", True),
+        ("https://www.aldi.us/store/aldi/products/62750261-coconut-cacao-super-food-granola", "Millville", False),
+    ],
+)
+def test_some_stores_addresses_name_the_brand(url: str, brand: str, named: bool):
+    assert address_names_brand(url, brand) is named
+
+
+OLD_LISTING = "https://www.aldi.us/store/aldi/products/19696916-simply-nature-coconut-cacao-granola-11-oz"
+
+
+@pytest.fixture
+def photo_checks(monkeypatch: pytest.MonkeyPatch) -> list[str]:
+    """The household's AI looking at store photos: the old listing's still shows the Simply Nature bag"""
+    checked: list[str] = []
+
+    async def photo_shows(group_id, household_id, photo, product):
+        checked.append(photo)
+        return not photo.startswith(OLD_LISTING)
+
+    monkeypatch.setattr(store_pages, "_photo_shows", photo_shows)
+    return checked
+
+
+@pytest.mark.asyncio
+async def test_a_renamed_products_old_photo_is_passed_over_for_one_that_shows_the_brand(web, photo_checks):
+    web.urls = [OLD_LISTING, ALDI_PAGE]
+    web.pages = {
+        OLD_LISTING: product_page(OLD_LISTING, "Millville Coconut Cacao Super Food Granola | ALDI"),
+        ALDI_PAGE: product_page(ALDI_PAGE, "Millville Gluten Free Coconut Cacao Superfood Granola | ALDI"),
+    }
+
+    page = await search_store(uuid4(), uuid4(), GRANOLA.barcode, GroceryStore.aldi)
+
+    assert page == StorePage(url=ALDI_PAGE, photo=f"{ALDI_PAGE}/photo.jpg")
+    assert photo_checks == [f"{OLD_LISTING}/photo.jpg", f"{ALDI_PAGE}/photo.jpg"]
+
+
+@pytest.mark.asyncio
+async def test_the_products_page_is_kept_without_a_photo_of_some_other_package(web, photo_checks):
+    web.urls = [OLD_LISTING]
+    web.pages = {OLD_LISTING: product_page(OLD_LISTING, "Millville Coconut Cacao Super Food Granola | ALDI")}
+
+    page = await search_store(uuid4(), uuid4(), GRANOLA.barcode, GroceryStore.aldi)
+
+    assert page == StorePage(url=OLD_LISTING, photo=None)
+
+
+@pytest.mark.asyncio
+async def test_an_address_that_names_the_brand_needs_no_look_at_the_photo(web, photo_checks, monkeypatch):
+    walmart = "https://www.walmart.com/ip/Millville-Coconut-Cacao-Granola-11-oz/123456"
+    web.urls = [walmart]
+    web.pages = {walmart: product_page(walmart, "Millville Coconut Cacao Granola, 11 oz - Walmart.com")}
+
+    page = await search_store(uuid4(), uuid4(), GRANOLA.barcode, GroceryStore.walmart)
+
+    assert page is not None and page.photo
+    assert photo_checks == []

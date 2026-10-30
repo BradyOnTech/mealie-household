@@ -218,7 +218,7 @@ class GroceryController(BaseCrudController):
         page = await StorePageFinder(self.repos).find(data.barcode, data.store, data.name)
         if page is None:
             return None
-        photo = await self.photos.draft_from_url(page.photo, GroceryPhotoSource.store)
+        photo = await self.photos.draft_from_url(page.photo, GroceryPhotoSource.store) if page.photo else None
         return GroceryStorePage(url=page.url, photo=photo)
 
     @router.delete("/products/{product_id}", response_model=SuccessResponse)

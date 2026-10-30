@@ -11,3 +11,12 @@ class OpenAIStoreProductPages(OpenAIBase):
             "best first, at most three. Empty when it can't be found."
         ),
     )
+
+
+class OpenAIPackagePhotoCheck(OpenAIBase):
+    brand: str = Field(
+        "", description="The brand the package in the photo shows, or empty when it shows no package or brand."
+    )
+    same_product: bool = Field(
+        False, description="Whether the photo shows the scanned product: the same brand and the same product."
+    )

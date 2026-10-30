@@ -15,8 +15,10 @@ looked for twice, and an answer is kept for a while, found or not.
 import asyncio
 import json
 import re
+import tempfile
 import time
 from dataclasses import dataclass, field
+from pathlib import Path
 from urllib.parse import urlsplit
 
 from bs4 import BeautifulSoup
@@ -28,11 +30,18 @@ from mealie.repos.all_repositories import get_repositories
 from mealie.repos.repository_factory import AllRepositories
 from mealie.schema.grocery.grocery import GroceryPhotoSource, GroceryStore, GroceryUnit
 from mealie.schema.group.ai_providers import AITask
-from mealie.schema.openai.grocery_store_page import OpenAIStoreProductPages
-from mealie.services.openai import OpenAIService
+from mealie.schema.openai.grocery_store_page import OpenAIPackagePhotoCheck, OpenAIStoreProductPages
+from mealie.services.openai import OpenAILocalImage, OpenAIService
 
 from .grocery_barcodes import look_up_barcode
-from .grocery_product_links import PackageSize, name_similarity, name_words, package_size, store_for_url
+from .grocery_product_links import (
+    PackageSize,
+    name_similarity,
+    name_words,
+    package_size,
+    product_text,
+    store_for_url,
+)
 from .grocery_product_photos import (
     RANK,
     GroceryProductPhotos,
@@ -48,6 +57,7 @@ TASK = AITask.ingredient_parsing
 """Finding a product is the same kind of request as reading one, so it runs on the same provider and model"""
 
 AI_SEARCH_TIMEOUT = 90
+PHOTO_CHECK_TIMEOUT = 60
 MAX_CANDIDATES = 3
 FOUND_LIFETIME = 24 * 3600
 NOT_FOUND_LIFETIME = 6 * 3600
@@ -103,7 +113,8 @@ class ScannedProduct:
 @dataclass
 class StorePage:
     url: str
-    photo: str
+    photo: str | None
+    """The store's photo of the product, unless it shows another package (see `_photo_shows`)"""
 
 
 class SearchFailedError(Exception):
@@ -142,6 +153,11 @@ def page_product_name(html: str) -> str:
     content = meta.get("content") if meta else None
     title = content if isinstance(content, str) else soup.title.get_text() if soup.title else ""
     return _TITLE_NOISE.sub("", title.split("|")[0]).strip()
+
+
+def address_names_brand(url: str, brand: str) -> bool:
+    """Whether a page's address names the brand, as Walmart's and Cub's do and Aldi's don't"""
+    return bool(name_words(brand) & name_words(product_text(url)))
 
 
 def carries_barcode(html: str, barcode: str) -> bool:
@@ -237,6 +253,41 @@ async def _ask_ai(group_id: UUID4, household_id: UUID4, store: GroceryStore, pro
     return [url.strip() for url in (response.urls if response else [])][:MAX_CANDIDATES]
 
 
+async def _photo_shows(group_id: UUID4, household_id: UUID4, photo: str, product: ScannedProduct) -> bool:
+    """
+    Whether a store's photo shows the scanned product's package, as the household's AI reads it. Stores keep
+    a product's old photo when they rename it: Aldi's coconut cacao granola is sold as Millville, and its older
+    page, renamed to match, still shows the bag from when it was Simply Nature. A photo that can't be checked is
+    taken on trust, since its page has been checked already.
+    """
+
+    image = await download_image(photo)
+    if image is None:
+        return False
+    with session_context() as session:
+        ai = OpenAIService(get_repositories(session, group_id=group_id, household_id=household_id))
+        if not ai.can_read_images(TASK):
+            return True
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "photo"
+            path.write_bytes(image)
+            try:
+                check = await asyncio.wait_for(
+                    ai.get_response(
+                        ai.get_prompt("household.check-store-photo"),
+                        f"Scanned product: {product.names[0]}\nBrand: {product.brand}",
+                        response_schema=OpenAIPackagePhotoCheck,
+                        attachments=[OpenAILocalImage(filename="photo", path=path)],
+                        task=TASK,
+                    ),
+                    timeout=PHOTO_CHECK_TIMEOUT,
+                )
+            except Exception:
+                logger.warning("Couldn't check a store's photo against the scanned product")
+                return True
+    return bool(check and check.same_product)
+
+
 async def search_store(
     group_id: UUID4, household_id: UUID4, barcode: str, store: GroceryStore, name: str = ""
 ) -> StorePage | None:
@@ -252,14 +303,26 @@ async def search_store(
     if not product.names:
         return None
 
+    # the product's page with a photo of some other package, if that's all there is
+    without_photo: StorePage | None = None
     for url in await _ask_ai(group_id, household_id, store, product):
         if not is_product_page(url, store):
             continue
         page: ProductPage | None = await fetch_product_page(url)
-        if page and is_product_page(page.url, store) and await asyncio.to_thread(page_is_product, page.html, product):
+        if not (
+            page and is_product_page(page.url, store) and await asyncio.to_thread(page_is_product, page.html, product)
+        ):
+            logger.debug("The AI named a store page that isn't the scanned product's")
+            continue
+        # an address that names the brand is the brand's page; one that doesn't may be an old one, renamed
+        if (
+            not product.brand
+            or address_names_brand(page.url, product.brand)
+            or await _photo_shows(group_id, household_id, page.photo, product)
+        ):
             return StorePage(url=page.url, photo=page.photo)
-        logger.debug("The AI named a store page that isn't the scanned product's")
-    return None
+        without_photo = without_photo or StorePage(url=page.url, photo=None)
+    return without_photo
 
 
 _searches: dict[tuple[str, GroceryStore], tuple[float, asyncio.Task[StorePage | None]]] = {}
@@ -339,7 +402,7 @@ async def fill_in_from_store(group_id: UUID4, household_id: UUID4, product_id: U
                 return
             product = repos.grocery_products.patch(product_id, {"url": page.url})
             current = RANK[product.photo_source] if product.photo_source else 0
-            if RANK[GroceryPhotoSource.store] <= current:
+            if page.photo is None or RANK[GroceryPhotoSource.store] <= current:
                 return
             image = await download_image(page.photo)
             if image:

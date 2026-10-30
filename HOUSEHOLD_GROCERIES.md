@@ -149,9 +149,13 @@ gets the best photo there is, as soon as its link is pasted or its package scann
 A scanned product is also looked for at its store, so it gets the store's link and photo without
 anyone pasting one. Stores don't answer a server's searches (Walmart's search shows robots a check, and
 the others build their results in the browser), so the household's AI searches the web for the product's
-page, with Codex's own search; this needs the ChatGPT provider. Each page it names is opened and checked
+page, with Codex's own search; this needs the ChatGPT provider, and Codex's `codex-code-mode-host`
+installed beside `codex` (the Docker image has both), without which Codex offers the model no tools. Each page it names is opened and checked
 first: it has to carry the scanned barcode, as Walmart's and Cub's do, or name the same brand, product and
-size. The form shows "Looking for it at Walmart…" and fills in the link and photo when it's found, about
+size. Where a store's address doesn't name the brand, as Aldi's don't, the AI also looks at the photo:
+stores keep a renamed product's old photo (Aldi's Millville granola still has a page showing the bag from
+when it was Simply Nature), so a photo of another brand's package is passed over, for a better page or
+for none. The form shows "Looking for it at Walmart…" and fills in the link and photo when it's found, about
 10 to 20 seconds after the scan. A product saved before then, or saved from the Out of list, is filled in
 by the server afterwards; searches for the same product are shared, and kept for a day. A link someone
 gave or took off, and a photo someone chose, are never replaced.
