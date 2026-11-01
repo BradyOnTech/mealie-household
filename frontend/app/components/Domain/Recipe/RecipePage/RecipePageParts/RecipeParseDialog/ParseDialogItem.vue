@@ -178,7 +178,45 @@
 
       <!-- Questions: what the user needs to decide, one block each -->
       <div
-        v-if="unitUnresolved(item)"
+        v-if="item.splitSuggestion"
+        class="parse-item__question"
+      >
+        <div class="font-weight-bold">
+          {{ $t("recipe.parser.split-question", { count: item.splitSuggestion.parts.length }) }}
+        </div>
+        <p class="text-body-2 my-1">
+          {{ amountText
+            ? $t("recipe.parser.split-question-help-amount", { count: item.splitSuggestion.parts.length, amount: amountText })
+            : $t("recipe.parser.split-question-help", { count: item.splitSuggestion.parts.length }) }}
+        </p>
+        <div class="d-flex flex-wrap ga-1 mb-2">
+          <v-chip
+            v-for="part in item.splitSuggestion.parts"
+            :key="part"
+            size="small"
+            variant="outlined"
+          >
+            {{ part }}
+          </v-chip>
+        </div>
+        <div class="d-flex flex-wrap ga-2">
+          <v-btn
+            color="warning"
+            variant="flat"
+            size="small"
+            :prepend-icon="$globals.icons.check"
+            @click="splitLine(item)"
+          >
+            {{ $t("recipe.parser.split-lines", { count: item.splitSuggestion.parts.length }) }}
+          </v-btn>
+          <v-btn variant="outlined" size="small" @click="keepAsOneLine(item)">
+            {{ $t("recipe.parser.keep-one-line") }}
+          </v-btn>
+        </div>
+      </div>
+
+      <div
+        v-if="!item.splitSuggestion && unitUnresolved(item)"
         class="parse-item__question"
       >
         <div class="font-weight-bold">
@@ -209,7 +247,7 @@
       </div>
 
       <div
-        v-if="foodUnresolved(item)"
+        v-if="!item.splitSuggestion && foodUnresolved(item)"
         class="parse-item__question"
       >
         <div class="font-weight-bold">
@@ -240,7 +278,7 @@
       </div>
 
       <div
-        v-if="!unitUnresolved(item) && !foodUnresolved(item) && isUnsure(item) && !editing"
+        v-if="!item.splitSuggestion && !unitUnresolved(item) && !foodUnresolved(item) && isUnsure(item) && !editing"
         class="parse-item__question"
       >
         <div class="font-weight-bold">
@@ -295,6 +333,8 @@ const {
   canRemember,
   preview,
   confirm,
+  splitLine,
+  keepAsOneLine,
   keepAsNote,
   addUnmatched,
   rememberAsAlias,
@@ -325,6 +365,15 @@ const { locale } = useI18n();
 function formatQuantity(quantity: number) {
   return quantity.toLocaleString(locale.value, { maximumFractionDigits: 3 });
 }
+
+/** "1 teaspoon": the amount each line gets when a list is split */
+const amountText = computed(() => {
+  const { quantity, unit } = props.item.ingredient;
+  if (!quantity) {
+    return "";
+  }
+  return [formatQuantity(quantity), unit?.name || props.item.unmatchedUnit].filter(Boolean).join(" ");
+});
 </script>
 
 <style scoped>

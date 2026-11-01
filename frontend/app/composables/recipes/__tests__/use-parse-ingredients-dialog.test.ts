@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, test, vi } from "vitest";
 import type { NoUndefinedField } from "~/lib/api/types/non-generated";
 import type { ParsedIngredient, RecipeIngredient } from "~/lib/api/types/recipe";
 import { uuid4 } from "../../use-utils";
-import { ParseStep, useParseIngredientsDialog } from "../use-parse-ingredients-dialog";
+import { ParseStep, suggestSplit, useParseIngredientsDialog } from "../use-parse-ingredients-dialog";
 import type { Parser } from "~/lib/api/user/recipes/recipe";
 import { i18n } from "~/tests/setup";
 
@@ -59,8 +59,11 @@ const createFood = vi.fn();
 const updateFood = vi.fn();
 const createUnit = vi.fn();
 const updateUnit = vi.fn();
-const foodStore = { actions: { createOne: createFood, updateOne: updateFood } };
-const unitStore = { actions: { createOne: createUnit, updateOne: updateUnit } };
+const savedFoods = ["salt", "paprika", "garlic powder", "onion powder", "oregano", "thyme", "garlic", "pepper", "cheese"]
+  .map(name => ({ id: `f-${name}`, name, pluralName: null, aliases: [] }));
+const savedUnits = [{ id: "unit-teaspoon", name: "teaspoon", pluralName: "teaspoons", abbreviation: "tsp", aliases: [] }];
+const foodStore = { store: ref(savedFoods), actions: { createOne: createFood, updateOne: updateFood, refresh: vi.fn() } };
+const unitStore = { store: ref(savedUnits), actions: { createOne: createUnit, updateOne: updateUnit, refresh: vi.fn() } };
 
 vi.mock("~/composables/store", async (importOriginal) => {
   const original: object = await importOriginal();
@@ -291,6 +294,106 @@ describe("useParseIngredientsDialog", () => {
       const wrapped = await parsedWrapper([butterBeans(), parsed("2 cups flour", { quantity: 2 })]);
       wrapped.vm.remove(wrapped.vm.items[0]!);
       expect(wrapped.vm.items.map(i => i.input)).toEqual(["2 cups flour"]);
+    });
+  });
+
+  describe("matching words the reader didn't", () => {
+    test("drops a leading \"of\" and matches a saved food", async () => {
+      const wrapped = await parsedWrapper([parsed("1 tsp of salt", {
+        quantity: 1,
+        food: { id: "", name: "of salt" } as RecipeIngredient["food"],
+      })]);
+      const item = wrapped.vm.items[0]!;
+      expect(item.ingredient.food?.id).toBe("f-salt");
+      expect(item.unmatchedFood).toBe("");
+    });
+
+    test("keeps the words without the \"of\" when there's no saved food", async () => {
+      const wrapped = await parsedWrapper([parsed("1 tsp of sumac", {
+        food: { id: "", name: "of sumac" } as RecipeIngredient["food"],
+      })]);
+      expect(wrapped.vm.items[0]!.unmatchedFood).toBe("sumac");
+    });
+
+    test("matches a unit by its abbreviation", async () => {
+      const wrapped = await parsedWrapper([parsed("1 tsp salt", {
+        unit: { id: "", name: "tsp" } as RecipeIngredient["unit"],
+      })]);
+      expect(wrapped.vm.items[0]!.ingredient.unit?.id).toBe("unit-teaspoon");
+    });
+  });
+
+  describe("suggestSplit", () => {
+    const isUnit = (w: string) => ["tsp", "tsp.", "teaspoon", "cup", "cups"].includes(w.toLowerCase());
+    const isFood = (w: string) => savedFoods.some(f => f.name === w.toLowerCase());
+
+    test("splits a list of saved foods under one amount", () => {
+      expect(suggestSplit("1 tsp of salt, paprika, garlic powder, onion powder, oregano, thyme", isUnit, isFood)).toEqual({
+        parts: ["salt", "paprika", "garlic powder", "onion powder", "oregano", "thyme"],
+        note: "",
+      });
+    });
+
+    test("handles \"and\", \"each\" and a trailing qualifier", () => {
+      expect(suggestSplit("½ tsp each salt, pepper and thyme, to taste", isUnit, isFood)).toEqual({
+        parts: ["salt", "pepper", "thyme"],
+        note: "to taste",
+      });
+    });
+
+    test.each([
+      ["a preparation note", "2 cloves garlic, minced"],
+      ["alternatives", "1 tsp salt or pepper"],
+      ["a dish name", "1 cup mac and cheese"],
+      ["a single food", "1 tsp salt"],
+      ["long phrases", "1 cup salt, freshly ground black pepper from the mill"],
+    ])("leaves %s alone", (_, input) => {
+      expect(suggestSplit(input, isUnit, isFood)).toBeNull();
+    });
+  });
+
+  describe("splitting a line", () => {
+    const listLine = () => parsed("1 tsp of salt, paprika, sumac", {
+      quantity: 1,
+      unit: { id: "unit-teaspoon", name: "teaspoon" } as RecipeIngredient["unit"],
+      food: { id: "", name: "of salt" } as RecipeIngredient["food"],
+      note: "paprika, sumac",
+    });
+
+    test("is suggested, and counts as needing input", async () => {
+      const wrapped = await parsedWrapper([listLine()]);
+      const item = wrapped.vm.items[0]!;
+      expect(item.splitSuggestion?.parts).toEqual(["salt", "paprika", "sumac"]);
+      expect(wrapped.vm.needsInput(item)).toBe(true);
+    });
+
+    test("makes one line per food with the same amount", async () => {
+      const ingredients = [{ note: "1 tsp of salt, paprika, sumac", referenceId: "ref-spices", title: "Rub" }] as NoUndefinedField<RecipeIngredient>[];
+      const wrapped = await parsedWrapper([listLine()], ingredients);
+      wrapped.vm.splitLine(wrapped.vm.items[0]!);
+
+      const { items } = wrapped.vm;
+      expect(items).toHaveLength(3);
+      expect(items.map(i => i.ingredient.quantity)).toEqual([1, 1, 1]);
+      expect(items.map(i => i.ingredient.unit?.id)).toEqual(["unit-teaspoon", "unit-teaspoon", "unit-teaspoon"]);
+      expect(items.map(i => i.ingredient.food?.id)).toEqual(["f-salt", "f-paprika", undefined]);
+      expect(items.map(i => i.ingredient.note)).toEqual(["", "", ""]);
+      // The first line keeps the original's place; the rest are new
+      expect(items[0]!.ingredient.referenceId).toBe("ref-spices");
+      expect(items[0]!.ingredient.title).toBe("Rub");
+      expect(items[1]!.ingredient.referenceId).not.toBe("ref-spices");
+      expect(items[1]!.ingredient.title).toBe("");
+      // The unknown one still asks about its food
+      expect(items[2]!.unmatchedFood).toBe("sumac");
+      expect(wrapped.vm.needsInputCount).toBe(1);
+    });
+
+    test("keeping it as one line clears the question", async () => {
+      const wrapped = await parsedWrapper([listLine()]);
+      const item = wrapped.vm.items[0]!;
+      wrapped.vm.keepAsOneLine(item);
+      expect(item.splitSuggestion).toBeNull();
+      expect(wrapped.vm.items).toHaveLength(1);
     });
   });
 

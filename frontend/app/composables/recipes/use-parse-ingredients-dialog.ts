@@ -34,6 +34,94 @@ export interface ParseReviewItem {
   unmatchedFood: string;
   /** The user said the split looks right */
   confirmed: boolean;
+  /** The line seems to list several foods ("1 tsp salt, paprika, thyme"); null once answered */
+  splitSuggestion: SplitSuggestion | null;
+}
+
+export interface SplitSuggestion {
+  /** One entry per food, in the order written */
+  parts: string[];
+  /** A trailing qualifier that applies to every part, like "to taste" */
+  note: string;
+}
+
+type Matchable = { name: string; pluralName?: string | null; aliases?: { name: string }[] };
+type MatchableUnit = Matchable & { abbreviation?: string; pluralAbbreviation?: string | null };
+
+/** Lowercase, collapse spaces, drop surrounding punctuation */
+function normalizeWords(text: string) {
+  return text.toLowerCase().replace(/\s+/g, " ").replace(/^[\s.,;:]+|[\s.,;:]+$/g, "");
+}
+
+/** The parser often keeps the "of" in "1 tsp of salt" as part of the food */
+function stripLeadingOf(text: string) {
+  return text.replace(/^\s*(of\s+(the\s+)?)+/i, "").trim();
+}
+
+function namesOf(item: MatchableUnit): string[] {
+  return [
+    item.name,
+    item.pluralName,
+    item.abbreviation,
+    item.pluralAbbreviation,
+    ...(item.aliases || []).map(a => a.name),
+  ].filter((n): n is string => !!n).map(normalizeWords);
+}
+
+function findByName<T extends MatchableUnit>(list: T[], words: string): T | undefined {
+  const target = normalizeWords(words);
+  if (!target) {
+    return undefined;
+  }
+  return list.find(item => namesOf(item).includes(target));
+}
+
+const LEADING_AMOUNT = /^\s*[\d½¼¾⅓⅔⅛⅜⅝⅞]+(?:[\s./-]+[\d½¼¾⅓⅔⅛⅜⅝⅞]+)*\s*/;
+const TRAILING_QUALIFIER = /\s*,?\s*\b(to taste|as needed|for garnish|for serving|optional)\.?\s*$/i;
+
+/**
+ * Spot a line that lists several foods under one amount, like
+ * "1 tsp of salt, paprika, garlic powder, oregano". Only suggests it when most of the listed
+ * words are foods the household already has, so "garlic, minced" or "mac and cheese" stay whole.
+ */
+export function suggestSplit(
+  input: string,
+  isUnit: (word: string) => boolean,
+  isFood: (words: string) => boolean,
+): SplitSuggestion | null {
+  let text = input.replace(/\([^)]*\)/g, " ").replace(/\s+/g, " ").trim();
+  if (/\bor\b/i.test(text)) {
+    // "butter beans or any other bean" offers alternatives, not separate ingredients
+    return null;
+  }
+
+  text = text.replace(LEADING_AMOUNT, "");
+  const firstWord = text.split(" ")[0] || "";
+  if (firstWord && isUnit(firstWord)) {
+    text = text.slice(firstWord.length);
+  }
+  text = text.replace(/^\s*(each\s+)?(of\s+)?(each\s+)?/i, "");
+
+  let note = "";
+  const qualifier = text.match(TRAILING_QUALIFIER);
+  if (qualifier) {
+    note = qualifier[1]!.toLowerCase();
+    text = text.slice(0, qualifier.index);
+  }
+
+  const parts = text
+    .split(/\s*,\s*|\s+(?:and|&)\s+/i)
+    .map(part => part.replace(/^(and|&)\s+/i, "").replace(/\s+each$/i, "").trim())
+    .filter(Boolean);
+  if (parts.length < 2 || parts.some(part => part.split(" ").length > 3)) {
+    return null;
+  }
+
+  const known = parts.filter(isFood).length;
+  if (known < 2 || known < Math.ceil(parts.length * 0.6)) {
+    return null;
+  }
+  return { parts, note };
 }
 
 export type ReviewField = "unit" | "food";
@@ -49,8 +137,10 @@ export function useParseIngredientsDialog(
   const api = useUserApi();
 
   const unitStore = useUnitStore();
+  const findUnit = (words: string) => findByName(unitStore.store.value, words);
   const unitData = useUnitData();
   const foodStore = useFoodStore();
+  const findFood = (words: string) => findByName(foodStore.store.value, words);
   const foodData = useFoodData();
 
   // The natural language parser is trained on English recipes, so it isn't a sensible default for
@@ -111,7 +201,7 @@ export function useParseIngredientsDialog(
   }
 
   function needsInput(item: ParseReviewItem) {
-    return unitUnresolved(item) || foodUnresolved(item) || isUnsure(item);
+    return !!item.splitSuggestion || unitUnresolved(item) || foodUnresolved(item) || isUnsure(item);
   }
 
   /** An existing unit/food was picked for words the reader found, so offer to remember them as another name */
@@ -159,27 +249,90 @@ export function useParseIngredientsDialog(
     let unmatchedUnit = "";
     let unmatchedFood = "";
 
+    // The reader only matches exact names; also try plurals, abbreviations and other names,
+    // and drop the "of" it sometimes keeps ("1 tsp of salt" -> "of salt")
     const unit = ingredient.unit;
     if (unit && !unit.id && unit.name) {
-      unmatchedUnit = unit.name;
-      ingredient.unit = undefined;
+      const existing = findUnit(unit.name);
+      if (existing) {
+        ingredient.unit = existing;
+      }
+      else {
+        unmatchedUnit = unit.name;
+        ingredient.unit = undefined;
+      }
     }
 
     const food = ingredient.food;
     if (food && !food.id && food.name) {
-      unmatchedFood = food.name;
-      ingredient.food = undefined;
+      const words = stripLeadingOf(food.name) || food.name;
+      const existing = findFood(words);
+      if (existing) {
+        ingredient.food = existing;
+      }
+      else {
+        unmatchedFood = words;
+        ingredient.food = undefined;
+      }
     }
+
+    const input = parsed.input || "";
+    const splitSuggestion = ingredient.referencedRecipe
+      ? null
+      : suggestSplit(
+          input,
+          word => !!findUnit(word) || normalizeWords(word) === normalizeWords(unmatchedUnit),
+          words => !!findFood(words),
+        );
 
     return {
       key: uuid4(),
-      input: parsed.input || "",
+      input,
       ingredient,
       confidence: parsed.confidence?.average ?? undefined,
       unmatchedUnit,
       unmatchedFood,
       confirmed: false,
+      splitSuggestion,
     };
+  }
+
+  /** Replace a line listing several foods with one line per food, each with the same amount */
+  function splitLine(item: ParseReviewItem) {
+    const suggestion = item.splitSuggestion;
+    const index = items.value.findIndex(i => i.key === item.key);
+    if (!suggestion || index < 0) {
+      return;
+    }
+
+    const { display: _display, ...base } = item.ingredient;
+    const lines = suggestion.parts.map((part, i): ParseReviewItem => {
+      const food = findFood(part);
+      return {
+        key: uuid4(),
+        input: item.input,
+        ingredient: {
+          ...base,
+          food: food ?? undefined,
+          note: suggestion.note,
+          substitutions: [],
+          // The first line takes the original's place: its section heading and the id
+          // instruction steps link to
+          title: i === 0 ? base.title : "",
+          referenceId: i === 0 ? base.referenceId : uuid4(),
+        },
+        confidence: 1,
+        unmatchedUnit: item.unmatchedUnit,
+        unmatchedFood: food ? "" : part,
+        confirmed: true,
+        splitSuggestion: null,
+      };
+    });
+    items.value.splice(index, 1, ...lines);
+  }
+
+  function keepAsOneLine(item: ParseReviewItem) {
+    item.splitSuggestion = null;
   }
 
   /** Choosing a reader and re-reading can both ask at once; only one request runs */
@@ -204,6 +357,12 @@ export function useParseIngredientsDialog(
     state.step = ParseStep.LOADING;
     parseInFlight = true;
     try {
+      // Matching words to saved units and foods needs both lists
+      await Promise.all([
+        unitStore.store.value.length ? null : unitStore.actions.refresh(),
+        foodStore.store.value.length ? null : foodStore.actions.refresh(),
+      ]);
+
       const toParse = ingredients.filter(ing => !ing.referencedRecipe);
       const { data, error } = await api.recipes.parseIngredients(parser.value, toParse.map(ing => ingredientToParserString(ing)));
       if (error || !data) {
@@ -231,7 +390,7 @@ export function useParseIngredientsDialog(
         if (parsed) {
           return toItem(parsed);
         }
-        return toItem({ input: original.note || "", confidence: {}, ingredient: original });
+        return toItem({ input: original.note || "", confidence: {}, ingredient: { ...original } });
       });
       state.step = ParseStep.REVIEW;
     }
@@ -422,6 +581,8 @@ export function useParseIngredientsDialog(
     preview,
     parseIngredients,
     confirm,
+    splitLine,
+    keepAsOneLine,
     keepAsNote,
     addUnmatched,
     rememberAsAlias,
