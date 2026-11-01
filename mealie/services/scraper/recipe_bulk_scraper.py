@@ -5,6 +5,7 @@ from pydantic import UUID4
 
 from mealie.core import exceptions
 from mealie.lang.providers import Translator
+from mealie.repos.all_repositories import get_repositories
 from mealie.repos.repository_factory import AllRepositories
 from mealie.schema.recipe.recipe import CreateRecipeBulk, CreateRecipeByUrlBulk
 from mealie.schema.reports.reports import (
@@ -20,6 +21,7 @@ from mealie.services.openai import OpenAINotEnabledException
 from mealie.services.recipe.ai_recipe_service import AIProviderNotEnabledError
 from mealie.services.recipe.import_workflow.exceptions import NoRecipeDataError
 from mealie.services.recipe.recipe_service import RecipeService
+from mealie.services.recipe.recipe_source_matching import RecipeSourceService, source_key
 from mealie.services.scraper.scraper import ParserErrors, create_from_html
 
 
@@ -89,9 +91,29 @@ class RecipeBulkScraperService(BaseService):
         assert self.report is not None
 
         sem = asyncio.Semaphore(3)
+        # Recipes from anyone in the group count, the same as on the import page
+        sources = RecipeSourceService(
+            get_repositories(self.repos.session, group_id=self.group.id, household_id=None).recipes
+        )
+        seen: set[str] = set()
 
         async def _do(bulk_url: CreateRecipeBulk) -> bool:
             url = bulk_url.url
+
+            # Skip links already saved, and a link listed twice in one batch. Both count as done:
+            # nothing went wrong, and the report says why nothing was imported.
+            key = source_key(url)
+            if key and key in seen:
+                self._add_entry(self.translator.t("recipe.bulk-import.listed-twice", url=url), success=True)
+                return True
+            if key:
+                seen.add(key)
+            if match := sources.find(url):
+                self._add_entry(
+                    self.translator.t("recipe.bulk-import.already-saved", url=url, name=match.name), success=True
+                )
+                return True
+
             async with sem:
                 try:
                     recipe, _ = await create_from_html(

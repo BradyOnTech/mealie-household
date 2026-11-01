@@ -97,6 +97,7 @@ from .recipe_scraper import (
 )
 from .recipe_settings import RecipeSettings
 from .recipe_share_token import RecipeShareToken, RecipeShareTokenCreate, RecipeShareTokenSave, RecipeShareTokenSummary
+from .recipe_source_match import RecipeSourceMatch, RecipeSourceQuery
 from .recipe_step import IngredientReferences, NoteReference, RecipeStep
 from .recipe_suggestion import (
     RecipeSuggestionQuery,
@@ -141,6 +142,8 @@ __all__ = [
     "CookbookImportCreate",
     "CookbookImportOut",
     "CookbookImportRecipe",
+    "RecipeSourceMatch",
+    "RecipeSourceQuery",
     "RecipeNote",
     "CategoryBase",
     "CategoryIn",

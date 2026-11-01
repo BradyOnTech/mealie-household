@@ -19,6 +19,8 @@ class ScrapeRecipeBase(MealieModel):
 
 class ScrapeRecipe(ScrapeRecipeBase):
     url: str
+    allow_duplicate: bool = False
+    """Import the link even if a saved recipe already came from it"""
     model_config = ConfigDict(
         json_schema_extra={
             "example": {

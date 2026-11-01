@@ -326,6 +326,12 @@
     "import-count": "Import {count} recipes",
     "import-cookbook": "Import cookbook",
     "already-saved": "You already have this one:",
+    "duplicate-title": "You already have this recipe",
+    "duplicate-saved-on": "saved {date}",
+    "open-recipe": "Open recipe",
+    "import-another-copy": "Import another copy",
+    "already-saved-button": "Already saved",
+    "links-already-saved": "{count} of these links is already in your recipes, so it will be skipped. | {count} of these links are already in your recipes, so they'll be skipped.",
     "set-up-ai": "Set one up",
     "choose-file": "Choose the file",
     "needs-ai": {

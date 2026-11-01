@@ -77,14 +77,39 @@
           <button v-if="hint.action" type="button" class="recipe-import__hint-action" @click="hint.action.run">{{ hint.action.label }}</button>
         </span>
       </p>
-      <p v-if="duplicate" class="recipe-import__hint recipe-import__hint--duplicate">
+      <p v-if="savedLinks.length" class="recipe-import__hint">
         <v-icon size="18" class="recipe-import__hint-icon" :icon="$globals.icons.duplicate" />
-        <span>
-          {{ $t("recipe-import.already-saved") }}
-          <NuxtLink :to="`/g/${groupSlug}/r/${duplicate.slug}`" class="paper-link">{{ duplicate.name }}</NuxtLink>
-        </span>
+        <span>{{ $t("recipe-import.links-already-saved", savedLinks.length) }}</span>
       </p>
     </div>
+
+    <section v-if="duplicate && !running" class="recipe-import__duplicate" role="status">
+      <v-icon class="recipe-import__duplicate-icon" size="22" :icon="$globals.icons.duplicate" />
+      <div class="recipe-import__duplicate-body">
+        <h2 class="recipe-import__duplicate-title">
+          {{ $t("recipe-import.duplicate-title") }}
+        </h2>
+        <p class="recipe-import__duplicate-text">
+          <NuxtLink :to="`/g/${groupSlug}/r/${duplicate.slug}`" class="paper-link">{{ duplicate.name }}</NuxtLink>
+          <template v-if="duplicateSavedOn">
+            · {{ $t("recipe-import.duplicate-saved-on", { date: duplicateSavedOn }) }}
+          </template>
+        </p>
+        <div class="recipe-import__failure-actions">
+          <v-btn
+            variant="flat"
+            color="primary"
+            :prepend-icon="$globals.icons.openInNew"
+            :to="`/g/${groupSlug}/r/${duplicate.slug}`"
+          >
+            {{ $t("recipe-import.open-recipe") }}
+          </v-btn>
+          <v-btn variant="outlined" :prepend-icon="$globals.icons.contentCopy" @click="importAnotherCopy">
+            {{ $t("recipe-import.import-another-copy") }}
+          </v-btn>
+        </div>
+      </div>
+    </section>
 
     <section v-if="failure && !running" class="recipe-import__failure" role="alert">
       <h2 class="recipe-import__failure-title">
@@ -161,8 +186,6 @@ import { useGroupSelf } from "~/composables/use-groups";
 import { useNewRecipeOptions } from "~/composables/use-new-recipe-options";
 import {
   IMPORT_FILE_TYPES,
-  linkKey,
-  linkSearchTerm,
   linkSource,
   planImport,
   progressStep,
@@ -170,6 +193,7 @@ import {
   type ImportPlan,
 } from "~/composables/use-recipe-import";
 import { alert } from "~/composables/use-toast";
+import type { RecipeSourceMatch } from "~/lib/api/types/recipe";
 import type { ReportOut } from "~/lib/api/types/reports";
 
 definePageMeta({
@@ -279,13 +303,17 @@ const submitLabel = computed(() => {
     case "cookbook":
       return i18n.t("recipe-import.import-cookbook");
     default:
-      return duplicate.value ? i18n.t("recipe-import.import-again") : i18n.t("recipe-import.import");
+      return duplicate.value ? i18n.t("recipe-import.already-saved-button") : i18n.t("recipe-import.import");
   }
 });
 
 const canSubmit = computed(() => {
   const current = plan.value;
   if (current.kind === "empty" || current.blocker || running.value) {
+    return false;
+  }
+  if (current.kind === "link" && duplicate.value) {
+    // the card below asks what to do: open the saved one, or import another copy
     return false;
   }
   return current.kind !== "cookbook" || !!cookbookName.value.trim();
@@ -370,35 +398,60 @@ function onRejected(rejected: File[]) {
 // =========================================================
 // A link that's been imported before
 
-interface SavedRecipe {
-  name: string;
-  slug: string;
+const duplicate = ref<RecipeSourceMatch | null>(null);
+/** The link the duplicate check last finished for, so submitting knows whether to check first */
+const checkedUrl = ref<string | null>(null);
+/** Of several pasted links, the ones already saved, which the import will skip */
+const savedLinks = ref<RecipeSourceMatch[]>([]);
+
+const duplicateSavedOn = computed(() => {
+  const created = duplicate.value?.createdAt;
+  return created ? new Date(created).toLocaleDateString(i18n.locale.value, { dateStyle: "medium" }) : "";
+});
+
+/** Looks the link up among saved recipes, and shows the match if the box still has that link */
+async function checkDuplicate(url: string): Promise<RecipeSourceMatch | null> {
+  const { data } = await api.recipes.findBySource([url]);
+  const match = data?.[0] ?? null;
+  // the box may have moved on while this was looking
+  if (plan.value.kind === "link" && plan.value.url === url) {
+    duplicate.value = match;
+    checkedUrl.value = url;
+  }
+  return match;
 }
 
-const duplicate = ref<SavedRecipe | null>(null);
+const checkDuplicateSoon = useDebounceFn(checkDuplicate, 350);
 
-const findDuplicate = useDebounceFn(async (url: string) => {
-  const term = linkSearchTerm(url);
-  const key = linkKey(url);
-  if (!term || !key) {
-    return;
+const checkSavedLinks = useDebounceFn(async (urls: string[]) => {
+  const { data } = await api.recipes.findBySource(urls);
+  if (plan.value.kind === "links" && plan.value.urls.join("\n") === urls.join("\n")) {
+    savedLinks.value = data ?? [];
   }
-
-  const { data } = await api.recipes.getAll(1, 10, { queryFilter: `orgURL LIKE "%${term}%"` });
-  // the box may have moved on while this was looking
-  if (plan.value.url !== url) {
-    return;
-  }
-  const match = data?.items.find(recipe => recipe.orgURL && linkKey(recipe.orgURL) === key);
-  duplicate.value = match?.slug ? { name: match.name || match.slug, slug: match.slug } : null;
 }, 350);
 
 watch(() => (plan.value.kind === "link" ? plan.value.url : null), (url) => {
   duplicate.value = null;
+  checkedUrl.value = null;
   if (url) {
-    findDuplicate(url);
+    checkDuplicateSoon(url);
   }
 });
+
+watch(() => (plan.value.kind === "links" ? plan.value.urls.join("\n") : ""), () => {
+  savedLinks.value = [];
+  if (plan.value.kind === "links") {
+    checkSavedLinks(plan.value.urls);
+  }
+});
+
+function importAnotherCopy() {
+  const current = plan.value;
+  if (current.kind === "link") {
+    duplicate.value = null;
+    runSingle(current, { allowDuplicate: true });
+  }
+}
 
 // =========================================================
 // Other ways in
@@ -566,8 +619,17 @@ async function start() {
 }
 
 /** Imports one recipe, following its progress, then opens it */
-async function runSingle(current: ImportPlan) {
+async function runSingle(current: ImportPlan, { allowDuplicate = false } = {}) {
   failure.value = null;
+
+  // The check that runs as a link is pasted may not have finished, so make sure before importing
+  if (current.kind === "link" && !allowDuplicate) {
+    const match = checkedUrl.value === current.url ? duplicate.value : await checkDuplicate(current.url!);
+    if (match) {
+      return;
+    }
+  }
+
   running.value = true;
   runningPlan.value = current;
   startedAt.value = Date.now();
@@ -584,7 +646,7 @@ async function runSingle(current: ImportPlan) {
   let message: string | null | undefined;
 
   if (current.kind === "link") {
-    const { data, error } = await api.recipes.createOneByUrl(current.url!, options, onProgress);
+    const { data, error } = await api.recipes.createOneByUrl(current.url!, { ...options, allowDuplicate }, onProgress);
     slug = data;
     message = error?.message;
   }
@@ -627,6 +689,11 @@ async function runSingle(current: ImportPlan) {
   }
 
   if (!slug) {
+    // Saved in the meantime (another device, a second tap): the server refused it, so show the
+    // saved recipe instead of an error
+    if (current.kind === "link" && !allowDuplicate && await checkDuplicate(current.url!)) {
+      return;
+    }
     failure.value = {
       title: i18n.t("recipe-import.error.title"),
       message: failureMessage(current, message),
@@ -793,8 +860,34 @@ onMounted(() => {
   color: rgb(var(--v-theme-warning));
 }
 
-.recipe-import__hint--duplicate {
-  color: rgb(var(--v-theme-on-background));
+.recipe-import__duplicate {
+  display: flex;
+  gap: 14px;
+  margin-top: 16px;
+  padding: 18px 20px 20px;
+  border: 1px solid rgba(var(--v-theme-primary), 0.3);
+  border-left: 3px solid rgb(var(--v-theme-primary));
+  border-radius: 10px;
+  background: rgb(var(--v-theme-surface));
+}
+
+.recipe-import__duplicate-icon {
+  flex: none;
+  margin-top: 3px;
+}
+
+.recipe-import__duplicate-body {
+  min-width: 0;
+}
+
+.recipe-import__duplicate-title {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.recipe-import__duplicate-text {
+  margin: 6px 0 0;
+  line-height: 1.5;
 }
 
 .recipe-import__source {

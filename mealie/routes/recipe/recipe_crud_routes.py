@@ -45,6 +45,7 @@ from mealie.schema.recipe.recipe import (
 )
 from mealie.schema.recipe.recipe_asset import RecipeAsset
 from mealie.schema.recipe.recipe_scraper import ScrapeRecipeAI, ScrapeRecipePdfStarted, ScrapeRecipeTest
+from mealie.schema.recipe.recipe_source_match import RecipeSourceMatch, RecipeSourceQuery
 from mealie.schema.recipe.recipe_suggestion import RecipeSuggestionQuery, RecipeSuggestionResponse
 from mealie.schema.recipe.request_helpers import (
     RecipeDuplicate,
@@ -76,6 +77,7 @@ from mealie.services.recipe.recipe_data_service import (
     NotAnImageError,
     RecipeDataService,
 )
+from mealie.services.recipe.recipe_source_matching import DuplicateRecipeSourceError, RecipeSourceService
 from mealie.services.scraper.recipe_bulk_scraper import RecipeBulkScraperService
 from mealie.services.scraper.scraped_extras import ScrapedExtras, ScraperContext
 from mealie.services.scraper.scraper import create_from_html
@@ -247,7 +249,7 @@ class RecipeController(BaseRecipeController):
         if isinstance(ex, exceptions.RateLimitError):
             return self.t("exceptions.rate-limit-error")
 
-        if isinstance(ex, NoRecipeDataError | AIProviderNotEnabledError):
+        if isinstance(ex, NoRecipeDataError | AIProviderNotEnabledError | DuplicateRecipeSourceError):
             # these are raised with an already-translated message
             if message := str(ex):
                 return message
@@ -333,6 +335,14 @@ class RecipeController(BaseRecipeController):
             url = req.url
 
         async def create(on_progress: Callable[[str], Awaitable[None]]) -> str:
+            # A link imported before is refused unless asked for again, so a second tap, a re-share or
+            # another client doesn't quietly make a copy. Checked first, before the slow scrape.
+            if isinstance(req, ScrapeRecipe) and not req.allow_duplicate:
+                if match := RecipeSourceService(self.group_recipes).find(url):
+                    raise DuplicateRecipeSourceError(
+                        self.t("recipe.import-errors.already-saved", name=match.name), match
+                    )
+
             recipe, extras = await create_from_html(
                 url,
                 self.repos,
@@ -459,6 +469,15 @@ class RecipeController(BaseRecipeController):
             return recipe.slug
 
         return self._stream_recipe_creation(create)
+
+    @router.post("/find-by-source", response_model=list[RecipeSourceMatch])
+    def find_by_source(self, req: RecipeSourceQuery) -> list[RecipeSourceMatch]:
+        """
+        Saved recipes imported from the same place as each link, matched however the link was
+        shared (tracking parameters, "www.", an Instagram /p/ or /reel/ path). Links with no
+        match are left out.
+        """
+        return RecipeSourceService(self.group_recipes).find_many(req.urls)
 
     @router.post("/create/url/bulk", status_code=202)
     def parse_recipe_url_bulk(self, bulk: CreateRecipeByUrlBulk, bg_tasks: BackgroundTasks):

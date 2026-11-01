@@ -18,6 +18,8 @@ import type {
   RecipeTimelineEventOut,
   RecipeTimelineEventUpdate,
   ScrapeRecipePdfStarted,
+  RecipeSourceMatch,
+  RecipeSourceQuery,
 } from "~/lib/api/types/recipe";
 import type { SSEDataEventDone, SSEDataEventMessage } from "~/lib/api/types/response";
 import type { ApiRequestInstance, PaginationData, RequestResponse } from "~/lib/api/types/non-generated";
@@ -37,6 +39,11 @@ export interface RecipeImportOptions {
   createNewOrganizers?: boolean;
 }
 
+export interface RecipeUrlImportOptions extends RecipeImportOptions {
+  /** Import the link even though a saved recipe already came from it */
+  allowDuplicate?: boolean;
+}
+
 export interface CreateAsset {
   name: string;
   icon: string;
@@ -53,6 +60,7 @@ const routes = {
   recipesTestScrapeUrl: `${prefix}/recipes/test-scrape-url`,
   recipesCreateUrl: `${prefix}/recipes/create/url/stream`,
   recipesCreateUrlBulk: `${prefix}/recipes/create/url/bulk`,
+  recipesFindBySource: `${prefix}/recipes/find-by-source`,
   recipesCreateFromPdf: `${prefix}/recipes/create/pdf`,
   recipesCreateFromZip: `${prefix}/recipes/create/zip`,
   recipesCreateWithAI: `${prefix}/recipes/create/ai/stream`,
@@ -245,9 +253,14 @@ export class RecipeAPI extends BaseCRUDAPI<CreateRecipe, Recipe, Recipe> {
     return this.streamRecipeCreate(routes.recipesCreateFromHtmlOrJson, { data, url, ...options }, onProgress);
   }
 
+  /** Saved recipes imported from the same place as each link; links with no match are left out */
+  async findBySource(urls: string[]) {
+    return await this.requests.post<RecipeSourceMatch[]>(routes.recipesFindBySource, { urls } satisfies RecipeSourceQuery);
+  }
+
   async createOneByUrl(
     url: string,
-    options: RecipeImportOptions = {},
+    options: RecipeUrlImportOptions = {},
     onProgress?: (message: string) => void,
   ): Promise<RequestResponse<string>> {
     return this.streamRecipeCreate(routes.recipesCreateUrl, { url, ...options }, onProgress);

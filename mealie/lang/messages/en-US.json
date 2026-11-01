@@ -23,13 +23,16 @@
         },
         "and-amount": "and {amount}",
         "bulk-import": {
+            "already-saved": "Skipped {url}: you already have it as {name}",
             "failed": "Couldn't import {url}",
             "imported": "Imported {name}",
+            "listed-twice": "Skipped {url}: it was listed twice",
             "report-name": "Recipe links ({count})"
         },
         "import-errors": {
             "ai-not-enabled": "AI services are not enabled",
             "ai-request-failed": "The AI provider was unable to complete the request. Please try again",
+            "already-saved": "You already have this recipe: {name}",
             "image-provider-not-enabled": "AI image services are not enabled",
             "no-recipe-found": "No recipe was found in the provided source",
             "no-recipe-on-page": "No recipe was found on that page",

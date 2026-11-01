@@ -1,7 +1,7 @@
 import re as re
 from collections.abc import Iterable, Sequence
 from datetime import UTC, datetime
-from typing import Self
+from typing import NamedTuple, Self
 from uuid import UUID
 
 import sqlalchemy as sa
@@ -27,6 +27,14 @@ from mealie.services.query_filter.builder import QueryFilterBuilder
 from ..db.models._model_base import SqlAlchemyBase
 from ._recipe_suggestions import RecipeSuggestionMixin
 from .repository_generic import HouseholdRepositoryGeneric
+
+
+class RecipeSourceRow(NamedTuple):
+    id: UUID
+    slug: str
+    name: str
+    org_url: str | None
+    created_at: datetime | None
 
 
 class RepositoryRecipes(RecipeSuggestionMixin, HouseholdRepositoryGeneric[Recipe, RecipeModel]):
@@ -102,6 +110,19 @@ class RepositoryRecipes(RecipeSuggestionMixin, HouseholdRepositoryGeneric[Recipe
 
                 if i >= max_retries:
                     raise
+
+    def find_by_source_term(self, term: str, limit: int = 50) -> list[RecipeSourceRow]:
+        """Recipes whose source link contains `term`, oldest first, for spotting links imported before"""
+        query = sa.select(
+            RecipeModel.id, RecipeModel.slug, RecipeModel.name, RecipeModel.org_url, RecipeModel.created_at
+        ).filter(RecipeModel.org_url.icontains(term, autoescape=True))
+        if self.group_id:
+            query = query.filter(RecipeModel.group_id == self.group_id)
+        if self.household_id:
+            query = query.filter(RecipeModel.household_id == self.household_id)
+
+        rows = self.session.execute(query.order_by(RecipeModel.created_at).limit(limit)).all()
+        return [RecipeSourceRow(*row) for row in rows]
 
     def _delete_recipe(self, recipe: RecipeModel) -> Recipe:
         recipe_as_model = self.schema.model_validate(recipe)

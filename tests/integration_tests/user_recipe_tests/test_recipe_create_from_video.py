@@ -23,6 +23,7 @@ from tests.utils import api_routes
 from tests.utils.factories import random_int, random_string
 from tests.utils.fixture_schemas import TestUser
 
+# These tests import the same links again and again, so they ask to import a saved link anyway
 VIDEO_URL = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
 
 # What YouTube serves for a video: its title, and structured data for the video rather than a recipe
@@ -114,7 +115,9 @@ def messages(monkeypatch: pytest.MonkeyPatch, openai_recipe: OpenAIRecipe) -> li
 
 
 def _import(api_client: TestClient, user: TestUser):
-    return api_client.post(api_routes.recipes_create_url, json={"url": VIDEO_URL}, headers=user.token)
+    return api_client.post(
+        api_routes.recipes_create_url, json={"url": VIDEO_URL, "allowDuplicate": True}, headers=user.token
+    )
 
 
 def test_create_recipe_from_video(
@@ -288,7 +291,7 @@ INSTAGRAM_URL = "https://www.instagram.com/reel/C66-jHYy5_k/"
 
 
 def _import_url(api_client: TestClient, user: TestUser, url: str):
-    return api_client.post(api_routes.recipes_create_url, json={"url": url}, headers=user.token)
+    return api_client.post(api_routes.recipes_create_url, json={"url": url, "allowDuplicate": True}, headers=user.token)
 
 
 def _message(response) -> str:
@@ -336,7 +339,7 @@ def test_instagram_import_saves_video_link_and_source_category(
 ) -> None:
     response = api_client.post(
         api_routes.recipes_create_url,
-        json={"url": INSTAGRAM_URL, "organize": organize},
+        json={"url": INSTAGRAM_URL, "organize": organize, "allowDuplicate": True},
         headers=unique_user.token,
     )
     assert response.status_code == 201
@@ -407,7 +410,9 @@ def test_instagram_caption_amounts_and_sections_survive_import(
 
     monkeypatch.setattr(OpenAIService, "get_response", response)
     result = api_client.post(
-        api_routes.recipes_create_url, json={"url": url, "organize": False}, headers=unique_user.token
+        api_routes.recipes_create_url,
+        json={"url": url, "organize": False, "allowDuplicate": True},
+        headers=unique_user.token,
     )
     assert result.status_code == 201
     recipe = api_client.get(api_routes.recipes_slug(result.json()), headers=unique_user.token).json()

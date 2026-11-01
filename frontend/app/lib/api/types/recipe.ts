@@ -507,6 +507,16 @@ export interface RecipeShareTokenSummary {
 export interface RecipeSlug {
   slug: string;
 }
+export interface RecipeSourceMatch {
+  url: string;
+  id: string;
+  slug: string;
+  name: string;
+  createdAt?: string | null;
+}
+export interface RecipeSourceQuery {
+  urls?: string[];
+}
 export interface RecipeSuggestionQuery {
   orderBy?: string | null;
   orderByNullPosition?: OrderByNullPosition | null;
@@ -638,6 +648,7 @@ export interface ScrapeRecipe {
   organize?: boolean;
   createNewOrganizers?: boolean;
   url: string;
+  allowDuplicate?: boolean;
 }
 export interface ScrapeRecipeAI {
   content?: string | null;

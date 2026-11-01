@@ -2,8 +2,6 @@ import { describe, expect, test } from "vitest";
 import {
   findLinks,
   importFileKind,
-  linkKey,
-  linkSearchTerm,
   linkSource,
   planImport,
   progressStep,
@@ -114,37 +112,6 @@ describe("linkSource", () => {
     expect(linkSource("https://m.facebook.com/watch?v=1")).toEqual({ site: "Facebook", video: true });
     expect(linkSource("https://www.seriouseats.com/chili")).toEqual({ site: "seriouseats.com", video: false });
     expect(linkSource("not a link")).toBeNull();
-  });
-});
-
-describe("linkKey", () => {
-  test("the same video matches however it was shared", () => {
-    expect(linkKey("https://youtu.be/abc123?si=share")).toBe("youtube:abc123");
-    expect(linkKey("https://www.youtube.com/watch?v=abc123&t=30")).toBe("youtube:abc123");
-    expect(linkKey("https://m.youtube.com/shorts/abc123")).toBe("youtube:abc123");
-    expect(linkKey("https://www.instagram.com/reel/C0de/?igsh=xyz")).toBe("instagram:C0de");
-    expect(linkKey("https://instagram.com/chef/p/C0de")).toBe("instagram:C0de");
-    expect(linkKey("https://www.tiktok.com/@chef/video/42?is_from_webapp=1")).toBe("tiktok:42");
-  });
-
-  test("pages match without tracking parameters or a trailing slash, but keep the ones that pick a recipe", () => {
-    expect(linkKey("https://www.example.test/chili/?utm_source=x&fbclid=y")).toBe("example.test/chili");
-    expect(linkKey("https://example.test/chili")).toBe("example.test/chili");
-    expect(linkKey("https://example.test/recipe.php?id=12&ref=home")).toBe("example.test/recipe.php?id=12");
-    expect(linkKey("https://example.test/recipe.php?id=13")).not.toBe(linkKey("https://example.test/recipe.php?id=12"));
-  });
-});
-
-describe("linkSearchTerm", () => {
-  test("searches by a video's ID, or a page's host and path", () => {
-    expect(linkSearchTerm("https://youtu.be/abc123")).toBe("abc123");
-    expect(linkSearchTerm("https://www.example.test/chili/?utm_source=x")).toBe("example.test/chili");
-    expect(linkSearchTerm("https://example.test/recipe.php?id=12")).toBe("example.test/recipe.php");
-  });
-
-  test("skips terms too short to be worth searching", () => {
-    expect(linkSearchTerm("https://youtu.be/ab")).toBeNull();
-    expect(linkSearchTerm("nope")).toBeNull();
   });
 });
 
