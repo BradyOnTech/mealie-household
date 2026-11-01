@@ -3,63 +3,53 @@
     :model-value="modelValue"
     :title="$t('recipe.parse-ingredients')"
     :icon="$globals.icons.fileSign"
+    :cancel-text="$t('recipe.parser.skip-for-now')"
     disable-submit-on-enter
     @update:model-value="emit('update:modelValue', $event)"
   >
-    <v-container fluid class="pa-2 ma-0">
-      <SwipeTransition direction="left">
-        <!-- These wrapping divs appear to be load-bearing in making sure the transition renders correctly -->
-        <div v-if="state.step === ParseStep.LOADING">
-          <AppLoader class="my-6" :waiting-text="$t('recipe.parser.parsing-ingredients')" />
-        </div>
-        <div v-else-if="state.step === ParseStep.INFO">
-          <ParseDialogInfo v-model="dontShowInfoPage" :auto-parsed="autoParsedIngredientsCount" :to-review="ingredientsToReviewCount" />
-        </div>
-        <div
-          v-else-if="state.step === ParseStep.PARSE && currentIng"
-          :key="currentIng.ingredient.referenceId"
-        >
-          <ParseDialogParse :dialog-state="dialogState" />
-        </div>
-        <div v-else>
-          <ParseDialogReview
-            v-model="parsedIngs"
+    <div v-if="state.step === ParseStep.LOADING" class="pa-3">
+      <AppLoader class="my-6" :waiting-text="$t('recipe.parser.parsing-ingredients')" />
+    </div>
+
+    <v-empty-state
+      v-else-if="state.step === ParseStep.ERROR"
+      :icon="$globals.icons.alertCircle"
+      color="error"
+      :headline="$t('recipe.parser.parse-failed-title')"
+      :text="$t('recipe.parser.parse-failed-body')"
+    >
+      <template #actions>
+        <div class="d-flex flex-column align-center ga-3">
+          <v-btn color="info" variant="flat" :prepend-icon="$globals.icons.refresh" @click="parseIngredients">
+            {{ $t("recipe.parser.try-again") }}
+          </v-btn>
+          <ParseDialogChangeParser
+            v-model="parser"
             :available-parsers="availableParsers"
-            :parser="parser"
             :show-nlp-language-hint="showNlpLanguageHint"
             @parse="parseIngredients"
-            @change-parser="(newParser) => parser = newParser"
           />
         </div>
-      </SwipeTransition>
-    </v-container>
-    <template v-if="state.step !== ParseStep.LOADING" #custom-card-action>
-      <SwipeTransition direction="left">
-        <BaseButton
-          v-if="state.step === ParseStep.INFO"
-          color="info"
-          icon-right
-          :icon="$globals.icons.arrowRightBold"
-          :text="$t('general.next')"
-          @click="nextStep"
-        />
-        <BaseButton
-          v-else-if="state.step === ParseStep.PARSE"
-          :color="currentIngShouldDelete ? 'error' : 'info'"
-          :icon="currentIngShouldDelete ? $globals.icons.delete : $globals.icons.arrowRightBold"
-          :icon-right="!currentIngShouldDelete"
-          :text="$t(currentIngShouldDelete ? 'recipe.parser.delete-item' : 'general.next')"
-          @click="nextIngredient"
-        />
-        <BaseButton
-          v-else-if="state.step === ParseStep.REVIEW"
-          create
-          :text="$t('general.save')"
-          :icon="$globals.icons.save"
-          :loading="state.saveLoading"
-          @click="saveIngs"
-        />
-      </SwipeTransition>
+      </template>
+    </v-empty-state>
+
+    <v-empty-state
+      v-else-if="!items.length"
+      :icon="$globals.icons.fileSign"
+      :text="$t('recipe.parser.no-ingredients')"
+    />
+
+    <ParseDialogReview v-else :dialog-state="dialogState" />
+
+    <template #custom-card-action>
+      <BaseButton
+        v-if="state.step === ParseStep.REVIEW && items.length"
+        save
+        :text="$t('recipe.parser.save-ingredients')"
+        :icon="$globals.icons.save"
+        :loading="state.saveLoading"
+        @click="save"
+      />
     </template>
   </BaseDialog>
 </template>
@@ -80,23 +70,7 @@ const emit = defineEmits<{
 }>();
 
 const dialogState = useParseIngredientsDialog(props.ingredients, ings => emit("save", ings));
-
-const {
-  availableParsers,
-  parser,
-  showNlpLanguageHint,
-  dontShowInfoPage,
-  parsedIngs,
-  currentIng,
-  currentIngShouldDelete,
-  state,
-  autoParsedIngredientsCount,
-  ingredientsToReviewCount,
-  nextStep,
-  saveIngs,
-  nextIngredient,
-  parseIngredients,
-} = dialogState;
+const { items, state, parser, availableParsers, showNlpLanguageHint, parseIngredients, save } = dialogState;
 
 watch(() => props.modelValue, () => {
   if (!props.modelValue) {

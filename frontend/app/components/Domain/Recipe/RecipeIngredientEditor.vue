@@ -8,6 +8,7 @@
       hide-details
       class="mx-1 mt-3 mb-4"
       :placeholder="$t('recipe.section-title')"
+      :label="showLabels ? $t('recipe.section-title') : undefined"
       style="max-width: 500px"
       @click="$emit('clickIngredientField', 'title')"
     />
@@ -44,6 +45,7 @@
               density="compact"
               :style="$vuetify.display.mdAndDown ? '' : 'flex: 3 0 50px;'"
               :placeholder="$t('recipe.quantity')"
+              :label="showLabels ? $t('recipe.quantity') : undefined"
               @keypress="quantityFilter"
             />
             <v-autocomplete
@@ -60,6 +62,7 @@
               :custom-filter="() => true"
               item-title="name"
               :placeholder="$t('recipe.choose-unit')"
+              :label="showLabels ? $t('recipe.unit') : undefined"
               clearable
               :menu-props="{ attach: props.menuAttachTarget, maxHeight: '250px' }"
               @keyup.enter="handleUnitEnter"
@@ -112,6 +115,7 @@
               :custom-filter="() => true"
               item-title="name"
               :placeholder="$t('recipe.choose-food')"
+              :label="showLabels ? $t('recipe.food') : undefined"
               clearable
               :menu-props="{ attach: props.menuAttachTarget, maxHeight: '250px' }"
               @keyup.enter="handleFoodEnter"
@@ -174,6 +178,7 @@
               :style="$vuetify.display.mdAndDown ? '' : 'flex: 7 0 50px;'"
               variant="filled"
               :placeholder="$t('recipe.notes')"
+              :label="showLabels ? $t('recipe.note') : undefined"
               class=""
               @click="$emit('clickIngredientField', 'note')"
             />
@@ -251,6 +256,11 @@ const props = defineProps({
     default: false,
   },
   deleteDisabled: {
+    type: Boolean,
+    default: false,
+  },
+  /** Name each box (Quantity, Unit, Food, Note), for places where the bare boxes aren't self-explanatory */
+  showLabels: {
     type: Boolean,
     default: false,
   },

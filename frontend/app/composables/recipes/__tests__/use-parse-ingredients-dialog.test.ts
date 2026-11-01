@@ -11,7 +11,7 @@ import { i18n } from "~/tests/setup";
 
 const mockError = vi.spyOn((await import("~/composables/use-toast")).alert, "error");
 
-const mockParseIngredients = vi.fn().mockResolvedValue({ data: [{ ingredient: {} }] });
+const mockParseIngredients = vi.fn();
 const onSave = vi.fn();
 const group = ref({
   aiProviderSettings: { aiEnabled: true },
@@ -26,7 +26,14 @@ vi.mock("~/composables/api", () => ({
 
 vi.mock("../use-recipe-ingredients", () => ({
   useIngredientTextParser: () => ({
-    ingredientToParserString: vi.fn().mockReturnValue("4 unit ingredient"),
+    ingredientToParserString: (ing: RecipeIngredient) => ing.note || "",
+    // Enough of the real display text to check what a line will save as
+    parseIngredientText: (ing: RecipeIngredient) => [
+      ing.quantity || "",
+      ing.unit?.name || "",
+      ing.food?.name || "",
+      ing.note || "",
+    ].filter(Boolean).join(" "),
   }),
 }));
 
@@ -35,8 +42,7 @@ const preferences = ref({
   dontShowInfoPage: true,
 });
 // `useLocalStorage(..., { mergeDefaults: true })` only falls back to the caller's default when
-// nothing has been stored yet. `parsingStorageEmpty` models that first-visit case; the existing
-// tests leave it false, so a stored preference keeps winning for them.
+// nothing has been stored yet. `parsingStorageEmpty` models that first-visit case.
 let parsingStorageEmpty = false;
 let lastDefaultParser: Parser | undefined;
 vi.mock("../../use-users/preferences", () => ({
@@ -49,23 +55,12 @@ vi.mock("../../use-users/preferences", () => ({
   },
 }));
 
-const createFood = vi.fn().mockResolvedValue({ id: "food_id", name: "fuwud" });
-const updateFood = vi.fn().mockResolvedValue({ id: "food_id", name: "fuwud" });
-const foodStore = {
-  actions: {
-    createOne: createFood,
-    updateOne: updateFood,
-  },
-};
-
-const createUnit = vi.fn().mockResolvedValue({ id: "unit_id", name: "uwunit" });
-const updateUnit = vi.fn().mockResolvedValue({ id: "unit_id", name: "uwunit" });
-const unitStore = {
-  actions: {
-    createOne: createUnit,
-    updateOne: updateUnit,
-  },
-};
+const createFood = vi.fn();
+const updateFood = vi.fn();
+const createUnit = vi.fn();
+const updateUnit = vi.fn();
+const foodStore = { actions: { createOne: createFood, updateOne: updateFood } };
+const unitStore = { actions: { createOne: createUnit, updateOne: updateUnit } };
 
 vi.mock("~/composables/store", async (importOriginal) => {
   const original: object = await importOriginal();
@@ -76,604 +71,285 @@ vi.mock("~/composables/store", async (importOriginal) => {
   };
 });
 
-const wrapper = (ingredients: NoUndefinedField<RecipeIngredient>[] = [{}, { referencedRecipe: {} }] as NoUndefinedField<RecipeIngredient>[]) => {
+const lines = (...notes: string[]) => notes.map((note, i) => ({
+  note,
+  referenceId: `ref-${i}`,
+})) as NoUndefinedField<RecipeIngredient>[];
+
+function parsed(input: string, ingredient: Partial<RecipeIngredient>, confidence = 0.99): ParsedIngredient {
+  return { input, confidence: { average: confidence }, ingredient: { referenceId: uuid4(), ...ingredient } as RecipeIngredient };
+}
+
+const butterBeans = () => parsed("29 oz butter beans (or any other type of bean)", {
+  quantity: 29,
+  unit: { id: "unit-ounce", name: "ounce" } as RecipeIngredient["unit"],
+  food: { id: "", name: "butter beans" } as RecipeIngredient["food"],
+  note: "or any other type of bean",
+});
+
+const wrapper = (ingredients: NoUndefinedField<RecipeIngredient>[] = lines("a")) => {
   const TestComponent = defineComponent({
     template: "<div />",
-    props: {},
     setup() {
       const x = useParseIngredientsDialog(ingredients, onSave);
       return {
-        setCurrentFood(str: string) {
-          x.currentMissingFood.value = str;
-        },
-        setCurrentUnit(str: string) {
-          x.currentMissingUnit.value = str;
-        },
-        setParsedIngs(ings: ParsedIngredient[]) {
-          x.parsedIngs.value = ings;
-        },
-        setShouldDelete(should: boolean) {
-          x.currentIngShouldDelete.value = should;
-        },
-        setCurrentIng(ing: ParsedIngredient) {
-          x.currentIng.value = ing;
-        },
         setParser(parser: Parser) {
           x.parser.value = parser;
-        },
-        setDontShow(dontShow: boolean) {
-          x.dontShowInfoPage.value = dontShow;
         },
         ...x,
       };
     },
   });
-
-  const wrapper = mount(TestComponent, { props: {} });
-  return wrapper;
+  return mount(TestComponent, { props: {} });
 };
+
+async function parsedWrapper(results: ParsedIngredient[], ingredients = lines(...results.map(r => r.input || ""))) {
+  mockParseIngredients.mockResolvedValueOnce({ data: results });
+  const wrapped = wrapper(ingredients);
+  await wrapped.vm.parseIngredients();
+  return wrapped;
+}
 
 describe("useParseIngredientsDialog", () => {
   beforeEach(() => {
     group.value.aiProviderSettings.aiEnabled = true;
-    preferences.value = {
-      parser: "nlp",
-      dontShowInfoPage: false,
-    };
+    preferences.value = { parser: "nlp", dontShowInfoPage: false };
     parsingStorageEmpty = false;
     lastDefaultParser = undefined;
     i18n.global.locale = "en-US";
     vi.clearAllMocks();
+    mockParseIngredients.mockResolvedValue({ data: [] });
+    createFood.mockImplementation(async (data: { name: string }) => ({ id: `food-${data.name}`, name: data.name, aliases: [] }));
+    createUnit.mockImplementation(async (data: { name: string }) => ({ id: `unit-${data.name}`, name: data.name, aliases: [] }));
+    updateFood.mockImplementation(async (data: object) => data);
+    updateUnit.mockImplementation(async (data: object) => data);
   });
 
-  describe("nextIngredient", () => {
-    test("steps through the ingredients", () => {
-      const wrapped = wrapper();
-      const { nextIngredient, setParsedIngs } = wrapped.vm;
-      setParsedIngs([{
-        ingredient: {},
-        confidence: { average: 0.5 },
-      }, {
-        ingredient: {},
-      }, {
-        ingredient: {
-          food: {
-            id: "",
-            name: "fuwud",
-          },
-        },
-        confidence: { average: 0.99 },
-      }, {
-        ingredient: {
-          unit: {
-            id: "",
-            name: "uwunit",
-          },
-        },
-        confidence: { average: 0.99 },
-      }]);
-      const { state } = wrapped.vm;
-      expect(state.currentParsedIndex).toBe(-1);
-      expect(state.allReviewed).toBe(false);
-      nextIngredient();
-      expect(state.currentParsedIndex).toBe(0);
-      expect(state.allReviewed).toBe(false);
-      nextIngredient();
-      expect(state.currentParsedIndex).toBe(1);
-      expect(state.allReviewed).toBe(false);
-      nextIngredient();
-      expect(state.currentParsedIndex).toBe(2);
-      expect(state.allReviewed).toBe(false);
-      nextIngredient();
-      expect(state.currentParsedIndex).toBe(3);
-      expect(state.allReviewed).toBe(false);
-      nextIngredient();
-      expect(state.currentParsedIndex).toBe(3);
-      expect(state.allReviewed).toBe(true);
-    });
-    test("skips over ingredients that don't need to be reviewed", () => {
-      const wrapped = wrapper();
-      const { nextIngredient, setParsedIngs } = wrapped.vm;
-      setParsedIngs([{
-        ingredient: {},
-        confidence: { average: 0.5 },
-      }, {
-        ingredient: {},
-        confidence: { average: 0.99 },
-      }, {
-        ingredient: {
-          referencedRecipe: {},
-        },
-        confidence: { average: 0.5 },
-      }, {
-        ingredient: {},
-        confidence: { average: 0.5 },
-      }]);
-      const { state } = wrapped.vm;
-      expect(wrapped.vm.ingredientsToReviewCount).toBe(2);
-      expect(wrapped.vm.autoParsedIngredientsCount).toBe(2);
-      expect(state.currentParsedIndex).toBe(-1);
-      expect(state.allReviewed).toBe(false);
-      nextIngredient();
-      expect(state.currentParsedIndex).toBe(0);
-      expect(state.allReviewed).toBe(false);
-      nextIngredient();
-      expect(state.currentParsedIndex).toBe(3);
-      expect(state.allReviewed).toBe(false);
-      nextIngredient();
-      expect(state.currentParsedIndex).toBe(3);
-      expect(state.allReviewed).toBe(true);
-    });
-    test("skips over deleted ingredients properly", () => {
-      const wrapped = wrapper();
-      const { nextIngredient, setParsedIngs, setShouldDelete } = wrapped.vm;
-      setParsedIngs([{
-        ingredient: {},
-        confidence: { average: 0.5 },
-      }, {
-        ingredient: {},
-        confidence: { average: 0.5 },
-      }, {
-        ingredient: {},
-        confidence: { average: 0.5 },
-      }]);
-      const { state } = wrapped.vm;
-      expect(state.currentParsedIndex).toBe(-1);
-      expect(state.allReviewed).toBe(false);
-      expect(wrapped.vm.currentIngShouldDelete).toBe(false);
-      nextIngredient();
-      expect(state.currentParsedIndex).toBe(0);
-      expect(state.allReviewed).toBe(false);
-      expect(wrapped.vm.currentIngShouldDelete).toBe(false);
-      nextIngredient();
-      expect(state.currentParsedIndex).toBe(1);
-      expect(state.allReviewed).toBe(false);
-      expect(wrapped.vm.currentIngShouldDelete).toBe(false);
-      setShouldDelete(true);
-      nextIngredient();
-      expect(state.currentParsedIndex).toBe(1);
-      expect(state.allReviewed).toBe(false);
-      expect(wrapped.vm.currentIngShouldDelete).toBe(false);
-      nextIngredient();
-      expect(state.currentParsedIndex).toBe(1);
-      expect(state.allReviewed).toBe(true);
-      expect(wrapped.vm.currentIngShouldDelete).toBe(false);
-    });
-    test("pulls from cache when it can", async () => {
-      const wrapped = wrapper();
-      const { createMissingUnit, createMissingFood, nextIngredient, setCurrentUnit, setCurrentFood, setCurrentIng, setParsedIngs } = wrapped.vm;
-      setParsedIngs([{
-        ingredient: {},
-        confidence: { average: 0.5 },
-      }, {
-        ingredient: {},
-      }, {
-        ingredient: {
-          food: {
-            id: "",
-            name: "fuwud",
-          },
-        },
-        confidence: { average: 0.99 },
-      }, {
-        ingredient: {
-          unit: {
-            id: "",
-            name: "uwunit",
-          },
-        },
-        confidence: { average: 0.99 },
-      }]);
-      setCurrentIng({
-        ingredient: {},
+  describe("parseIngredients", () => {
+    test("turns each imported line into a review item, in recipe order", async () => {
+      const ingredients = [
+        ...lines("29 oz butter beans"),
+        { note: "", referencedRecipe: { name: "Pie crust" }, referenceId: "ref-link" },
+        { note: "1 tsp salt", referenceId: "ref-salt", title: "Seasoning" },
+      ] as NoUndefinedField<RecipeIngredient>[];
+      mockParseIngredients.mockResolvedValueOnce({
+        data: [butterBeans(), parsed("1 tsp salt", { quantity: 1, food: { id: "f-salt", name: "salt" } as RecipeIngredient["food"] })],
       });
-      setCurrentUnit("uwunit");
-      setCurrentFood("fuwud");
-      await createMissingUnit();
-      await createMissingFood();
-      createUnit.mockClear();
-      createFood.mockClear();
-      const { state } = wrapped.vm;
-      expect(state.currentParsedIndex).toBe(-1);
-      expect(state.allReviewed).toBe(false);
-      nextIngredient();
-      expect(state.currentParsedIndex).toBe(0);
-      expect(state.allReviewed).toBe(false);
-      nextIngredient();
-      expect(state.currentParsedIndex).toBe(1);
-      expect(state.allReviewed).toBe(false);
-      nextIngredient();
-      expect(state.currentParsedIndex).toBe(2);
-      expect(state.allReviewed).toBe(false);
-      nextIngredient();
-      expect(state.currentParsedIndex).toBe(3);
-      expect(state.allReviewed).toBe(false);
-      nextIngredient();
-      expect(state.currentParsedIndex).toBe(3);
-      expect(state.allReviewed).toBe(true);
-      expect(createUnit).not.toHaveBeenCalled();
-      expect(createFood).not.toHaveBeenCalled();
-    });
-  });
-  describe("nextStep", () => {
-    test("walks through the workflow", () => {
-      const { nextStep, state } = wrapper().vm;
-      expect(state.step).toBe(ParseStep.LOADING);
-      nextStep();
-      expect(state.step).toBe(ParseStep.INFO);
-      nextStep();
-      expect(state.step).toBe(ParseStep.PARSE);
-      nextStep();
+      const wrapped = wrapper(ingredients);
+
+      const promise = wrapped.vm.parseIngredients();
+      expect(wrapped.vm.state.step).toBe(ParseStep.LOADING);
+      await promise;
+
+      const { items, state } = wrapped.vm;
       expect(state.step).toBe(ParseStep.REVIEW);
+      expect(mockParseIngredients).toHaveBeenCalledWith("nlp", ["29 oz butter beans", "1 tsp salt"]);
+      expect(items.map(i => i.input)).toEqual(["29 oz butter beans (or any other type of bean)", "", "1 tsp salt"]);
+      expect(items[1]!.ingredient.referencedRecipe?.name).toBe("Pie crust");
     });
-    test("skips the info page if already seen", () => {
-      preferences.value.dontShowInfoPage = true;
-      const { nextStep, state } = wrapper().vm;
-      expect(state.step).toBe(ParseStep.LOADING);
-      nextStep();
-      expect(state.step).toBe(ParseStep.PARSE);
-      nextStep();
-      expect(state.step).toBe(ParseStep.REVIEW);
+
+    test("keeps section titles and reference ids, so instruction links survive", async () => {
+      const ingredients = [{ note: "1 tsp salt", referenceId: "ref-salt", title: "Seasoning" }] as NoUndefinedField<RecipeIngredient>[];
+      const wrapped = await parsedWrapper([parsed("1 tsp salt", {})], ingredients);
+      const ing = wrapped.vm.items[0]!.ingredient;
+      expect(ing.title).toBe("Seasoning");
+      expect(ing.referenceId).toBe("ref-salt");
     });
-    test("skips the parse page if nothing to confirm", () => {
-      const { nextStep, state } = wrapper().vm;
-      state.allReviewed = true;
-      expect(state.step).toBe(ParseStep.LOADING);
-      nextStep();
-      expect(state.step).toBe(ParseStep.INFO);
-      nextStep();
-      expect(state.step).toBe(ParseStep.REVIEW);
+
+    test("holds unsaved unit and food words aside instead of filling the field", async () => {
+      const wrapped = await parsedWrapper([parsed("a handful of crackers", {
+        quantity: 1,
+        unit: { id: "", name: "handful" } as RecipeIngredient["unit"],
+        food: { id: "", name: "crackers" } as RecipeIngredient["food"],
+      })]);
+      const item = wrapped.vm.items[0]!;
+      expect(item.unmatchedUnit).toBe("handful");
+      expect(item.unmatchedFood).toBe("crackers");
+      expect(item.ingredient.unit).toBeUndefined();
+      expect(item.ingredient.food).toBeUndefined();
     });
-    test("skips the info page if already seen", () => {
-      preferences.value.dontShowInfoPage = true;
-      const { nextStep, state } = wrapper().vm;
-      expect(state.step).toBe(ParseStep.LOADING);
-      nextStep();
-      expect(state.step).toBe(ParseStep.PARSE);
-      nextStep();
-      expect(state.step).toBe(ParseStep.REVIEW);
-    });
-    test("skips the info and parse pages if necessary", () => {
-      preferences.value.dontShowInfoPage = true;
-      const { nextStep, state } = wrapper().vm;
-      state.allReviewed = true;
-      expect(state.step).toBe(ParseStep.LOADING);
-      nextStep();
-      expect(state.step).toBe(ParseStep.REVIEW);
-    });
-  });
-  describe("currentIngHasError", () => {
-    test("is true if either food or unit have an error", () => {
+
+    test("only makes one call at a time", async () => {
       const wrapped = wrapper();
-      const { setCurrentFood, setCurrentUnit } = wrapped.vm;
-      setCurrentFood("");
-      setCurrentUnit("");
-      expect(wrapped.vm.currentIngHasError).toBeFalsy();
-      setCurrentFood("food");
-      setCurrentUnit("");
-      expect(wrapped.vm.currentIngHasError).toBeTruthy();
-      setCurrentFood("");
-      setCurrentUnit("unit");
-      expect(wrapped.vm.currentIngHasError).toBeTruthy();
-      setCurrentFood("food");
-      setCurrentUnit("unit");
-      expect(wrapped.vm.currentIngHasError).toBeTruthy();
+      const first = wrapped.vm.parseIngredients();
+      wrapped.vm.parseIngredients();
+      await first;
+      expect(mockParseIngredients).toHaveBeenCalledOnce();
+    });
+
+    test("an empty recipe goes straight to an empty review", async () => {
+      const wrapped = wrapper([]);
+      await wrapped.vm.parseIngredients();
+      expect(wrapped.vm.state.step).toBe(ParseStep.REVIEW);
+      expect(wrapped.vm.items).toEqual([]);
+      expect(mockParseIngredients).not.toHaveBeenCalled();
+    });
+
+    test("shows the error state when the request fails", async () => {
+      mockParseIngredients.mockRejectedValueOnce(new Error("boom"));
+      const wrapped = wrapper();
+      await wrapped.vm.parseIngredients();
+      expect(wrapped.vm.state.step).toBe(ParseStep.ERROR);
+    });
+
+    test("shows the error state when no data comes back", async () => {
+      mockParseIngredients.mockResolvedValueOnce({ data: undefined });
+      const wrapped = wrapper();
+      await wrapped.vm.parseIngredients();
+      expect(wrapped.vm.state.step).toBe(ParseStep.ERROR);
     });
   });
+
+  describe("what needs the user's input", () => {
+    test("counts lines with an unsaved food, an unsaved unit, or an unsure split", async () => {
+      const wrapped = await parsedWrapper([
+        butterBeans(),
+        parsed("2 cups flour", { quantity: 2 }, 0.99),
+        parsed("salt to taste", { note: "salt to taste" }, 0.4),
+        parsed("1 handful nuts", { unit: { id: "", name: "handful" } as RecipeIngredient["unit"] }),
+      ]);
+      const { items, needsInput, needsInputCount, readyCount, foodUnresolved, unitUnresolved, isUnsure } = wrapped.vm;
+      expect(items.map(needsInput)).toEqual([true, false, true, true]);
+      expect(foodUnresolved(items[0]!)).toBe(true);
+      expect(isUnsure(items[2]!)).toBe(true);
+      expect(unitUnresolved(items[3]!)).toBe(true);
+      expect(needsInputCount).toBe(3);
+      expect(readyCount).toBe(1);
+    });
+
+    test("confirming an unsure line makes it ready", async () => {
+      const wrapped = await parsedWrapper([parsed("salt to taste", { note: "salt to taste" }, 0.4)]);
+      const item = wrapped.vm.items[0]!;
+      wrapped.vm.confirm(item);
+      expect(wrapped.vm.needsInput(item)).toBe(false);
+      expect(wrapped.vm.needsInputCount).toBe(0);
+    });
+
+    test("picking an existing food answers the question and offers to remember the words", async () => {
+      const wrapped = await parsedWrapper([butterBeans()]);
+      const item = wrapped.vm.items[0]!;
+      item.ingredient.food = { id: "f-lima", name: "lima beans", aliases: [] } as unknown as RecipeIngredient["food"];
+      expect(wrapped.vm.needsInput(item)).toBe(false);
+      expect(wrapped.vm.canRemember(item, "food")).toBe(true);
+    });
+  });
+
+  describe("answering a question", () => {
+    test("adding a food creates it once and fills every line that used the same words", async () => {
+      const wrapped = await parsedWrapper([
+        butterBeans(),
+        parsed("1 can Butter Beans", { food: { id: "", name: "Butter Beans" } as RecipeIngredient["food"] }),
+      ]);
+      const [first, second] = wrapped.vm.items;
+      await wrapped.vm.addUnmatched(first!, "food");
+
+      expect(createFood).toHaveBeenCalledOnce();
+      expect(first!.ingredient.food?.name).toBe("butter beans");
+      expect(second!.ingredient.food?.id).toBe("food-butter beans");
+      expect(wrapped.vm.needsInputCount).toBe(0);
+    });
+
+    test("adding a unit fills the unit", async () => {
+      const wrapped = await parsedWrapper([parsed("1 handful nuts", { unit: { id: "", name: "handful" } as RecipeIngredient["unit"] })]);
+      const item = wrapped.vm.items[0]!;
+      await wrapped.vm.addUnmatched(item, "unit");
+      expect(createUnit).toHaveBeenCalledOnce();
+      expect(item.ingredient.unit?.name).toBe("handful");
+      expect(item.unmatchedUnit).toBe("");
+    });
+
+    test("says so when the food can't be created", async () => {
+      createFood.mockResolvedValueOnce(null);
+      const wrapped = await parsedWrapper([butterBeans()]);
+      const item = wrapped.vm.items[0]!;
+      await wrapped.vm.addUnmatched(item, "food");
+      expect(mockError).toHaveBeenCalled();
+      expect(wrapped.vm.foodUnresolved(item)).toBe(true);
+      expect(wrapped.vm.state.busy[item.key]).toBeUndefined();
+    });
+
+    test("keeping the words as a note puts them in front of the existing note", async () => {
+      const wrapped = await parsedWrapper([butterBeans()]);
+      const item = wrapped.vm.items[0]!;
+      wrapped.vm.keepAsNote(item, "food");
+      expect(item.ingredient.note).toBe("butter beans, or any other type of bean");
+      expect(item.unmatchedFood).toBe("");
+      expect(wrapped.vm.needsInput(item)).toBe(false);
+    });
+
+    test("remembering the words adds them as another name for the chosen food", async () => {
+      const wrapped = await parsedWrapper([butterBeans()]);
+      const item = wrapped.vm.items[0]!;
+      item.ingredient.food = { id: "f-lima", name: "lima beans", aliases: [] } as unknown as RecipeIngredient["food"];
+      await wrapped.vm.rememberAsAlias(item, "food");
+      expect(updateFood).toHaveBeenCalledWith(expect.objectContaining({ id: "f-lima", aliases: [{ name: "butter beans" }] }));
+      expect(item.unmatchedFood).toBe("");
+      expect(wrapped.vm.canRemember(item, "food")).toBe(false);
+    });
+
+    test("removing a line drops it from the review", async () => {
+      const wrapped = await parsedWrapper([butterBeans(), parsed("2 cups flour", { quantity: 2 })]);
+      wrapped.vm.remove(wrapped.vm.items[0]!);
+      expect(wrapped.vm.items.map(i => i.input)).toEqual(["2 cups flour"]);
+    });
+  });
+
+  describe("saving", () => {
+    test("saves every line, with unanswered words folded into the note", async () => {
+      const wrapped = await parsedWrapper([
+        butterBeans(),
+        parsed("2 cups flour", { quantity: 2, food: { id: "f-flour", name: "flour" } as RecipeIngredient["food"] }),
+      ]);
+      expect(wrapped.vm.preview(wrapped.vm.items[0]!)).toBe("29 ounce butter beans, or any other type of bean");
+
+      wrapped.vm.save();
+
+      expect(wrapped.vm.state.saveLoading).toBe(true);
+      const saved = onSave.mock.calls[0]![0] as RecipeIngredient[];
+      expect(saved).toHaveLength(2);
+      expect(saved[0]!.food).toBeUndefined();
+      expect(saved[0]!.note).toBe("butter beans, or any other type of bean");
+      expect(saved[1]!.food?.name).toBe("flour");
+    });
+
+    test("doesn't save an empty list", async () => {
+      const wrapped = wrapper([]);
+      await wrapped.vm.parseIngredients();
+      wrapped.vm.save();
+      expect(onSave).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("explainer", () => {
+    test("is open until dismissed, and stays dismissed", () => {
+      const wrapped = wrapper();
+      expect(wrapped.vm.showExplainer).toBe(true);
+      wrapped.vm.dismissExplainer();
+      expect(wrapped.vm.showExplainer).toBe(false);
+      expect(preferences.value.dontShowInfoPage).toBe(true);
+      expect(wrapper().vm.showExplainer).toBe(false);
+    });
+  });
+
   describe("availableParsers", () => {
     test("shows open ai parser when available", () => {
       const { availableParsers } = wrapper().vm;
-      expect(availableParsers.find(({ value }) => value === "openai")?.hide).toBe(false);
+      expect(availableParsers.find(p => p.value === "openai")?.hide).toBeFalsy();
     });
     test("hides open ai parser when not available", () => {
       group.value.aiProviderSettings.aiEnabled = false;
       const { availableParsers } = wrapper().vm;
-      expect(availableParsers.find(({ value }) => value === "openai")?.hide).toBe(true);
+      expect(availableParsers.find(p => p.value === "openai")?.hide).toBe(true);
     });
   });
-  test("saveIngs", () => {
-    const wrapped = wrapper();
-    const { state, saveIngs, setParsedIngs } = wrapped.vm;
-    setParsedIngs([{
-      ingredient: {},
-      confidence: { average: 0.5 },
-    }, {
-      ingredient: {},
-      confidence: { average: 0.99 },
-    }, {
-      ingredient: {
-        referencedRecipe: {},
-      },
-      confidence: { average: 0.5 },
-    }, {
-      ingredient: {},
-      confidence: { average: 0.5 },
-    }]);
-    saveIngs();
-    expect(state.saveLoading).toBe(true);
-    expect(onSave).toHaveBeenCalled();
-  });
-  describe("parseIngredients", () => {
-    test("parses ingredients", async () => {
-      const wrapped = wrapper();
-      const { state, parseIngredients } = wrapped.vm;
-      const promise = parseIngredients();
-      expect(state.step).toBe(ParseStep.LOADING);
-      expect(state.saveLoading).toBe(false);
-      expect(state.loadingCount).toBe(1);
-      await promise;
-      expect(state.step).toBe(ParseStep.INFO);
-      expect(state.loadingCount).toBe(0);
-      expect(mockParseIngredients).toHaveBeenCalled();
-    });
-    test("only makes one call at a time", async () => {
-      const wrapped = wrapper();
-      const { state, parseIngredients } = wrapped.vm;
-      const promise = parseIngredients();
-      expect(state.step).toBe(ParseStep.LOADING);
-      expect(state.saveLoading).toBe(false);
-      expect(state.loadingCount).toBe(1);
-      parseIngredients(); // Second call
-      await promise;
-      expect(state.step).toBe(ParseStep.INFO);
-      expect(state.loadingCount).toBe(0);
-      expect(mockParseIngredients).toHaveBeenCalledOnce();
-    });
-    test("doesn't parse from an empty list", async () => {
-      const wrapped = wrapper([]);
-      const { state, parseIngredients } = wrapped.vm;
-      const promise = parseIngredients();
-      expect(state.step).toBe(ParseStep.INFO);
-      expect(state.saveLoading).toBe(false);
-      expect(state.loadingCount).toBe(0);
-      await promise;
-      expect(state.step).toBe(ParseStep.INFO);
-      expect(state.loadingCount).toBe(0);
-      expect(mockParseIngredients).not.toHaveBeenCalled();
-    });
-    test("handles errors gracefully", async () => {
-      mockParseIngredients.mockRejectedValue("💥 Woe, exception be upon ye 💥");
-      const wrapped = wrapper();
-      const { state, parseIngredients } = wrapped.vm;
-      const promise = parseIngredients();
-      expect(state.step).toBe(ParseStep.LOADING);
-      expect(state.saveLoading).toBe(false);
-      expect(state.loadingCount).toBe(1);
-      await promise;
-      expect(state.step).toBe(ParseStep.INFO);
-      expect(state.loadingCount).toBe(0);
-      expect(mockError).toHaveBeenCalled();
-    });
-    test("handles errors gracefully", async () => {
-      mockParseIngredients.mockResolvedValue({ data: undefined });
-      const wrapped = wrapper();
-      const { state, parseIngredients } = wrapped.vm;
-      const promise = parseIngredients();
-      expect(state.step).toBe(ParseStep.LOADING);
-      expect(state.saveLoading).toBe(false);
-      expect(state.loadingCount).toBe(1);
-      await promise;
-      expect(state.step).toBe(ParseStep.INFO);
-      expect(state.loadingCount).toBe(0);
-      expect(mockError).toHaveBeenCalled();
-    });
-  });
-  describe("create and alias food and unit", () => {
-    test("createMissingUnit", async () => {
-      const wrapped = wrapper();
-      const { createMissingUnit, setCurrentUnit, setCurrentIng } = wrapped.vm;
-      setCurrentIng({
-        ingredient: {},
-      });
-      setCurrentUnit("uwunit");
-      await createMissingUnit();
-      expect(createUnit).toHaveBeenCalled();
-      expect(wrapped.vm.currentIng?.ingredient.unit?.name).toBe("uwunit");
-    });
-    test("createMissingUnit skips if not missing a unit", async () => {
-      const wrapped = wrapper();
-      const { createMissingUnit, setCurrentUnit, setCurrentIng } = wrapped.vm;
-      setCurrentIng({
-        ingredient: {},
-      });
-      setCurrentUnit("uwunit");
-      await createMissingUnit();
-      createUnit.mockClear();
-      await createMissingUnit();
-      expect(createUnit).not.toHaveBeenCalled();
-      expect(wrapped.vm.currentIng?.ingredient.unit?.name).toBe("uwunit");
-    });
-    test("createMissingUnit pulls from cache", async () => {
-      const wrapped = wrapper();
-      const { createMissingUnit, setCurrentUnit, setCurrentIng } = wrapped.vm;
-      setCurrentIng({
-        ingredient: {},
-      });
-      setCurrentUnit("uwunit");
-      await createMissingUnit();
-      createUnit.mockClear();
-      setCurrentUnit("uwunit");
-      await createMissingUnit();
-      expect(createUnit).not.toHaveBeenCalled();
-      expect(wrapped.vm.currentIng?.ingredient.unit?.name).toBe("uwunit");
-    });
-    test("createMissingUnit handles undefined values", async () => {
-      createUnit.mockReturnValue(undefined);
-      const wrapped = wrapper();
-      const { createMissingUnit, setCurrentUnit, setCurrentIng } = wrapped.vm;
-      setCurrentIng({
-        ingredient: {},
-      });
-      setCurrentUnit("uwunit");
-      await createMissingUnit();
-      expect(mockError).toHaveBeenCalled();
-    });
-    test("createMissingFood", async () => {
-      const wrapped = wrapper();
-      const { createMissingFood, setCurrentFood, setCurrentIng } = wrapped.vm;
-      setCurrentIng({
-        ingredient: {},
-      });
-      setCurrentFood("fuwud");
-      await createMissingFood();
-      expect(createFood).toHaveBeenCalled();
-      expect(wrapped.vm.currentIng?.ingredient.food?.name).toBe("fuwud");
-    });
-    test("createMissingFood skips if not missing a unit", async () => {
-      const wrapped = wrapper();
-      const { createMissingFood, setCurrentFood, setCurrentIng } = wrapped.vm;
-      setCurrentIng({
-        ingredient: {},
-      });
-      setCurrentFood("fuwud");
-      await createMissingFood();
-      createFood.mockClear();
-      await createMissingFood();
-      expect(createFood).not.toHaveBeenCalled();
-      expect(wrapped.vm.currentIng?.ingredient.food?.name).toBe("fuwud");
-    });
-    test("createMissingFood pulls from cache", async () => {
-      const wrapped = wrapper();
-      const { createMissingFood, setCurrentFood, setCurrentIng } = wrapped.vm;
-      setCurrentIng({
-        ingredient: {},
-      });
-      setCurrentFood("fuwud");
-      await createMissingFood();
-      createFood.mockClear();
-      setCurrentFood("fuwud");
-      await createMissingFood();
-      expect(createFood).not.toHaveBeenCalled();
-      expect(wrapped.vm.currentIng?.ingredient.food?.name).toBe("fuwud");
-    });
-    test("createMissingFood handles undefined values", async () => {
-      createFood.mockReturnValue(undefined);
-      const wrapped = wrapper();
-      const { createMissingFood, setCurrentFood, setCurrentIng } = wrapped.vm;
-      setCurrentIng({
-        ingredient: {},
-      });
-      setCurrentFood("fuwud");
-      await createMissingFood();
-      expect(mockError).toHaveBeenCalled();
-    });
-    test("addMissingUnitAsAlias", async () => {
-      const wrapped = wrapper();
-      const { addMissingUnitAsAlias, setCurrentUnit, setCurrentIng } = wrapped.vm;
-      setCurrentIng({
-        ingredient: {
-          unit: { name: "2uwunit", id: "unit_id_2" },
-        },
-      });
-      setCurrentUnit("uwunit");
-      await addMissingUnitAsAlias();
-      expect(updateUnit).toHaveBeenCalled();
-      expect(wrapped.vm.currentIng?.ingredient.unit?.name).toBe("uwunit");
-    });
-    test("addMissingUnitAsAlias skips if there's no alias to add", async () => {
-      const wrapped = wrapper();
-      const { addMissingUnitAsAlias, setCurrentIng } = wrapped.vm;
-      setCurrentIng({
-        ingredient: {
-          unit: { name: "2uwunit", id: "unit_id_2" },
-        },
-      });
-      await addMissingUnitAsAlias();
-      expect(updateUnit).not.toHaveBeenCalled();
-    });
-    test("addMissingUnitAsAlias skips if already includes the alias", async () => {
-      const wrapped = wrapper();
-      const { addMissingUnitAsAlias, setCurrentUnit, setCurrentIng } = wrapped.vm;
-      setCurrentIng({
-        ingredient: {
-          unit: { name: "2uwunit", id: "unit_id_2", aliases: [{ name: "uwunit" }] },
-        },
-      });
-      setCurrentUnit("uwunit");
-      await addMissingUnitAsAlias();
-      expect(updateUnit).not.toHaveBeenCalled();
-    });
-    test("addMissingUnitAsAlias fails gracefully", async () => {
-      updateUnit.mockResolvedValue(undefined);
-      const wrapped = wrapper();
-      const { addMissingUnitAsAlias, setCurrentUnit, setCurrentIng } = wrapped.vm;
-      setCurrentIng({
-        ingredient: {
-          unit: { name: "2uwunit", id: "unit_id_2" },
-        },
-      });
-      setCurrentUnit("uwunit");
-      await addMissingUnitAsAlias();
-      expect(updateUnit).toHaveBeenCalled();
-      expect(mockError).toHaveBeenCalled();
-    });
-    test("addMissingFoodAsAlias", async () => {
-      const wrapped = wrapper();
-      const { addMissingFoodAsAlias, setCurrentFood, setCurrentIng } = wrapped.vm;
-      setCurrentIng({
-        ingredient: {
-          food: { name: "f2uwud", id: "food_id_2" },
-        },
-      });
-      setCurrentFood("fuwud");
-      await addMissingFoodAsAlias();
-      expect(updateFood).toHaveBeenCalled();
-      expect(wrapped.vm.currentIng?.ingredient.food?.name).toBe("fuwud");
-    });
-    test("addMissingFoodAsAlias skips if there's no alias to add", async () => {
-      const wrapped = wrapper();
-      const { addMissingFoodAsAlias, setCurrentIng } = wrapped.vm;
-      setCurrentIng({
-        ingredient: {
-          food: { name: "f2uwud", id: "food_id_2" },
-        },
-      });
-      await addMissingFoodAsAlias();
-      expect(updateFood).not.toHaveBeenCalled();
-    });
-    test("addMissingFoodAsAlias skips if already includes the alias", async () => {
-      const wrapped = wrapper();
-      const { addMissingFoodAsAlias, setCurrentFood, setCurrentIng } = wrapped.vm;
-      setCurrentIng({
-        ingredient: {
-          food: { name: "f2uwud", id: "food_id_2", aliases: [{ name: "fuwud" }] },
-        },
-      });
-      setCurrentFood("fuwud");
-      await addMissingFoodAsAlias();
-      expect(updateFood).not.toHaveBeenCalled();
-    });
-    test("addMissingFoodAsAlias fails gracefully", async () => {
-      updateFood.mockResolvedValue(undefined);
-      const wrapped = wrapper();
-      const { addMissingFoodAsAlias, setCurrentFood, setCurrentIng } = wrapped.vm;
-      setCurrentIng({
-        ingredient: {
-          food: { name: "f2uwud", id: "food_id_2" },
-        },
-      });
-      setCurrentFood("fuwud");
-      await addMissingFoodAsAlias();
-      expect(updateFood).toHaveBeenCalled();
-      expect(mockError).toHaveBeenCalled();
-    });
-  });
-  test("parser preferences are stored automatically", async () => {
+
+  test("the chosen reader is remembered", async () => {
     preferences.value.parser = "";
     const wrapped = wrapper();
-    const { parser, parserPreferences, setParser, setDontShow } = wrapped.vm;
-    expect(parser).toBe("nlp");
-    expect(parserPreferences.parser).toBe("");
-    expect(parserPreferences.dontShowInfoPage).toBe(false);
-
-    setParser("openai");
-    setDontShow(true);
-
+    expect(wrapped.vm.parser).toBe("nlp");
+    wrapped.vm.setParser("openai");
     await wrapped.vm.$nextTick();
-
-    const { parserPreferences: newPrefs } = wrapped.vm;
-    expect(newPrefs.parser).toBe("openai");
-    expect(newPrefs.dontShowInfoPage).toBe(true);
+    expect(preferences.value.parser).toBe("openai");
   });
 
   describe("locale-aware parser default", () => {
@@ -691,15 +367,13 @@ describe("useParseIngredientsDialog", () => {
       const { parser, showNlpLanguageHint } = wrapper().vm;
       expect(lastDefaultParser).toBe("brute");
       expect(parser).toBe("brute");
-      // No hint: the parser it landed on is the one being recommended.
       expect(showNlpLanguageHint).toBe(false);
     });
 
     test("a stored preference is never overridden", () => {
       i18n.global.locale = "de-DE";
       preferences.value.parser = "nlp";
-      const { parser } = wrapper().vm;
-      expect(parser).toBe("nlp");
+      expect(wrapper().vm.parser).toBe("nlp");
     });
 
     test("the hint appears for a stored nlp preference outside English", () => {
@@ -708,20 +382,13 @@ describe("useParseIngredientsDialog", () => {
       expect(wrapper().vm.showNlpLanguageHint).toBe(true);
     });
 
-    test("the hint stays away on an English locale", () => {
-      preferences.value.parser = "nlp";
-      expect(wrapper().vm.showNlpLanguageHint).toBe(false);
-    });
-
     test("the hint goes away once another parser is picked", async () => {
       i18n.global.locale = "de-DE";
       preferences.value.parser = "nlp";
       const wrapped = wrapper();
       expect(wrapped.vm.showNlpLanguageHint).toBe(true);
-
       wrapped.vm.setParser("brute");
       await wrapped.vm.$nextTick();
-
       expect(wrapped.vm.showNlpLanguageHint).toBe(false);
     });
   });
